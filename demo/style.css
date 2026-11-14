@@ -273,3 +273,16 @@ details:not([open]) summary::after { transform: rotate(-90deg); }
 .step-alg { font: 600 15px/1.5 ui-monospace, 'SF Mono', Menlo, monospace; overflow-wrap: anywhere; }
 .step-hint { margin: 0; }
 .chip-dot[data-color='W'] { background: var(--W); }
+
+.now { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); min-height: 74px; }
+.now:empty { display: none; }
+.now-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.now-title { font-weight: 600; }
+.now-count { margin-left: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+.now-case { font-size: 14px; margin-top: 2px; }
+.now-alg { margin-top: 4px; font: 600 16px/1.6 ui-monospace, 'SF Mono', Menlo, monospace; overflow-wrap: anywhere; }
+.now-alg .done { color: var(--muted); font-weight: 400; }
+.now-alg .current { background: var(--accent); color: var(--accent-text); border-radius: 4px; padding: 0 3px; }
+.now + twisty-player { margin-top: 8px; }
+#btn-whole.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.step.playing .step-btn { border-color: var(--accent); border-style: dashed; }
