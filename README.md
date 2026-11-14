@@ -11,7 +11,7 @@ Done so far:
   orientation, whole-cube colour reading, a review / manual fix screen, and hand-off to the
   scramble page.
   The scanner now defaults to a **guide frame**: line a face up roughly with a square and the
-  grid snaps to it, with no face detection (free-hand detection is still there as a second mode). Center
+  grid snaps to it. Free-hand, the default, finds the face anywhere in the picture. Center
   stickers are read around their edge, so a brand logo in the middle does not change the colour.
 - **Phase 3**: timer with WCA inspection (+2 after 15 s, DNF after 17 s), hold-and-release start,
   random-state scrambles, solve history with ao5 / ao12 / ao100, a history chart, penalties and
@@ -47,7 +47,10 @@ npm run build    # static site in dist/
 | `src/core/validate.ts` | Colour counts, real pieces, each piece once, twist / flip / parity checks with readable errors |
 | `src/core/orient.ts` | `assemble(scans)`: faces in any order and rotation (+ optional neighbour strip) → every valid cube state |
 | `src/core/scramble.ts` | Kociemba two-phase solve (`cubejs`), invert, self-check that the scramble rebuilds the input |
-| `src/vision/detect.ts` | `detectFace(frame)`: edge map → square sticker regions → 3 × 3 grid fit (homography) → 9 Lab colour readings with glare rejection |
+| `src/vision/grid.ts` | A 3 × 3 face placed by position, size and turn, and its two measurements: how flat each cell is, and how strong the outline around the face is |
+| `src/vision/faceSearch.ts` | `findFace(frame)`: tries every position, size and turn on a shrunk frame (integral images), keeps placements with flat cells and an outline, fine-tunes the best |
+| `src/vision/detect.ts` | `detectFace(frame)`: `findFace`, then 9 Lab colour readings with glare rejection (center on a ring), and a neighbour strip when one shows |
+| `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms) and re-searches the whole frame every third frame or when the colours change |
 | `src/vision/color.ts` | sRGB → Lab, sticker distance, nearest-colour reading, `classifyBalanced` (centers as references, exactly 9 per colour, Hungarian assignment) |
 | `src/vision/guide.ts` | Guide-frame scanning: `fitGuide(frame, square)` finds where the face really sits near the square, `readGuide` reads its 9 cells (center cell on a ring, to skip logos), `SteadyDetector` for auto-capture, `findDuplicate` to spot a face scanned twice in any rotation |
 | `src/vision/tracker.ts` | Free-hand auto-capture once a detected face is steady for 300 ms |
@@ -67,7 +70,7 @@ npm run build    # static site in dist/
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
-| `demo/scan.*` | Camera page: guide frame or free-hand mode, overlay, live reading, six captured-face slots; also a simulated cube (with a logo on the white center) and photo upload |
+| `demo/scan.*` | Camera page: free-hand or guide frame mode, overlay, live reading, six captured-face slots; also a simulated cube (with a logo on the white center) and photo upload |
 | `demo/` | 2D net editor, Generate button, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
 | `tests/` | Cube, solver and timer tests; `scan-real.test.ts` runs the scanner on the real photos in `tests/fixtures` |
 
@@ -76,22 +79,29 @@ npm run build    # static site in dist/
 - **No OpenCV.js.** The plan named it for finding the sticker grid; the vision code here is plain
   TypeScript instead of a ~10 MB download, and it runs unchanged in Node, so it is tested there.
 - **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
-  overexposed stickered cube. Each photo is re-framed the way a hand holds a cube in front of a
+  overexposed stickered cube, plus cube-free views. Each photo is shrunk to video sizes for
+  free-hand, and re-framed the way a hand holds a cube in front of a
   phone (up to 20% too small or big, turned 10°, a quarter sticker off-center, slightly blurred)
   and the whole cube must come out right. The earlier synthetic-image tests passed while real
   cubes failed, so they are gone; the synthetic renderer only feeds the "Simulated cube" button.
 
-- **Guide frame instead of detection.** You hold a face roughly in a square on screen. Nobody
+- **Guide frame.** The second mode: you hold a face roughly in a square on screen. Nobody
   holds a cube exactly on a grid, so the grid is fitted to the face first: it tries sizes, turns
   and offsets near the square and keeps the one where all 9 cells are flat colours (a cell that
   straddles two stickers is not flat). This needs no gaps between stickers, so it works on
   stickerless cubes, in about 10 ms per reading. A face is captured after it holds still for
   0.45 s, or on a tap. Faces can be shown in any order and rotation; rotations come from the search
   below (one answer for about 99% of random cubes, otherwise "Next possibility").
-- **Free-hand mode is for stickered cubes.** It finds sticker-sized square regions between edges.
-  On a stickerless cube same-coloured neighbours merge into one region, and border stickers merge
-  with a similar background, so faces go missing unless the cube is close to the camera. It never
-  reported a wrong face on the test photos; it just misses some.
+- **Free-hand detection without gaps.** The first detector looked for sticker-sized square regions
+  between edges. On a stickerless cube same-coloured neighbours merge into one region and border
+  stickers merge with a similar background; on the real photos it found about half the faces at
+  video size. The detector now looks for what a face is rather than for its gaps: a 3 × 3 placement
+  whose cells are each one flat colour, with something else just outside all four sides. On the
+  real photos it finds all 84 views (both cubes, face 40 to 200 px wide) in the right place, and
+  nothing in 30 cube-free views, at about 25 ms per frame (4 ms while following a face).
+- **Free-hand limits.** A face that is all one colour is not found (it looks like a wall or a tile):
+  use the guide frame for it. White stickers against a white background weaken the outline. The
+  fit is a square, so a face tilted far away from the camera is read less reliably.
 - **Logos and colour reading.** Each cell's colour is its largest group of similar pixels, never a
   blend, so a logo, glare or a sticker gap is ignored unless it covers most of the cell. The center
   cell is also sampled on a ring that skips its middle. Faces are named at the end by matching the 6

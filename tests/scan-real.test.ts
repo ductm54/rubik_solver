@@ -4,14 +4,16 @@
  *                     white center, in a cluttered room
  *   stickered-robot   a stickered cube in a LEGO robot, badly overexposed: white and yellow are
  *                     almost the same pixel values, orange looks salmon, green looks mint
+ *   no-cube           views without a cube face
  */
 import { describe, expect, it } from 'vitest';
 import { type Color, FACES } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import { captureOf, readCube } from '../src/scan/readCube';
 import { detectFace } from '../src/vision/detect';
+import { FaceFollower } from '../src/vision/follow';
 import { SteadyDetector, findDuplicate, fitGuide, isClear, readGuide } from '../src/vision/guide';
-import { type Framing, type PhotoFace, frameInGuide, loadSet, shrink } from './helpers/image';
+import { type Framing, type PhotoFace, frameInGuide, loadNoCube, loadSet, shrink } from './helpers/image';
 
 function mulberry32(seed: number) {
   return () => {
@@ -140,47 +142,93 @@ describe('free-hand detection, real photos', () => {
     const { image, scale } = shrink(f.image, Math.round((Math.max(f.image.width, f.image.height) * facePx) / side));
     const { face } = detectFace(image);
     if (!face) return null;
+    // how far the reported corners are from the real ones, as a share of the face's width
     const off = Math.max(...face.corners.map((c, i) => Math.hypot(c[0] - f.corners[i][0] * scale, c[1] - f.corners[i][1] * scale))) / facePx;
-    return { face, off };
+    return { face, off, image };
+  }
+  // from a cube that fills a tenth of the picture to one that fills most of it
+  const SIZES = [40, 60, 75, 90, 110, 140, 200];
+
+  for (const [name, faces] of Object.entries(SETS)) {
+    it(`${name}: finds the face at every size, in the right place`, () => {
+      let missed = 0;
+      for (const facePx of SIZES) {
+        for (const f of faces) {
+          const d = detectAt(f, facePx);
+          if (!d) {
+            missed++;
+            continue;
+          }
+          // The fit is a square; a tilted face is not quite one, hence the allowance.
+          expect(d.off).toBeLessThan(0.16);
+        }
+      }
+      expect(missed).toBeLessThanOrEqual(1); // of 42
+    });
+
+    it(`${name}: reads the whole cube at every size`, () => {
+      for (const facePx of [60, 90, 140, 200]) {
+        const found = faces.map((f) => detectAt(f, facePx));
+        for (const d of found) expect(d).not.toBeNull();
+        const r = readCube(found.map((d) => captureOf(d!.face)));
+        expect(r.faces.map((c) => c.join(''))).toEqual(truthOf(faces));
+        expect(r.states).toHaveLength(1);
+      }
+    });
   }
 
-  it('stickered cube: finds every face at every size and reads the whole cube', () => {
-    const faces = SETS['stickered-robot'];
-    for (const facePx of [60, 90, 140, 180]) {
-      const found = faces.map((f) => detectAt(f, facePx));
-      for (const d of found) {
-        expect(d).not.toBeNull();
-        expect(d!.off).toBeLessThan(0.1);
-      }
-      const r = readCube(found.map((d) => captureOf(d!.face)));
-      expect(r.faces.map((c) => c.join(''))).toEqual(truthOf(faces));
-      expect(r.states).toHaveLength(1);
-    }
-  });
-
-  it('stickerless cube, close up: finds every face and reads the whole cube', () => {
-    const faces = SETS['moyu-stickerless'];
-    const found = faces.map((f) => detectAt(f, 200));
-    for (const d of found) expect(d).not.toBeNull();
-    const r = readCube(found.map((d) => captureOf(d!.face)));
-    expect(r.faces.map((c) => c.join(''))).toEqual(truthOf(faces));
-    expect(r.states).toHaveLength(1);
-  });
-
-  it('stickerless cube, smaller: may miss a face, but never reports a wrong one', () => {
-    // Known limit: with no gaps, same-coloured neighbours (and stickers against a similar
-    // background) merge, so faces go missing. Guide mode is the way to scan these cubes.
-    let found = 0;
-    for (const facePx of [60, 75, 90, 110, 140]) {
+  it('stickerless cube: the live preview of each found face is right', () => {
+    for (const facePx of SIZES) {
       for (const f of SETS['moyu-stickerless']) {
         const d = detectAt(f, facePx);
-        if (!d) continue;
-        found++;
-        expect(d.off).toBeLessThan(0.12);
-        expect(d.face.colors).toEqual(f.colors);
+        if (d) expect(d.face.colors).toEqual(f.colors);
       }
     }
-    expect(found).toBeGreaterThanOrEqual(15); // of 30
+  });
+
+  it('finds nothing in photos without a cube face (floor, desk, hand, robot, part of a cube)', () => {
+    for (const n of loadNoCube()) {
+      for (const max of [360, 240, 160]) {
+        expect(detectFace(shrink(n.image, max).image).face, `${n.name} at ${max}px`).toBeNull();
+      }
+    }
+  });
+
+  it('follows a face from one frame to the next', () => {
+    for (const f of SETS['moyu-stickerless']) {
+      const first = detectAt(f, 110)!;
+      // next frame: the same view, moved a little
+      const moved = { ...first.face.placement, cx: first.face.placement.cx + 3, cy: first.face.placement.cy - 2 };
+      const next = detectFace(first.image, { previous: moved, searchIfLost: false }).face!;
+      expect(next.colors).toEqual(f.colors);
+      expect(Math.hypot(next.placement.cx - first.face.placement.cx, next.placement.cy - first.face.placement.cy)).toBeLessThan(0.15 * first.face.placement.pitch);
+    }
+  });
+
+  it('video: a new face in a new spot is picked up at once, not confused with the last one', () => {
+    for (const faces of Object.values(SETS)) {
+      const follower = new FaceFollower();
+      for (let lap = 0; lap < 2; lap++) {
+        faces.forEach((f, i) => {
+          // each face a different size, so it lands somewhere else in the frame
+          const side = Math.hypot(f.corners[1][0] - f.corners[0][0], f.corners[1][1] - f.corners[0][1]);
+          const { image } = shrink(f.image, Math.round((Math.max(f.image.width, f.image.height) * (80 + 25 * ((i + lap) % 4))) / side));
+          for (let frame = 0; frame < 4; frame++) {
+            const face = follower.detect(image);
+            expect(face, `${f.name} frame ${frame}`).not.toBeNull();
+            if (faces === SETS['moyu-stickerless']) expect(face!.colors).toEqual(f.colors);
+          }
+        });
+      }
+    }
+  });
+
+  it('is quick enough for live video', () => {
+    const frames = [...SETS['moyu-stickerless'], ...SETS['stickered-robot']].map((f) => shrink(f.image, 360).image);
+    for (const image of frames) detectFace(image); // warm up
+    const t = performance.now();
+    for (const image of frames) detectFace(image);
+    expect((performance.now() - t) / frames.length).toBeLessThan(150); // ms per frame; about 25 on a laptop
   });
 });
 

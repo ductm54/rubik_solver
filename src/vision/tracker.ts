@@ -29,7 +29,7 @@ export class CaptureTracker {
   private opts: Required<TrackerOptions>;
 
   constructor(opts: TrackerOptions = {}) {
-    this.opts = { steadyMs: 300, maxDrift: 0.06, minSharpness: 0, ...opts };
+    this.opts = { steadyMs: 350, maxDrift: 0.06, minSharpness: 0, ...opts };
   }
 
   reset(): void {

@@ -1,7 +1,7 @@
 import { COLORS, type Color, type CubeState, FACES, applyMoves, randomMoves, solvedState } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import { type Capture, captureOf, readCube } from '../src/scan/readCube';
-import type { FaceReading, Region } from '../src/vision/detect';
+import type { FaceReading } from '../src/vision/detect';
 import { type GuideFit, type GuideReading, type SteadyUpdate, SteadyDetector, findDuplicate, fitCorners, fitGuide, guideSquare, readGuide } from '../src/vision/guide';
 import { neighboursOf, renderCube } from '../src/vision/synth';
 import { CaptureTracker, type TrackUpdate } from '../src/vision/tracker';
@@ -10,7 +10,7 @@ import { createNet, encodeCube } from './net';
 const COLOR_NAMES: Record<Color, string> = { W: 'white', Y: 'yellow', G: 'green', B: 'blue', R: 'red', O: 'orange' };
 const CSS: Record<Color, string> = { W: 'var(--W)', Y: 'var(--Y)', G: 'var(--G)', B: 'var(--B)', R: 'var(--R)', O: 'var(--O)' };
 const CSS_HEX: Record<Color, string> = { W: '#ffffff', Y: '#ffd500', G: '#009b48', B: '#0046ad', R: '#b71234', O: '#ff5800' };
-const PROC_MAX = 640; // longest side of the frame given to the free-hand detector
+const PROC_MAX = 480; // longest side of the frame given to the free-hand detector
 const GUIDE_PX = 120; // the guide square is read at this size...
 const GUIDE_MARGIN = 0.3; // ...with this much of its surroundings on each side, for a cube that is off the grid
 const GUIDE_CANVAS = Math.round(GUIDE_PX * (1 + 2 * GUIDE_MARGIN));
@@ -28,17 +28,16 @@ const perf = $('perf');
 const live = $('live');
 const capturedEl = $('captured');
 const countEl = $('count');
-const debug = $<HTMLInputElement>('debug');
 const auto = $<HTMLInputElement>('auto');
 const btnCamera = $<HTMLButtonElement>('btn-camera');
 const btnSim = $<HTMLButtonElement>('btn-sim');
 const btnCapture = $<HTMLButtonElement>('btn-capture');
 
 type Mode = 'idle' | 'camera' | 'sim' | 'photo';
-/** guide: line the face up with a fixed square. free: find the face anywhere in the frame. */
+/** free: find the face anywhere in the frame (default). guide: line the face up with a fixed square. */
 type ScanMode = 'guide' | 'free';
 let mode: Mode = 'idle';
-let scanMode: ScanMode = localStorage.getItem('scan-mode') === 'free' ? 'free' : 'guide';
+let scanMode: ScanMode = localStorage.getItem('scan-mode-v2') === 'guide' ? 'guide' : 'free';
 let stream: MediaStream | null = null;
 
 /** A photo cannot be lined up with the square, so it always uses the free-hand detector. */
@@ -71,7 +70,7 @@ const procCtx = proc.getContext('2d', { willReadFrequently: true })!;
 const tracker = new CaptureTracker();
 let busy = false;
 let reqId = 0;
-let last: { face: FaceReading | null; regions: Region[]; update: TrackUpdate } | null = null;
+let last: { face: FaceReading | null; update: TrackUpdate } | null = null;
 let fps = 0;
 let lastFrameT = 0;
 
@@ -277,14 +276,14 @@ function captureGuide(manual: boolean) {
 
 worker.onmessage = (e) => {
   busy = false;
-  const { face, regions, ms } = e.data as { face: FaceReading | null; regions: Region[]; ms: number };
+  const { face, ms } = e.data as { face: FaceReading | null; ms: number };
   if (mode === 'idle' || activeScan() !== 'free') return;
   const now = performance.now();
   if (lastFrameT) fps = 0.8 * fps + 0.2 * (1000 / (now - lastFrameT));
   lastFrameT = now;
   perf.textContent = `${ms.toFixed(0)} ms/frame · ${fps.toFixed(0)} fps`;
   const update = tracker.update(face, now);
-  last = { face, regions, update };
+  last = { face, update };
   renderLive(face?.colors ?? null, face?.stickers.map(uncertain));
   renderStatus(face, update);
   if (update.capture) {
@@ -459,14 +458,6 @@ function drawDetected(ctx: CanvasRenderingContext2D, dpr: number) {
   ctx.save();
   ctx.scale(k, k);
   const lw = 1 / k;
-  if (debug.checked) {
-    ctx.fillStyle = 'rgba(255,0,255,0.8)';
-    for (const r of last.regions) {
-      ctx.beginPath();
-      ctx.arc(r.cx, r.cy, 3 * dpr * lw * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
   const f = last.face;
   if (f) {
     const st = last.update.status;
@@ -584,7 +575,7 @@ for (const input of document.querySelectorAll<HTMLInputElement>('input[name="sca
   input.checked = input.value === scanMode;
   input.onchange = () => {
     scanMode = input.value as ScanMode;
-    localStorage.setItem('scan-mode', scanMode);
+    localStorage.setItem('scan-mode-v2', scanMode);
     simSwitchAt = performance.now();
     renderScanMode();
   };

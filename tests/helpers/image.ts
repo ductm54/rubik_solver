@@ -35,6 +35,15 @@ export function loadSet(set: string): PhotoFace[] {
   });
 }
 
+/** Photos with no cube face in them (tests/fixtures/no-cube). */
+export function loadNoCube(): { name: string; image: RGBAImage }[] {
+  const meta = JSON.parse(readFileSync(join(FIXTURES, 'no-cube', 'files.json'), 'utf8')) as { files: string[] };
+  return meta.files.map((file) => {
+    const j = jpeg.decode(readFileSync(join(FIXTURES, 'no-cube', file)), { useTArray: true, formatAsRGBA: true });
+    return { name: `no-cube/${file}`, image: { width: j.width, height: j.height, data: j.data } };
+  });
+}
+
 /** Shrink so the longest side is `max` pixels (area average, like drawing video onto a small canvas). */
 export function shrink(img: RGBAImage, max: number): { image: RGBAImage; scale: number } {
   const k = max / Math.max(img.width, img.height);
