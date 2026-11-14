@@ -182,6 +182,17 @@ for (const f of FACES) {
 BASE_PERMS.x = buildPerm(FACE_FRAMES.R.n, () => true);
 BASE_PERMS.y = buildPerm(FACE_FRAMES.U.n, () => true);
 BASE_PERMS.z = buildPerm(FACE_FRAMES.F.n, () => true);
+// Wide moves (two layers, e.g. Rw = r) and slice moves (WCA: M follows L, E follows D, S follows F).
+for (const f of FACES) {
+  const n = FACE_FRAMES[f].n;
+  BASE_PERMS[f.toLowerCase()] = buildPerm(n, (p) => dot(p, n) >= 0);
+}
+BASE_PERMS.M = buildPerm(FACE_FRAMES.L.n, (p) => p[0] === 0);
+BASE_PERMS.E = buildPerm(FACE_FRAMES.D.n, (p) => p[1] === 0);
+BASE_PERMS.S = buildPerm(FACE_FRAMES.F.n, (p) => p[2] === 0);
+
+/** Every supported move base: face turns, wide turns (lower case), slices, rotations. */
+export const MOVE_BASES = Object.keys(BASE_PERMS);
 
 function applyPerm<T>(arr: readonly T[], p: Perm): T[] {
   const out = new Array<T>(arr.length);
@@ -190,20 +201,26 @@ function applyPerm<T>(arr: readonly T[], p: Perm): T[] {
 }
 
 export interface Move {
-  base: string; // U R F D L B x y z
+  base: string; // U R F D L B, wide u r f d l b, slices M E S, rotations x y z
   amount: 1 | 2 | 3; // quarter turns clockwise
 }
 
+/**
+ * Parse WCA notation. Accepts face turns, wide turns (`Rw` or `r`), slices (`M E S`) and rotations,
+ * each with an optional `2`, `'` or `2'`. Brackets are ignored, so `(R U R' U')` works.
+ */
 export function parseAlg(alg: string): Move[] {
   return alg
+    .replace(/[()[\]]/g, ' ')
     .trim()
     .split(/\s+/)
     .filter(Boolean)
     .map((tok) => {
-      const m = /^([URFDLBxyz])(2|'|2')?$/.exec(tok);
+      const m = /^(?:([URFDLB])w|([URFDLBurfdlbMESxyz]))(2|'|2'|’)?$/.exec(tok);
       if (!m) throw new Error(`Unsupported move "${tok}"`);
-      const amount = m[2] === "'" ? 3 : m[2]?.startsWith('2') ? 2 : 1;
-      return { base: m[1], amount } as Move;
+      const base = m[1] ? m[1].toLowerCase() : m[2];
+      const amount = m[3] === "'" || m[3] === '’' ? 3 : m[3]?.startsWith('2') ? 2 : 1;
+      return { base, amount } as Move;
     });
 }
 
@@ -221,10 +238,44 @@ export function invertAlg(moves: readonly Move[]): Move[] {
 }
 
 export function applyMoves(s: CubeState, moves: readonly Move[] | string): CubeState {
+  return fromColorArray(applyMovesToArray(toColorArray(s), moves));
+}
+
+/** Same as applyMoves on a flat 54-sticker array (URFDLB order); works for any sticker labels. */
+export function applyMovesToArray<T>(arr: readonly T[], moves: readonly Move[] | string): T[] {
   const list = typeof moves === 'string' ? parseAlg(moves) : moves;
-  let arr = toColorArray(s);
-  for (const m of list) for (let i = 0; i < m.amount; i++) arr = applyPerm(arr, BASE_PERMS[m.base]);
-  return fromColorArray(arr);
+  let out = arr as T[];
+  for (const m of list) for (let i = 0; i < m.amount; i++) out = applyPerm(out, BASE_PERMS[m.base]);
+  return out === arr ? [...arr] : out;
+}
+
+/** Permutation of one move (all quarter turns composed): next[p[i]] = prev[i]. */
+export function movePerm(m: Move): Perm {
+  let p = STICKERS.map((_, i) => i);
+  for (let k = 0; k < m.amount; k++) p = p.map((j) => BASE_PERMS[m.base][j]);
+  return p;
+}
+
+/**
+ * Merge neighbouring turns of the same base (R R → R2, U U' → nothing) and drop cancellations.
+ * Used to join AUFs with algorithms.
+ */
+export function simplifyAlg(moves: readonly Move[]): Move[] {
+  const out: Move[] = [];
+  for (const m of moves) {
+    const last = out[out.length - 1];
+    if (last && last.base === m.base) {
+      const amount = (last.amount + m.amount) % 4;
+      out.pop();
+      if (amount) out.push({ base: m.base, amount: amount as 1 | 2 | 3 });
+    } else out.push({ ...m });
+  }
+  return out;
+}
+
+/** Move count in the outer-block turn metric (rotations don't count; slices count 1). */
+export function countMoves(moves: readonly Move[]): number {
+  return moves.filter((m) => !'xyz'.includes(m.base)).length;
 }
 
 /** Random face-turn sequence with no two consecutive moves on the same face. */

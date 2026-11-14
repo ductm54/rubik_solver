@@ -15,7 +15,16 @@ Done so far:
   notes, csTimer import / export, saved in IndexedDB
   ([demo](https://ductm54.github.io/rubik_solver/timer.html)). Plan: [Rubik Cube Scanner App — Plan](https://claude.ai/artifact/K7kwAwiXBCjcMvoC7A37Yv).
 
-**Live demo:** https://ductm54.github.io/rubik_solver/ · scanner: https://ductm54.github.io/rubik_solver/scan.html · timer: https://ductm54.github.io/rubik_solver/timer.html
+- **Phase 4**: solve helper for learning CFOP ([demo](https://ductm54.github.io/rubik_solver/learn.html)).
+  Enter, scan or scramble a cube and see the solve as steps: an optimal cross, 4 F2L pairs (each
+  with its case described and an algorithm built from standard triggers), then OLL and PLL with the
+  case name and a recognition hint. Each step plays in the 3D viewer from the cube as it is at that
+  point, with the pieces that don't matter yet greyed out. **Solver settings**, remembered in the
+  browser: cross colours (tick several and the solver picks the shortest for each cube), OLL 2-look
+  or full 57, PLL 2-look or full 21. The settings view is built from each method's own setting list,
+  ready for more methods.
+
+**Live demo:** https://ductm54.github.io/rubik_solver/ · scanner: https://ductm54.github.io/rubik_solver/scan.html · timer: https://ductm54.github.io/rubik_solver/timer.html · learn: https://ductm54.github.io/rubik_solver/learn.html
 
 ## Develop
 
@@ -43,6 +52,14 @@ npm run build    # static site in dist/
 | `src/timer/stats.ts` | Solve records, time formatting, WCA averages (5% trimmed, DNF rules), rolling and best aoN |
 | `src/timer/cstimer.ts` | csTimer export / import (all sessions) |
 | `src/timer/store.ts` | Solve storage: IndexedDB, in-memory fallback; one interface for SQLite later |
+| `src/solve/types.ts`, `methods.ts` | Method interface (settings definitions + `solve`) and the method registry |
+| `src/solve/pieces.ts` | Piece lookup on a 54-sticker array, relative to the current centers |
+| `src/solve/mask.ts` | cubing.js stickering masks per step (any cross colour) |
+| `src/solve/cfop/cross.ts` | Optimal cross: 24⁴ distance table by BFS |
+| `src/solve/cfop/f2l.ts` | F2L pairs: y-turn to front-right, take stuck pieces out, then the shortest trigger sequence for the case (all 150 pair placements, ≤ 11 moves) |
+| `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
+| `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest |
+| `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
 | `demo/scan.*` | Camera page: overlay, live reading, six captured-face slots; also a simulated cube and photo upload |
 | `demo/` | 2D net editor, Generate button, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
@@ -64,6 +81,11 @@ npm run build    # static site in dist/
 - **Strip pinning** in `assemble()` pins the rotation with no search for ~98% of cubes; when a strip matches a
   wrong row by coincidence, a handful (≤ 4) of candidates are checked. The answer was unique in
   every test run.
+- **CFOP move counts** (random cubes, white cross): about 65 moves with 2-look OLL / PLL, 55 with
+  full; about 48 with all 6 cross colours allowed. Each solve takes 2-10 ms in the worker.
+- **F2L algorithms** come from a shortest-path search over the 150 places a pair can be, using only
+  triggers that leave the cross and other slots alone (R U R', F' U F, R' F R F', ...), so every case is
+  covered and each algorithm is checked, at the cost of some differing from the usual published ones.
 - **Deploys:** `.github/workflows/deploy.yml` runs tests, builds and publishes `dist/` to GitHub
   Pages on every push to `main` or `claude/**`. In the repo's **Settings → Pages**, set
   **Source** to **GitHub Actions** once.

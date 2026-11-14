@@ -43,6 +43,7 @@ function clearOutput() {
   btnCopy.disabled = true;
   player.alg = '';
   $('btn-time').classList.add('hidden');
+  $('btn-learn').classList.add('hidden');
 }
 
 function onStateChange() {
@@ -88,6 +89,9 @@ worker.onmessage = (e) => {
   const btnTime = $<HTMLAnchorElement>('btn-time');
   btnTime.href = `./timer.html#${new URLSearchParams({ scramble: d.scramble, source: cameFromScan ? 'scan' : 'manual' })}`;
   btnTime.classList.toggle('hidden', !d.scramble);
+  const btnLearn = $<HTMLAnchorElement>('btn-learn');
+  btnLearn.href = `./learn.html#cube=${encodeCube(state())}`;
+  btnLearn.classList.toggle('hidden', !d.scramble);
 };
 
 btnGenerate.onclick = () => {

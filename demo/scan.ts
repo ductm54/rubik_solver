@@ -309,6 +309,7 @@ const reviewSummary = $('review-summary');
 const reviewStatus = $('review-status');
 const btnAlt = $<HTMLButtonElement>('btn-alt');
 const btnScramble = $<HTMLAnchorElement>('btn-scramble');
+const btnLearn = $<HTMLAnchorElement>('btn-learn');
 const net = createNet($('net'), $('palette'), (s) => renderReviewStatus(s));
 let alternatives: CubeState[] = [];
 let altIndex = 0;
@@ -348,8 +349,11 @@ function renderReviewStatus(s: CubeState) {
     reviewStatus.append(ul);
   }
   btnScramble.href = `./index.html#cube=${encodeCube(s)}&from=scan`;
-  btnScramble.classList.toggle('disabled', !v.ok);
-  btnScramble.setAttribute('aria-disabled', String(!v.ok));
+  btnLearn.href = `./learn.html#cube=${encodeCube(s)}`;
+  for (const b of [btnScramble, btnLearn]) {
+    b.classList.toggle('disabled', !v.ok);
+    b.setAttribute('aria-disabled', String(!v.ok));
+  }
 }
 
 btnAlt.onclick = () => {
