@@ -218,19 +218,35 @@ const ROTATIONS = [
 ];
 
 /**
- * Index of the captured face that `labs` shows again (same center colour and the same stickers
- * in some rotation), or -1. Compares raw readings, so it does not depend on naming the colours.
+ * Index of the captured face that `labs` shows again (the same stickers in some rotation), or
+ * -1. Compares raw readings, so it does not depend on naming the colours.
+ *
+ * The light on a turning cube changes, so the same face read at two moments is not the same
+ * numbers: on real video its stickers differ by up to 35, and by 24 on average. Two different
+ * faces always have some sticker that is a different colour altogether (90 or more apart). So a
+ * repeat is a face where no sticker is far off and the average is close.
  */
 export function findDuplicate(labs: Lab[], captured: (Lab[] | null | undefined)[]): number {
+  let best = -1;
+  let bestMean = 30;
   for (let i = 0; i < captured.length; i++) {
     const c = captured[i];
-    if (!c || stickerDistance(labs[4], c[4]) > 14) continue;
+    if (!c) continue;
     for (const rot of ROTATIONS) {
-      const mean = rot.reduce((s, k, j) => s + stickerDistance(labs[j], c[k]), 0) / 9;
-      if (mean < 10) return i;
+      let sum = 0;
+      let worst = 0;
+      for (let j = 0; j < 9; j++) {
+        const d = stickerDistance(labs[j], c[rot[j]]);
+        sum += d;
+        if (d > worst) worst = d;
+      }
+      if (worst < 45 && sum / 9 < bestMean) {
+        bestMean = sum / 9;
+        best = i;
+      }
     }
   }
-  return -1;
+  return best;
 }
 
 export interface SteadyUpdate {

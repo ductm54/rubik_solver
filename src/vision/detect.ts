@@ -51,6 +51,8 @@ export interface FaceReading {
   /** 9 stickers row by row as seen in the image. */
   stickers: StickerReading[];
   colors: Color[];
+  /** True for a face that is all one colour (a solved side), found by its outline alone. */
+  plain: boolean;
   /** How many of the 9 cells are one flat colour. */
   found: number;
   /** Fit cost of the placement: lower is a clearer face. */
@@ -80,7 +82,7 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
   let found: FoundFace | null = null;
   if (opts.previous) {
     const again = refinePlacement(img, opts.previous, 6, 3);
-    if (isFace(again.score)) found = again;
+    if (isFace(again.score) || again.plain) found = again;
   }
   if (!found && (!opts.previous || opts.searchIfLost !== false)) found = findFace(img);
   if (!found) return { face: null };
@@ -110,6 +112,7 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
     face: {
       corners,
       placement: { cx, cy, pitch, rot },
+      plain: found.plain,
       homography: Hm,
       stickers,
       colors: stickers.map((s) => s.color),

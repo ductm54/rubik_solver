@@ -22,9 +22,15 @@ const SMALL = 160;
 const COARSE_HALF = 0.19;
 const EDGE_STEP = 36;
 const MIN_OUTLINE = 10.6;
+/** A one-colour face has only its outline to go by, so it must be there nearly all the way round. */
+const MIN_PLAIN_OUTLINE = 11.2;
+/** Cells closer in colour than this are one colour. */
+const SAME_COLOUR = 60;
 
 export interface FoundFace extends Placement {
   score: PlacementScore;
+  /** True for a face that is all one colour (found by its outline alone). */
+  plain: boolean;
   /** Lower is better. */
   cost: number;
 }
@@ -71,12 +77,35 @@ export function isFace(s: PlacementScore): boolean {
   const steps = s.outline.map((x) => x > OUTLINE_STEP);
   for (let side = 0; side < 4; side++) if (!steps[side * 3] && !steps[side * 3 + 1] && !steps[side * 3 + 2]) return false;
   if (outlineStrength(s) < MIN_OUTLINE) return false;
-  // at least two colours: one flat colour is as likely a wall, a tile or a sheet of paper
+  // at least two colours (a one-colour face goes through isPlainFace)
+  return colourRange(s) > SAME_COLOUR;
+}
+
+/** Largest colour difference between any two cells. */
+function colourRange(s: PlacementScore): number {
   let far = 0;
   for (let i = 0; i < 9; i++) {
     for (let j = i + 1; j < 9; j++) far = Math.max(far, Math.hypot(s.mean[i][0] - s.mean[j][0], s.mean[i][1] - s.mean[j][1], s.mean[i][2] - s.mean[j][2]));
   }
-  return far > 60;
+  return far;
+}
+
+/**
+ * Whether a measured placement looks like a face that is all one colour (a solved side). Its
+ * cells say nothing, since any plain surface is nine flat cells, so everything rests on the
+ * outline: a clear step on all 12 outer cell edges, bar one. A wall or a table top has no such
+ * outline; a sheet of paper or a tile does, which is why the caller should also ask for a cube
+ * to have been seen there (see FaceFollower).
+ */
+export function isPlainFace(s: PlacementScore): boolean {
+  if (!s.inside) return false;
+  const sorted = [...s.spread].sort((a, b) => a - b);
+  if (sorted[7] > Math.max(FLAT_SPREAD, sorted[4] + 10)) return false;
+  // a sticker colour: bright or vivid, never dark
+  if (s.mean.some((m) => Math.max(m[0], m[1], m[2]) < 90)) return false;
+  if (colourRange(s) > SAME_COLOUR) return false;
+  if (s.outline.filter((x) => x > OUTLINE_STEP).length < 11) return false;
+  return outlineStrength(s) >= MIN_PLAIN_OUTLINE;
 }
 
 interface Small {
@@ -193,8 +222,11 @@ interface Candidate extends Placement {
   cost: number;
 }
 
-/** Step 2: every position, size and turn on the small frame. Returns the best few, best first. */
-function coarseSearch(s: Small, keep: number): Candidate[] {
+/**
+ * Step 2: every position, size and turn on the small frame. Returns the best few placements with
+ * two or more colours, and the best few that are all one colour, each best first.
+ */
+function coarseSearch(s: Small, keep: number): { mixed: Candidate[]; plain: Candidate[] } {
   const { w, h, ir, ig, ib, iq, ie } = s;
   const W1 = w + 1;
   const N = w * h;
@@ -213,6 +245,7 @@ function coarseSearch(s: Small, keep: number): Candidate[] {
   const mb = new Float32Array(N);
   const best: Candidate[] = [];
   let worst = Infinity;
+  const plain: Candidate[] = [];
   const minDim = Math.min(w, h);
   // per turn: pixel offsets of the 9 cells, and x / y offsets of the 12 outline probes
   const cellOff = new Int32Array(9);
@@ -284,11 +317,13 @@ function coarseSearch(s: Small, keep: number): Candidate[] {
             const sp = spread[i];
             cost += k === 4 ? Math.min(sp, FLAT_SPREAD) : sp < SPREAD_CAP ? sp : SPREAD_CAP;
           }
-          if (far <= 60 || dark > 2) continue;
-          // A face has a colour change inside it and an outline around it; smooth areas (skin,
-          // a shaded wall) have neither.
+          if (dark > 2) continue;
+          const onePlain = far <= SAME_COLOUR;
+          // A face has an outline around it, and a colour change inside it unless it is all one
+          // colour; smooth areas (skin, a shaded wall) have neither.
           const inner = edgesIn(cx, cy, inBox);
-          if (inner < pitch || edgesIn(cx, cy, outBox) - inner < 4 * pitch) continue;
+          const ringEdges = edgesIn(cx, cy, outBox) - inner;
+          if (onePlain ? ringEdges < 6 * pitch || dark > 0 : inner < pitch || ringEdges < 4 * pitch) continue;
           // outline on every side
           let steps = 0;
           let ok = true;
@@ -309,7 +344,21 @@ function coarseSearch(s: Small, keep: number): Candidate[] {
             if (!sideSteps) ok = false;
             steps += sideSteps;
           }
-          if (!ok || steps < 7 || cost >= worst) continue;
+          if (!ok) continue;
+          if (onePlain) {
+            // all one colour: the outline has to carry it
+            if (steps < 10) continue;
+            const same = plain.findIndex((b) => Math.abs(b.cx - cx) < pitch && Math.abs(b.cy - cy) < pitch);
+            if (same >= 0) {
+              if (plain[same].cost <= cost) continue;
+              plain.splice(same, 1);
+            }
+            plain.push({ cx, cy, pitch, rot, cost });
+            plain.sort((a, b) => a.cost - b.cost);
+            if (plain.length > 2) plain.length = 2;
+            continue;
+          }
+          if (steps < 7 || cost >= worst) continue;
           // keep the list short and varied: one entry per spot and size
           const same = best.findIndex((b) => Math.abs(b.cx - cx) < pitch && Math.abs(b.cy - cy) < pitch && b.pitch / pitch < 1.4 && pitch / b.pitch < 1.4);
           if (same >= 0) {
@@ -324,7 +373,7 @@ function coarseSearch(s: Small, keep: number): Candidate[] {
       }
     }
   }
-  return best;
+  return { mixed: best, plain };
 }
 
 /** Step 3: nudge position, size and turn while the measured cost keeps dropping. */
@@ -357,7 +406,7 @@ export function refinePlacement(img: RGBAImage, start: Placement, lattice: numbe
     }
     step = { d: step.d / 2, size: step.size / 2, rot: step.rot / 2 };
   }
-  return { ...best, score, cost };
+  return { ...best, score, cost, plain: !isFace(score) && isPlainFace(score) };
 }
 
 const MOVES: [number, number, number, number][] = [];
@@ -366,15 +415,24 @@ for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) for (const ds of [-1, 
 /** The best cube face in the frame, or null. */
 export function findFace(img: RGBAImage): FoundFace | null {
   const small = shrinkFrame(img);
+  const found = coarseSearch(small, 4);
   let best: FoundFace | null = null;
-  for (const c of coarseSearch(small, 4)) {
+  for (const c of found.mixed) {
     const fine = refinePlacement(small.image, c, 5);
     if (!isFace(fine.score)) continue;
     if (!best || fine.cost < best.cost) best = fine;
+  }
+  // Only when no face with several colours is in view: one that is all one colour.
+  if (!best) {
+    for (const c of found.plain) {
+      const fine = refinePlacement(small.image, c, 5);
+      if (!fine.plain) continue;
+      if (!best || fine.cost < best.cost) best = fine;
+    }
   }
   if (!best) return null;
   if (small.k === 1) return best;
   // carry the placement back to the full frame and settle it there
   const full = refinePlacement(img, { cx: (best.cx + 0.5) / small.k - 0.5, cy: (best.cy + 0.5) / small.k - 0.5, pitch: best.pitch / small.k, rot: best.rot }, 6, 2, 0.5);
-  return isFace(full.score) ? full : null;
+  return isFace(full.score) || full.plain ? full : null;
 }

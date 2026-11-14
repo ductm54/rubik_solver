@@ -50,7 +50,7 @@ npm run build    # static site in dist/
 | `src/vision/grid.ts` | A 3 × 3 face placed by position, size and turn, and its two measurements: how flat each cell is, and how strong the outline around the face is |
 | `src/vision/faceSearch.ts` | `findFace(frame)`: tries every position, size and turn on a shrunk frame (integral images), keeps placements with flat cells and an outline, fine-tunes the best |
 | `src/vision/detect.ts` | `detectFace(frame)`: `findFace`, then 9 Lab colour readings with glare rejection (center on a ring), and a neighbour strip when one shows |
-| `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms) and re-searches the whole frame every third frame or when the colours change |
+| `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms), re-searches the whole frame every third frame or when the colours change, and believes a plain white face only where a cube was just seen |
 | `src/vision/color.ts` | sRGB → Lab, sticker distance, nearest-colour reading, `classifyBalanced` (centers as references, exactly 9 per colour, Hungarian assignment) |
 | `src/vision/guide.ts` | Guide-frame scanning: `fitGuide(frame, square)` finds where the face really sits near the square, `readGuide` reads its 9 cells (center cell on a ring, to skip logos), `SteadyDetector` for auto-capture, `findDuplicate` to spot a face scanned twice in any rotation |
 | `src/vision/tracker.ts` | Free-hand auto-capture: fires once the same nine colours have been read for 350 ms, even while the cube moves; the capture is the average over that time |
@@ -80,7 +80,7 @@ npm run build    # static site in dist/
   TypeScript instead of a ~10 MB download, and it runs unchanged in Node, so it is tested there.
 - **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
   overexposed stickered cube, cube-free views, and a phone video of the
-  cube being turned by hand (replayed frame by frame the way the page does it). Each photo is shrunk to video sizes for
+  cube being turned by hand (two of them, replayed frame by frame the way the page does it). Each photo is shrunk to video sizes for
   free-hand, and re-framed the way a hand holds a cube in front of a
   phone (up to 20% too small or big, turned 10°, a quarter sticker off-center, slightly blurred)
   and the whole cube must come out right. The earlier synthetic-image tests passed while real
@@ -105,9 +105,19 @@ npm run build    # static site in dist/
   the detector read every face steadily for 1.3 to 2.2 s, yet only 2 of 6 were captured. Now the
   reading has to hold still, not the cube, and all six are captured within a second of coming
   into view, down to 5 frames per second.
-- **Free-hand limits.** A face that is all one colour is not found (it looks like a wall or a tile):
-  use the guide frame for it. White stickers against a white background weaken the outline. The
-  fit is a square, so a face tilted far away from the camera is read less reliably.
+- **A side that is all one colour** (a solved side) has nothing inside it to go by, so it is found by
+  its outline alone: a clear step on at least 11 of its 12 outer cell edges. A sheet of paper or
+  a floor tile has that too, so a vivid one is accepted as it is, and a white one only where a
+  cube was seen in the last 4 seconds. Show another face first if the white side is solved.
+- **Repeats.** The light on a turning cube changes, so the same face read twice is not the same
+  numbers (on real video: up to 35 apart on one sticker, 24 on average). Two different faces
+  always have a sticker 90 or more apart. A repeat is a face with no sticker far off.
+- **Preview colours.** Before the whole cube is known, stickers are named by hue. This cube's red
+  sits at hue -7 to 17 and its orange at 23 to 45 depending on the light, so the boundary between
+  them is set by the gap between the reddish stickers seen so far, when there are two groups.
+- **Free-hand limits.** White stickers against a white background weaken the outline. The fit is a
+  square, so a face tilted far away from the camera is read less reliably. A view held between
+  two faces can be captured as a face; the cube then does not validate.
 - **Logos and colour reading.** Each cell's colour is its largest group of similar pixels, never a
   blend, so a logo, glare or a sticker gap is ignored unless it covers most of the cell. The center
   cell is also sampled on a ring that skips its middle. Faces are named at the end by matching the 6

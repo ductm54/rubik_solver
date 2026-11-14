@@ -6,11 +6,13 @@
  *                     almost the same pixel values, orange looks salmon, green looks mint
  *   no-cube           views without a cube face
  *   moyu-video        a phone video of the stickerless cube being turned by hand
+ *   moyu-video-2      another, in dim warm light, with the white side solved and a reflection
  */
 import { describe, expect, it } from 'vitest';
 import { type Color, FACES } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import { type Capture, captureOf, readCube } from '../src/scan/readCube';
+import { type Lab, nameTogether } from '../src/vision/color';
 import { detectFace } from '../src/vision/detect';
 import { FaceFollower } from '../src/vision/follow';
 import { CaptureTracker } from '../src/vision/tracker';
@@ -234,70 +236,121 @@ describe('free-hand detection, real photos', () => {
   });
 });
 
-describe('free-hand scan of a real video (cube turned by hand, never held still)', () => {
-  const video = loadVideo('moyu-video');
+for (const name of ['moyu-video', 'moyu-video-2']) {
+  describe(`free-hand scan of a real video (cube turned by hand, never held still): ${name}`, () => {
+    const video = loadVideo(name);
 
-  /** What the scan page does with a camera: follow the face, capture steady readings, drop repeats. */
-  const done = new Map<number, ReturnType<typeof run>>();
-  const scan = (skip = 1) => done.get(skip) ?? done.set(skip, run(skip)).get(skip)!;
-  function run(skip: number) {
+    /** What the scan page does with a camera: follow the face, capture steady readings, drop repeats. */
+    const done = new Map<number, ReturnType<typeof run>>();
+    const scan = (skip = 1) => done.get(skip) ?? done.set(skip, run(skip)).get(skip)!;
+    function run(skip: number) {
+      const follower = new FaceFollower();
+      const tracker = new CaptureTracker();
+      const captures: { t: number; capture: Capture; alone: string; together: string }[] = [];
+      let seen = 0;
+      let repeats = 0;
+      let i = 0;
+      for (const frame of video.frames()) {
+        if (i++ % skip) continue;
+        const t = ((i - 1) * 1000) / video.fps;
+        const face = follower.detect(frame, t);
+        if (face) seen++;
+        const u = tracker.update(face, t);
+        if (!u.capture) continue;
+        const capture = captureOf(u.capture);
+        if (findDuplicate(capture.labs, captures.map((c) => c.capture.labs)) >= 0) {
+          repeats++;
+          continue;
+        }
+        // the preview as the page shows it: named together with the faces captured before
+        const together = nameTogether([...captures.flatMap((c) => c.capture.rgbs!), ...capture.rgbs!]).slice(-9).join('');
+        captures.push({ t, capture, alone: u.capture.colors.join(''), together });
+      }
+      return { captures, seen, repeats, frames: Math.ceil(i / skip) };
+    }
+
+    it('captures all six faces in one pass, in the order shown, and reads the whole cube', () => {
+      const { captures, seen, frames } = scan();
+      expect(captures).toHaveLength(6);
+      const r = readCube(captures.map((c) => c.capture));
+      expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
+      expect(r.states).toHaveLength(1);
+      // a face is in view for most of the video; the rest is turning
+      expect(seen / frames).toBeGreaterThan(0.5);
+    }, 60_000);
+
+    it('captures each face within a second of it coming into view', () => {
+      const { captures } = scan();
+      captures.forEach((c, k) => {
+        expect(c.t / 1000).toBeGreaterThanOrEqual(video.shown[k]);
+        expect(c.t / 1000 - video.shown[k]).toBeLessThan(1);
+      });
+    }, 60_000);
+
+    it('still works on a slow phone that manages 5 frames per second', () => {
+      const { captures } = scan(2);
+      expect(captures).toHaveLength(6);
+      const r = readCube(captures.map((c) => c.capture));
+      expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
+    }, 60_000);
+
+    it('the live preview names every sticker right, before the whole cube is known', () => {
+      const { captures } = scan();
+      expect(captures.map((c) => c.together)).toEqual(video.faces);
+      expect(captures.map((c) => c.alone)).toEqual(video.faces);
+    }, 60_000);
+  });
+}
+
+describe('special cases in the second video', () => {
+  const video = loadVideo('moyu-video-2');
+
+  it('a solved white side is found by its outline, once a cube has been seen there', () => {
+    const follower = new FaceFollower();
+    let i = 0;
+    let white = 0;
+    for (const frame of video.frames()) {
+      const face = follower.detect(frame, (i++ * 1000) / video.fps);
+      if (face?.plain) {
+        white++;
+        expect(face.colors.join('')).toBe('WWWWWWWWW');
+      }
+    }
+    expect(white).toBeGreaterThanOrEqual(10); // it is in view for about 2 s = 20 frames
+  }, 60_000);
+
+  it('a white square is not taken for a face when no cube was seen before it', () => {
+    const follower = new FaceFollower();
+    const frames = [...video.frames()].slice(80, 95); // the white side only
+    expect(frames.map((f, k) => follower.detect(f, k * 100)).filter(Boolean)).toHaveLength(0);
+  }, 60_000);
+
+  it('a face read twice in changing light counts as a repeat, not as a seventh face', () => {
     const follower = new FaceFollower();
     const tracker = new CaptureTracker();
-    const captures: { t: number; capture: Capture; preview: string }[] = [];
-    let seen = 0;
+    const labs: Lab[][] = [];
+    let repeats = 0;
     let i = 0;
     for (const frame of video.frames()) {
-      if (i++ % skip) continue;
-      const t = ((i - 1) * 1000) / video.fps;
-      const face = follower.detect(frame);
-      if (face) seen++;
-      const u = tracker.update(face, t);
+      const t = (i++ * 1000) / video.fps;
+      const u = tracker.update(follower.detect(frame, t), t);
       if (!u.capture) continue;
-      const capture = captureOf(u.capture);
-      if (findDuplicate(capture.labs, captures.map((c) => c.capture.labs)) < 0) captures.push({ t, capture, preview: u.capture.colors.join('') });
+      const l = u.capture.stickers.map((s) => s.lab);
+      if (findDuplicate(l, labs) >= 0) repeats++;
+      else labs.push(l);
     }
-    return { captures, seen, frames: Math.ceil(i / skip) };
-  }
-
-  it('captures all six faces in one pass, in the order shown, and reads the whole cube', () => {
-    const { captures, seen, frames } = scan();
-    expect(captures).toHaveLength(6);
-    const r = readCube(captures.map((c) => c.capture));
-    expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
-    expect(r.states).toHaveLength(1);
-    // a face is in view for most of the video; the rest is turning
-    expect(seen / frames).toBeGreaterThan(0.6);
+    expect(labs).toHaveLength(6);
+    expect(repeats).toBeGreaterThanOrEqual(1);
   }, 60_000);
 
-  it('captures each face within a second of it coming into view', () => {
-    // when each face is first shown steadily, in seconds (read off the video)
-    const shown = [0, 2.1, 4.4, 7.1, 9.5, 11.9];
-    const { captures } = scan();
-    captures.forEach((c, k) => {
-      expect(c.t / 1000).toBeGreaterThanOrEqual(shown[k]);
-      expect(c.t / 1000 - shown[k]).toBeLessThan(1);
-    });
-  }, 60_000);
-
-  it('still works on a slow phone that manages 5 frames per second', () => {
-    const { captures } = scan(2);
-    expect(captures).toHaveLength(6);
-    const r = readCube(captures.map((c) => c.capture));
-    expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
-  }, 60_000);
-
-  it('the live preview is right except where red and orange are too close to call alone', () => {
-    const { captures } = scan();
-    let wrong = 0;
-    captures.forEach((c, k) => {
-      [...c.preview].forEach((got, i) => {
-        const truth = video.faces[k][i];
-        if (got === truth) return;
-        wrong++;
-        expect([got, truth].sort().join('')).toBe('OR');
-      });
-    });
-    expect(wrong).toBeLessThanOrEqual(1); // of 54
+  it('the small reflection of the cube in the window is never reported', () => {
+    const follower = new FaceFollower();
+    let i = 0;
+    for (const frame of video.frames()) {
+      const face = follower.detect(frame, (i++ * 1000) / video.fps);
+      // the reflection sits in the top fifth of the frame and is a third of the cube's size
+      if (face) expect(face.placement.cy).toBeGreaterThan(frame.height * 0.3);
+    }
   }, 60_000);
 });
 

@@ -45,11 +45,13 @@ export function loadNoCube(): { name: string; image: RGBAImage }[] {
 }
 
 /** A video under tests/fixtures as its frames, with the faces it shows in order. */
-export function loadVideo(set: string): { fps: number; faces: string[]; frames: () => Generator<RGBAImage> } {
-  const meta = JSON.parse(readFileSync(join(FIXTURES, set, 'video.json'), 'utf8')) as { fps: number; frames: number; faces: string[] };
+export function loadVideo(set: string): { fps: number; faces: string[]; shown: number[]; frames: () => Generator<RGBAImage> } {
+  const meta = JSON.parse(readFileSync(join(FIXTURES, set, 'video.json'), 'utf8')) as { fps: number; frames: number; faces: string[]; shown: number[] };
   return {
     fps: meta.fps,
     faces: meta.faces,
+    /** When each face first comes into view, in seconds. */
+    shown: meta.shown,
     *frames() {
       for (let i = 1; i <= meta.frames; i++) {
         const j = jpeg.decode(readFileSync(join(FIXTURES, set, `f_${String(i).padStart(3, '0')}.jpg`)), { useTArray: true, formatAsRGBA: true });

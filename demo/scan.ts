@@ -1,6 +1,7 @@
 import { COLORS, type Color, type CubeState, FACES, applyMoves, randomMoves, solvedState } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import { type Capture, captureOf, readCube } from '../src/scan/readCube';
+import { type RGB, nameTogether } from '../src/vision/color';
 import type { FaceReading } from '../src/vision/detect';
 import { type GuideFit, type GuideReading, type SteadyUpdate, SteadyDetector, findDuplicate, fitCorners, fitGuide, guideSquare, readGuide } from '../src/vision/guide';
 import { neighboursOf, renderCube } from '../src/vision/synth';
@@ -53,13 +54,24 @@ interface Slot {
 const slots: (Slot | null)[] = [null, null, null, null, null, null];
 const filled = () => slots.filter(Boolean).length;
 
+// Preview colours. Red and orange are close; telling them apart is easier with every sticker seen
+// so far in view, so a face in the camera is named together with the captured ones.
+const capturedRgbs = (): RGB[] => slots.flatMap((s) => s?.capture.rgbs ?? []);
+const nameLive = (rgbs: RGB[]): Color[] => nameTogether([...capturedRgbs(), ...rgbs]).slice(-9);
+/** Name the captured faces again, now that there is one more to compare with. */
+function renameSlots() {
+  const names = nameTogether(capturedRgbs());
+  let k = 0;
+  for (const s of slots) if (s) s.colors = names.slice(k, (k += 9));
+}
+
 // guide mode
 const guideCanvas = document.createElement('canvas');
 guideCanvas.width = guideCanvas.height = GUIDE_CANVAS;
 const guideSq = { x: Math.round(GUIDE_PX * GUIDE_MARGIN), y: Math.round(GUIDE_PX * GUIDE_MARGIN), size: GUIDE_PX };
 const guideCtx = guideCanvas.getContext('2d', { willReadFrequently: true })!;
 const steady = new SteadyDetector();
-let guide: { reading: GuideReading; update: SteadyUpdate; fit: GuideFit } | null = null;
+let guide: { reading: GuideReading; colors: Color[]; update: SteadyUpdate; fit: GuideFit } | null = null;
 let guideAt = 0;
 let flash: { kind: 'captured' | 'duplicate'; until: number } | null = null;
 let liveKey = '';
@@ -70,7 +82,7 @@ const procCtx = proc.getContext('2d', { willReadFrequently: true })!;
 const tracker = new CaptureTracker();
 let busy = false;
 let reqId = 0;
-let last: { face: FaceReading | null; update: TrackUpdate } | null = null;
+let last: { face: FaceReading | null; colors: Color[]; update: TrackUpdate } | null = null;
 let fps = 0;
 let lastFrameT = 0;
 
@@ -233,11 +245,12 @@ function tickGuide(el: CanvasImageSource, w: number, h: number, t: number) {
   const reading = readGuide(img, guideSq, fit);
   perf.textContent = `${(performance.now() - t0).toFixed(0)} ms/frame`;
   const update = steady.update(reading, t);
-  guide = { reading, update, fit };
-  const key = reading.stickers.map((s) => s.color + (uncertain(s) ? '?' : '')).join('');
+  const colors = nameLive(reading.stickers.map((s) => s.rgb));
+  guide = { reading, colors, update, fit };
+  const key = reading.stickers.map((s, i) => colors[i] + (uncertain(s) ? '?' : '')).join('');
   if (key !== liveKey) {
     liveKey = key;
-    renderLive(reading.colors, reading.stickers.map(uncertain));
+    renderLive(colors, reading.stickers.map(uncertain));
   }
   if (update.fire && auto.checked) captureGuide(false);
   if (flash && t > flash.until) flash = null;
@@ -268,7 +281,7 @@ function captureGuide(manual: boolean) {
     if (manual) statusEl.textContent = 'All 6 faces are scanned. Tap a face below to scan it again.';
     return;
   }
-  slots[idx] = { capture, colors: reading.colors };
+  slots[idx] = { capture, colors: guide.colors };
   flash = { kind: 'captured', until: now + 1500 };
   statusEl.textContent = dup >= 0 ? `Scanned face ${idx + 1} again ✓` : `Captured face ${filled()} of 6 ✓${filled() < 6 ? ' Turn to the next face.' : ''}`;
   onCapture();
@@ -283,9 +296,10 @@ worker.onmessage = (e) => {
   lastFrameT = now;
   perf.textContent = `${ms.toFixed(0)} ms/frame · ${fps.toFixed(0)} fps`;
   const update = tracker.update(face, now);
-  last = { face, update };
-  renderLive(face?.colors ?? null, face?.stickers.map(uncertain));
-  renderStatus(face, update);
+  const colors = face ? nameLive(face.stickers.map((s) => s.rgb)) : [];
+  last = { face, colors, update };
+  renderLive(face ? colors : null, face?.stickers.map(uncertain));
+  renderStatus(face, colors, update);
   if (update.capture) {
     const capture = captureOf(update.capture);
     const dup = findDuplicate(capture.labs, slots.map((s) => s?.capture.labs));
@@ -299,10 +313,10 @@ worker.onmessage = (e) => {
 
 // ---------------------------------------------------------------- UI
 
-function renderStatus(face: FaceReading | null, u: TrackUpdate) {
+function renderStatus(face: FaceReading | null, colors: Color[], u: TrackUpdate) {
   if (!face) statusEl.textContent = 'Looking for a face…';
-  else if (u.status === 'steadying') statusEl.textContent = `Hold still… ${COLOR_NAMES[face.colors[4]]} center`;
-  else if (u.status === 'captured') statusEl.textContent = `Captured the ${COLOR_NAMES[face.colors[4]]} face ✓ Turn to the next one.`;
+  else if (u.status === 'steadying') statusEl.textContent = `Reading the ${COLOR_NAMES[colors[4]]} face…`;
+  else if (u.status === 'captured') statusEl.textContent = `Captured the ${COLOR_NAMES[colors[4]]} face ✓ Turn to the next one.`;
 }
 
 function miniFace(colors: Color[] | null, unsure: boolean[] = []): HTMLElement {
@@ -347,6 +361,7 @@ function renderCaptured() {
 
 let audio: AudioContext | null = null;
 function onCapture() {
+  renameSlots();
   renderCaptured();
   if (filled() === 6) runReview();
   else reviewEl.classList.add('hidden');
@@ -435,7 +450,7 @@ function drawGuide(ctx: CanvasRenderingContext2D, w: number, dpr: number, t: num
     const [cx, cy] = at(((i % 3) + 0.5) / 3, (Math.floor(i / 3) + 0.5) / 3);
     ctx.beginPath();
     ctx.arc(cx, cy, pitch * 0.1, 0, Math.PI * 2);
-    ctx.fillStyle = CSS_HEX[s.color];
+    ctx.fillStyle = CSS_HEX[guide!.colors[i]];
     ctx.fill();
     ctx.lineWidth = 2 * dpr;
     ctx.strokeStyle = uncertain(s) ? '#ff3b30' : 'rgba(0,0,0,0.7)';
@@ -469,10 +484,10 @@ function drawDetected(ctx: CanvasRenderingContext2D, dpr: number) {
     ctx.closePath();
     ctx.stroke();
     const pitch = Math.hypot(f.corners[0][0] - f.corners[1][0], f.corners[0][1] - f.corners[1][1]) / 3;
-    for (const s of f.stickers) {
+    for (const [i, s] of f.stickers.entries()) {
       ctx.beginPath();
       ctx.arc(s.center[0], s.center[1], pitch * 0.18, 0, Math.PI * 2);
-      ctx.fillStyle = CSS_HEX[s.color];
+      ctx.fillStyle = CSS_HEX[last.colors[i]];
       ctx.fill();
       ctx.lineWidth = 2 * dpr * lw;
       ctx.strokeStyle = s.margin < 10 ? '#ff3b30' : 'rgba(0,0,0,0.6)';

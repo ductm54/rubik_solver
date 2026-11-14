@@ -10,5 +10,13 @@
   "GRYRWOOGR",
   "GGYBYGRGB"
  ],
- "note": "faces: the 9 colours of each face in the order shown, row by row as seen. The 54 stickers form a valid cube."
+ "note": "faces: the 9 colours of each face in the order shown, row by row as seen. shown: when each face first comes into view, in seconds. The 54 stickers form a valid cube.",
+ "shown": [
+  0,
+  2.1,
+  4.4,
+  7.1,
+  9.5,
+  11.9
+ ]
 }
