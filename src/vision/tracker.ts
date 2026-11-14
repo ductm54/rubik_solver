@@ -1,10 +1,16 @@
 /**
- * Auto-capture for free-hand scanning: a detected face is captured once it has been seen steady
- * (same colours, corners barely moving, sharp enough) for `steadyMs`. It fires once per hold;
- * whether that face was already scanned is for the caller to decide.
+ * Auto-capture for free-hand scanning. A face is captured once the detector has read the same
+ * nine colours from it for `steadyMs`. The cube may move while that happens: a hand never holds
+ * it still, and the detector follows it. What has to hold still is the reading, compared as raw
+ * colours (a sticker on the border between red and orange must not reset the clock each time
+ * its name flips).
+ *
+ * The captured reading is the average over the whole steady window, which is less noisy than
+ * any single frame. It fires once per hold; whether that face was already scanned is for the
+ * caller to decide.
  */
+import { type Lab, type RGB, classifySticker, stickerDistance } from './color';
 import type { FaceReading, StripReading } from './detect';
-import type { Point } from './homography';
 
 export type TrackStatus = 'searching' | 'steadying' | 'captured';
 
@@ -18,50 +24,70 @@ export interface TrackUpdate {
 
 export interface TrackerOptions {
   steadyMs?: number;
-  /** Max corner movement during the steady window, as a fraction of the face size. */
-  maxDrift?: number;
+  /**
+   * Largest colour change of any sticker that still counts as the same reading. Lightness counts
+   * half: a phone keeps adjusting its exposure.
+   */
+  maxChange?: number;
+  /** A face with fewer clean cells than this (of 9) is not captured. */
+  minFound?: number;
   minSharpness?: number;
 }
 
+interface Hold {
+  t: number;
+  /** The reading the hold started with; later frames are compared against it. */
+  labs: Lab[];
+  sumLab: number[][];
+  sumRgb: number[][];
+  frames: number;
+  strip?: StripReading;
+  fired: boolean;
+}
+
 export class CaptureTracker {
-  private start: { t: number; corners: Point[]; colors: string; strip?: StripReading } | null = null;
-  private lastCaptureKey = '';
+  private hold: Hold | null = null;
   private opts: Required<TrackerOptions>;
 
   constructor(opts: TrackerOptions = {}) {
-    this.opts = { steadyMs: 350, maxDrift: 0.06, minSharpness: 0, ...opts };
+    this.opts = { steadyMs: 350, maxChange: 12, minFound: 8, minSharpness: 0, ...opts };
   }
 
   reset(): void {
-    this.start = null;
-    this.lastCaptureKey = '';
+    this.hold = null;
   }
 
   update(face: FaceReading | null, t: number): TrackUpdate {
-    if (!face || face.sharpness < this.opts.minSharpness) {
-      this.start = null;
-      if (!face) this.lastCaptureKey = '';
+    if (!face || face.found < this.opts.minFound || face.sharpness < this.opts.minSharpness) {
+      this.hold = null;
       return { status: 'searching', progress: 0 };
     }
-    const key = face.colors.join('');
-    // Still looking at the face we just captured.
-    if (key === this.lastCaptureKey) return { status: 'captured', progress: 1 };
-    const size = Math.hypot(face.corners[0][0] - face.corners[2][0], face.corners[0][1] - face.corners[2][1]);
-    const drift = this.start
-      ? Math.max(...face.corners.map((c, i) => Math.hypot(c[0] - this.start!.corners[i][0], c[1] - this.start!.corners[i][1])))
-      : 0;
-    if (!this.start || this.start.colors !== key || drift > this.opts.maxDrift * size) {
-      this.start = { t, corners: face.corners.map((c) => [...c] as Point), colors: key, strip: face.strip };
-      return { status: 'steadying', progress: 0 };
+    const labs = face.stickers.map((s) => s.lab);
+    let h = this.hold;
+    if (!h || labs.some((l, i) => stickerDistance(l, h!.labs[i]) > this.opts.maxChange)) {
+      h = this.hold = { t, labs, sumLab: labs.map(() => [0, 0, 0]), sumRgb: labs.map(() => [0, 0, 0]), frames: 0, fired: false };
     }
-    // Remember a neighbour strip seen at any point while the face was held steady.
-    if (face.strip) this.start.strip = face.strip;
-    const progress = Math.min(1, (t - this.start.t) / this.opts.steadyMs);
+    face.stickers.forEach((s, i) => {
+      for (let k = 0; k < 3; k++) {
+        h.sumLab[i][k] += s.lab[k];
+        h.sumRgb[i][k] += s.rgb[k];
+      }
+    });
+    h.frames++;
+    // Remember a neighbour strip seen at any point during the hold.
+    if (face.strip) h.strip = face.strip;
+    if (h.fired) return { status: 'captured', progress: 1 };
+    const progress = Math.min(1, (t - h.t) / this.opts.steadyMs);
     if (progress < 1) return { status: 'steadying', progress };
 
-    const strip = face.strip ?? this.start.strip;
-    this.start = null;
-    this.lastCaptureKey = key;
-    return { status: 'captured', progress: 1, capture: strip ? { ...face, strip } : face };
+    h.fired = true;
+    const stickers = face.stickers.map((s, i) => {
+      const lab = h.sumLab[i].map((x) => x / h.frames) as Lab;
+      const rgb = h.sumRgb[i].map((x) => Math.round(x / h.frames)) as RGB;
+      const cls = classifySticker(lab, undefined, rgb);
+      return { ...s, lab, rgb, color: cls.color, margin: cls.margin };
+    });
+    const strip = face.strip ?? h.strip;
+    return { status: 'captured', progress: 1, capture: { ...face, stickers, colors: stickers.map((s) => s.color), ...(strip ? { strip } : {}) } };
   }
 }

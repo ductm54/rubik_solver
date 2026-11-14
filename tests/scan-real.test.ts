@@ -5,15 +5,17 @@
  *   stickered-robot   a stickered cube in a LEGO robot, badly overexposed: white and yellow are
  *                     almost the same pixel values, orange looks salmon, green looks mint
  *   no-cube           views without a cube face
+ *   moyu-video        a phone video of the stickerless cube being turned by hand
  */
 import { describe, expect, it } from 'vitest';
 import { type Color, FACES } from '../src/core/cube';
 import { validate } from '../src/core/validate';
-import { captureOf, readCube } from '../src/scan/readCube';
+import { type Capture, captureOf, readCube } from '../src/scan/readCube';
 import { detectFace } from '../src/vision/detect';
 import { FaceFollower } from '../src/vision/follow';
+import { CaptureTracker } from '../src/vision/tracker';
 import { SteadyDetector, findDuplicate, fitGuide, isClear, readGuide } from '../src/vision/guide';
-import { type Framing, type PhotoFace, frameInGuide, loadNoCube, loadSet, shrink } from './helpers/image';
+import { type Framing, type PhotoFace, frameInGuide, loadNoCube, loadSet, loadVideo, shrink } from './helpers/image';
 
 function mulberry32(seed: number) {
   return () => {
@@ -230,6 +232,73 @@ describe('free-hand detection, real photos', () => {
     for (const image of frames) detectFace(image);
     expect((performance.now() - t) / frames.length).toBeLessThan(150); // ms per frame; about 25 on a laptop
   });
+});
+
+describe('free-hand scan of a real video (cube turned by hand, never held still)', () => {
+  const video = loadVideo('moyu-video');
+
+  /** What the scan page does with a camera: follow the face, capture steady readings, drop repeats. */
+  const done = new Map<number, ReturnType<typeof run>>();
+  const scan = (skip = 1) => done.get(skip) ?? done.set(skip, run(skip)).get(skip)!;
+  function run(skip: number) {
+    const follower = new FaceFollower();
+    const tracker = new CaptureTracker();
+    const captures: { t: number; capture: Capture; preview: string }[] = [];
+    let seen = 0;
+    let i = 0;
+    for (const frame of video.frames()) {
+      if (i++ % skip) continue;
+      const t = ((i - 1) * 1000) / video.fps;
+      const face = follower.detect(frame);
+      if (face) seen++;
+      const u = tracker.update(face, t);
+      if (!u.capture) continue;
+      const capture = captureOf(u.capture);
+      if (findDuplicate(capture.labs, captures.map((c) => c.capture.labs)) < 0) captures.push({ t, capture, preview: u.capture.colors.join('') });
+    }
+    return { captures, seen, frames: Math.ceil(i / skip) };
+  }
+
+  it('captures all six faces in one pass, in the order shown, and reads the whole cube', () => {
+    const { captures, seen, frames } = scan();
+    expect(captures).toHaveLength(6);
+    const r = readCube(captures.map((c) => c.capture));
+    expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
+    expect(r.states).toHaveLength(1);
+    // a face is in view for most of the video; the rest is turning
+    expect(seen / frames).toBeGreaterThan(0.6);
+  }, 60_000);
+
+  it('captures each face within a second of it coming into view', () => {
+    // when each face is first shown steadily, in seconds (read off the video)
+    const shown = [0, 2.1, 4.4, 7.1, 9.5, 11.9];
+    const { captures } = scan();
+    captures.forEach((c, k) => {
+      expect(c.t / 1000).toBeGreaterThanOrEqual(shown[k]);
+      expect(c.t / 1000 - shown[k]).toBeLessThan(1);
+    });
+  }, 60_000);
+
+  it('still works on a slow phone that manages 5 frames per second', () => {
+    const { captures } = scan(2);
+    expect(captures).toHaveLength(6);
+    const r = readCube(captures.map((c) => c.capture));
+    expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
+  }, 60_000);
+
+  it('the live preview is right except where red and orange are too close to call alone', () => {
+    const { captures } = scan();
+    let wrong = 0;
+    captures.forEach((c, k) => {
+      [...c.preview].forEach((got, i) => {
+        const truth = video.faces[k][i];
+        if (got === truth) return;
+        wrong++;
+        expect([got, truth].sort().join('')).toBe('OR');
+      });
+    });
+    expect(wrong).toBeLessThanOrEqual(1); // of 54
+  }, 60_000);
 });
 
 describe('fixture sanity', () => {

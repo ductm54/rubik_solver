@@ -44,6 +44,21 @@ export function loadNoCube(): { name: string; image: RGBAImage }[] {
   });
 }
 
+/** A video under tests/fixtures as its frames, with the faces it shows in order. */
+export function loadVideo(set: string): { fps: number; faces: string[]; frames: () => Generator<RGBAImage> } {
+  const meta = JSON.parse(readFileSync(join(FIXTURES, set, 'video.json'), 'utf8')) as { fps: number; frames: number; faces: string[] };
+  return {
+    fps: meta.fps,
+    faces: meta.faces,
+    *frames() {
+      for (let i = 1; i <= meta.frames; i++) {
+        const j = jpeg.decode(readFileSync(join(FIXTURES, set, `f_${String(i).padStart(3, '0')}.jpg`)), { useTArray: true, formatAsRGBA: true });
+        yield { width: j.width, height: j.height, data: j.data };
+      }
+    },
+  };
+}
+
 /** Shrink so the longest side is `max` pixels (area average, like drawing video onto a small canvas). */
 export function shrink(img: RGBAImage, max: number): { image: RGBAImage; scale: number } {
   const k = max / Math.max(img.width, img.height);

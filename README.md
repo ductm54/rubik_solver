@@ -53,7 +53,7 @@ npm run build    # static site in dist/
 | `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms) and re-searches the whole frame every third frame or when the colours change |
 | `src/vision/color.ts` | sRGB → Lab, sticker distance, nearest-colour reading, `classifyBalanced` (centers as references, exactly 9 per colour, Hungarian assignment) |
 | `src/vision/guide.ts` | Guide-frame scanning: `fitGuide(frame, square)` finds where the face really sits near the square, `readGuide` reads its 9 cells (center cell on a ring, to skip logos), `SteadyDetector` for auto-capture, `findDuplicate` to spot a face scanned twice in any rotation |
-| `src/vision/tracker.ts` | Free-hand auto-capture once a detected face is steady for 300 ms |
+| `src/vision/tracker.ts` | Free-hand auto-capture: fires once the same nine colours have been read for 350 ms, even while the cube moves; the capture is the average over that time |
 | `src/vision/synth.ts` | Synthetic camera frames: a flat face (perspective, tint, glare, noise, clutter) and a ray-cast 3D cube for tilted views with visible side strips; used only by the simulated-cube mode |
 | `src/scan/readCube.ts` | 6 captures → cube: centers name the faces, exactly 9 per colour, strips matched by colour proportions, `assemble()`, best guess for manual fixing |
 | `src/timer/machine.ts` | Timer state machine: inspection, hold-to-ready, false starts, +2 / DNF from inspection |
@@ -79,7 +79,8 @@ npm run build    # static site in dist/
 - **No OpenCV.js.** The plan named it for finding the sticker grid; the vision code here is plain
   TypeScript instead of a ~10 MB download, and it runs unchanged in Node, so it is tested there.
 - **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
-  overexposed stickered cube, plus cube-free views. Each photo is shrunk to video sizes for
+  overexposed stickered cube, cube-free views, and a phone video of the
+  cube being turned by hand (replayed frame by frame the way the page does it). Each photo is shrunk to video sizes for
   free-hand, and re-framed the way a hand holds a cube in front of a
   phone (up to 20% too small or big, turned 10°, a quarter sticker off-center, slightly blurred)
   and the whole cube must come out right. The earlier synthetic-image tests passed while real
@@ -99,6 +100,11 @@ npm run build    # static site in dist/
   whose cells are each one flat colour, with something else just outside all four sides. On the
   real photos it finds all 84 views (both cubes, face 40 to 200 px wide) in the right place, and
   nothing in 30 cube-free views, at about 25 ms per frame (4 ms while following a face).
+- **Capture follows a moving cube.** The first capture rule wanted the cube's corners to stay within
+  6% of where they were for 300 ms. A hand does not hold a cube that still: on a real phone video
+  the detector read every face steadily for 1.3 to 2.2 s, yet only 2 of 6 were captured. Now the
+  reading has to hold still, not the cube, and all six are captured within a second of coming
+  into view, down to 5 frames per second.
 - **Free-hand limits.** A face that is all one colour is not found (it looks like a wall or a tile):
   use the guide frame for it. White stickers against a white background weaken the outline. The
   fit is a square, so a face tilted far away from the camera is read less reliably.

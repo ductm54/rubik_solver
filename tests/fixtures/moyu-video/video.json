@@ -1,0 +1,14 @@
+{
+ "source": "Phone video by the repository owner: a stickerless cube turned by hand, each of the 6 faces shown for 1.3 to 2.2 s, never held still. 10 frames per second, shrunk to 270 x 480.",
+ "fps": 10,
+ "frames": 139,
+ "faces": [
+  "BYRYGOOWW",
+  "GWRWRYOOW",
+  "WBYRBBBOO",
+  "GYYWOBWRB",
+  "GRYRWOOGR",
+  "GGYBYGRGB"
+ ],
+ "note": "faces: the 9 colours of each face in the order shown, row by row as seen. The 54 stickers form a valid cube."
+}
