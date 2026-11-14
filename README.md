@@ -70,7 +70,7 @@ npm run build    # static site in dist/
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
-| `demo/scan.*` | Camera page: free-hand or guide frame mode, overlay, live reading, six captured-face slots; also a simulated cube (with a logo on the white center) and photo upload |
+| `demo/scan.*` | Camera page: free-hand or guide frame mode, overlay, live reading, six captured-face slots; also a simulated cube (with a logo on the white center) and upload of several photos (read one after another) or a video (played like the camera) |
 | `demo/` | 2D net editor, Generate button, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
 | `tests/` | Cube, solver and timer tests; `scan-real.test.ts` runs the scanner on the real photos in `tests/fixtures` |
 
