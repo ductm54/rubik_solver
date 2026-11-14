@@ -56,6 +56,7 @@
         </div>
         <p id="summary" class="summary">Loading solver…</p>
         <div id="breakdown" class="breakdown"></div>
+        <div id="now" class="now" aria-live="polite"></div>
         <twisty-player
           id="player"
           puzzle="3x3x3"
@@ -65,10 +66,14 @@
           hint-facelets="floating"
         ></twisty-player>
         <div class="row between step-nav">
-          <button id="btn-prev" class="ghost small">← Prev</button>
-          <span id="step-pos" class="muted"></span>
-          <button id="btn-next" class="ghost small">Next →</button>
+          <button id="btn-prev" class="ghost small">← Prev step</button>
+          <button id="btn-whole" class="ghost small" aria-pressed="true">Whole solve</button>
+          <button id="btn-next" class="ghost small">Next step →</button>
         </div>
+        <label class="check">
+          <input id="opt-highlight" type="checkbox" checked />
+          Highlight the pieces each step works on (grey out the rest)
+        </label>
         <ol id="steps" class="steps"></ol>
       </section>
     </main>

@@ -12,6 +12,7 @@ import { CPLL, EPLL, PLL } from './algs/pll';
 import { EO, OCLL, OLL } from './algs/oll';
 import { solveCross } from './cross';
 import { SLOTS, SLOT_NAMES, type Slot, crossSolved, planPair, slotSolved } from './f2l';
+import { solveF2LAdvanced } from './f2lAdvanced';
 import { type LLTable, buildTable, matchLL } from './ll';
 
 let tables: Record<string, LLTable> | null = null;
@@ -32,6 +33,7 @@ const HOLDS = ['', 'x', 'x2', "x'", 'z', "z'"].flatMap((a) => ['', 'y', 'y2', "y
 
 export interface CfopOptions {
   crossColors: Color[];
+  f2l?: 'standard' | 'advanced';
   oll: 'full' | '2look';
   pll: 'full' | '2look';
 }
@@ -69,6 +71,22 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     const colors = slotColors(st, s);
     pairs.push(colors);
     steps.push({ stage: 'f2l', title: `F2L ${pairs.length} · ${pairName(colors)} pair`, caseName: 'Already solved after the cross', alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
+  }
+  if (opts.f2l === 'advanced') {
+    for (const p of solveF2LAdvanced(st, COLOR_WORDS[cross])) {
+      const colors = slotColors(st, p.slot);
+      pairs.push(colors);
+      push(
+        {
+          stage: 'f2l',
+          title: `F2L ${pairs.length} · ${pairName(colors)} pair`,
+          caseName: `Into the ${SLOT_NAMES[p.slot]} slot`,
+          hint: `No cube turn. Now: ${p.description}.`,
+        },
+        p.alg,
+        { kind: 'f2l', cross, pairs: [...pairs] },
+      );
+    }
   }
   while (pairs.length < 4) {
     const done = SLOTS.filter((s) => slotSolved(st, s));
@@ -176,6 +194,16 @@ export const CFOP: MethodDef = {
       options: COLOR_OPTIONS,
     },
     {
+      key: 'f2l',
+      label: 'F2L',
+      help: 'Standard: turn the cube so each pair goes in at the front-right, one case at a time. Advanced: no cube turns, any slot, best pair order: the fewest moves found.',
+      kind: 'choice',
+      options: [
+        { value: 'standard', label: 'Standard' },
+        { value: 'advanced', label: 'Advanced (fewest moves)' },
+      ],
+    },
+    {
       key: 'oll',
       label: 'OLL',
       help: '2-look: 3 + 7 algorithms. Full: 57 algorithms, one step.',
@@ -196,11 +224,12 @@ export const CFOP: MethodDef = {
       ],
     },
   ],
-  defaults: { crossColors: ['W'], oll: '2look', pll: '2look' },
+  defaults: { crossColors: ['W'], f2l: 'standard', oll: '2look', pll: '2look' },
   solve(state: CubeState, s: SettingValues) {
     const colors = (Array.isArray(s.crossColors) ? s.crossColors : [s.crossColors]) as Color[];
     return solveCfop(state, {
       crossColors: colors.length ? colors : ['W'],
+      f2l: s.f2l === 'advanced' ? 'advanced' : 'standard',
       oll: s.oll === 'full' ? 'full' : '2look',
       pll: s.pll === 'full' ? 'full' : '2look',
     });

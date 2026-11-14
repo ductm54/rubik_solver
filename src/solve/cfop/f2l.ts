@@ -21,7 +21,7 @@ const SLOT_ROTATION: Record<Slot, string> = { FR: '', FL: "y'", BL: 'y2', BR: 'y
 const CORNER_HOME = cubie('DFR'); // D, F, R facelets
 const EDGE_HOME = cubie('FR'); // F, R facelets
 const CROSS = ['DF', 'DR', 'DB', 'DL'].map(cubie);
-const SLOT_PIECES: Record<Slot, [number[], number[]]> = {
+export const SLOT_PIECES: Record<Slot, [number[], number[]]> = {
   FR: [cubie('DFR'), cubie('FR')],
   FL: [cubie('DLF'), cubie('FL')],
   BL: [cubie('DBL'), cubie('BL')],
