@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cube Scramble Finder</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Cube Scramble Finder</h1>
+      <p class="sub">Phase 0 demo: paint the 54 stickers, get a scramble that reproduces that exact cube.</p>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="row between">
+          <h2>Cube net</h2>
+          <div class="row gap">
+            <button id="btn-solved" class="ghost">Solved</button>
+            <button id="btn-random" class="ghost">Random cube</button>
+          </div>
+        </div>
+        <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour"></div>
+        <div id="net" class="net" aria-label="Cube net"></div>
+        <p class="hint">Tap a colour, then tap stickers to paint them. Centers are fixed: white top (U), green front (F).</p>
+        <div id="status" class="status" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <div class="row between">
+          <h2>Scramble</h2>
+          <button id="btn-generate" class="primary" disabled>Loading solver…</button>
+        </div>
+        <div class="scramble-box">
+          <code id="scramble">—</code>
+          <button id="btn-copy" class="ghost small" disabled>Copy</button>
+        </div>
+        <p id="meta" class="hint"></p>
+        <twisty-player
+          id="player"
+          puzzle="3x3x3"
+          alg=""
+          background="none"
+          control-panel="bottom-row"
+          hint-facelets="floating"
+        ></twisty-player>
+      </section>
+    </main>
+
+    <footer>
+      Solver: Kociemba two-phase (<a href="https://github.com/ldez/cubejs">cubejs</a>) · Viewer:
+      <a href="https://js.cubing.net/cubing/">cubing.js</a>
+    </footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
