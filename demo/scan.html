@@ -15,7 +15,7 @@
         <a href="./learn.html">Learn</a>
       </nav>
       <h1>Cube Face Scanner</h1>
-      <p class="sub">Line each of the 6 faces up with the square, in any order and any rotation. Each face is read the moment it sits still.</p>
+      <p class="sub">Show each of the 6 faces to the camera, in any order and any rotation. Each face is read the moment it sits still.</p>
     </header>
 
     <main>
@@ -30,11 +30,11 @@
         </div>
         <div class="row gap wrap scan-modes">
           <div class="segmented" role="radiogroup" aria-label="Scan mode">
-            <label class="seg"><input type="radio" name="scan-mode" value="guide" />Guide frame</label>
             <label class="seg"><input type="radio" name="scan-mode" value="free" />Free-hand</label>
+            <label class="seg"><input type="radio" name="scan-mode" value="guide" />Guide frame</label>
           </div>
-          <span class="hint" data-scan="guide">Fill the square with one face. Fast, and works with any cube.</span>
-          <span class="hint" data-scan="free">Finds the face anywhere in the picture. Slower, and needs clear gaps between stickers.</span>
+          <span class="hint" data-scan="guide">Hold one face roughly in the square; the grid snaps to it. Use this for a face that is all one colour.</span>
+          <span class="hint" data-scan="free">Show a face anywhere in the picture, facing the camera. Works with stickered and stickerless cubes.</span>
         </div>
         <div id="stage" class="stage">
           <video id="video" playsinline muted></video>
@@ -52,7 +52,6 @@
           <button id="btn-capture" class="primary" disabled>Capture face</button>
         </div>
         <p class="hint" data-scan="guide">You can also tap the picture or press Space to capture.</p>
-        <label class="check" data-scan="free"><input id="debug" type="checkbox" /> Show detected sticker regions</label>
       </section>
 
       <section class="card">

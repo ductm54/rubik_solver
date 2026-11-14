@@ -1,8 +1,9 @@
 import { COLORS, type Color, type CubeState, FACES, applyMoves, randomMoves, solvedState } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import { type Capture, captureOf, readCube } from '../src/scan/readCube';
-import type { FaceReading, Region } from '../src/vision/detect';
-import { type GuideReading, type SteadyUpdate, SteadyDetector, findDuplicate, guideSquare, readGuide } from '../src/vision/guide';
+import { type RGB, nameTogether } from '../src/vision/color';
+import type { FaceReading } from '../src/vision/detect';
+import { type GuideFit, type GuideReading, type SteadyUpdate, SteadyDetector, findDuplicate, fitCorners, fitGuide, guideSquare, readGuide } from '../src/vision/guide';
 import { neighboursOf, renderCube } from '../src/vision/synth';
 import { CaptureTracker, type TrackUpdate } from '../src/vision/tracker';
 import { createNet, encodeCube } from './net';
@@ -10,8 +11,11 @@ import { createNet, encodeCube } from './net';
 const COLOR_NAMES: Record<Color, string> = { W: 'white', Y: 'yellow', G: 'green', B: 'blue', R: 'red', O: 'orange' };
 const CSS: Record<Color, string> = { W: 'var(--W)', Y: 'var(--Y)', G: 'var(--G)', B: 'var(--B)', R: 'var(--R)', O: 'var(--O)' };
 const CSS_HEX: Record<Color, string> = { W: '#ffffff', Y: '#ffd500', G: '#009b48', B: '#0046ad', R: '#b71234', O: '#ff5800' };
-const PROC_MAX = 360; // longest side of the frame given to the free-hand detector
-const GUIDE_PX = 120; // the guide square is read at this size
+const PROC_MAX = 480; // longest side of the frame given to the free-hand detector
+const GUIDE_PX = 120; // the guide square is read at this size...
+const GUIDE_MARGIN = 0.3; // ...with this much of its surroundings on each side, for a cube that is off the grid
+const GUIDE_CANVAS = Math.round(GUIDE_PX * (1 + 2 * GUIDE_MARGIN));
+const GUIDE_INTERVAL = 70; // ms between guide readings
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const video = $<HTMLVideoElement>('video');
@@ -25,17 +29,16 @@ const perf = $('perf');
 const live = $('live');
 const capturedEl = $('captured');
 const countEl = $('count');
-const debug = $<HTMLInputElement>('debug');
 const auto = $<HTMLInputElement>('auto');
 const btnCamera = $<HTMLButtonElement>('btn-camera');
 const btnSim = $<HTMLButtonElement>('btn-sim');
 const btnCapture = $<HTMLButtonElement>('btn-capture');
 
 type Mode = 'idle' | 'camera' | 'sim' | 'photo';
-/** guide: line the face up with a fixed square. free: find the face anywhere in the frame. */
+/** free: find the face anywhere in the frame (default). guide: line the face up with a fixed square. */
 type ScanMode = 'guide' | 'free';
 let mode: Mode = 'idle';
-let scanMode: ScanMode = localStorage.getItem('scan-mode') === 'free' ? 'free' : 'guide';
+let scanMode: ScanMode = localStorage.getItem('scan-mode-v2') === 'guide' ? 'guide' : 'free';
 let stream: MediaStream | null = null;
 
 /** A photo cannot be lined up with the square, so it always uses the free-hand detector. */
@@ -47,18 +50,29 @@ interface Slot {
   capture: Capture;
   /** Colours for the thumbnail: the single-face guess, replaced by the whole-cube reading. */
   colors: Color[];
-  /** Center colour the free-hand tracker filed this face under. */
-  key?: Color;
 }
 const slots: (Slot | null)[] = [null, null, null, null, null, null];
 const filled = () => slots.filter(Boolean).length;
 
+// Preview colours. Red and orange are close; telling them apart is easier with every sticker seen
+// so far in view, so a face in the camera is named together with the captured ones.
+const capturedRgbs = (): RGB[] => slots.flatMap((s) => s?.capture.rgbs ?? []);
+const nameLive = (rgbs: RGB[]): Color[] => nameTogether([...capturedRgbs(), ...rgbs]).slice(-9);
+/** Name the captured faces again, now that there is one more to compare with. */
+function renameSlots() {
+  const names = nameTogether(capturedRgbs());
+  let k = 0;
+  for (const s of slots) if (s) s.colors = names.slice(k, (k += 9));
+}
+
 // guide mode
 const guideCanvas = document.createElement('canvas');
-guideCanvas.width = guideCanvas.height = GUIDE_PX;
+guideCanvas.width = guideCanvas.height = GUIDE_CANVAS;
+const guideSq = { x: Math.round(GUIDE_PX * GUIDE_MARGIN), y: Math.round(GUIDE_PX * GUIDE_MARGIN), size: GUIDE_PX };
 const guideCtx = guideCanvas.getContext('2d', { willReadFrequently: true })!;
 const steady = new SteadyDetector();
-let guide: { reading: GuideReading; update: SteadyUpdate } | null = null;
+let guide: { reading: GuideReading; colors: Color[]; update: SteadyUpdate; fit: GuideFit } | null = null;
+let guideAt = 0;
 let flash: { kind: 'captured' | 'duplicate'; until: number } | null = null;
 let liveKey = '';
 
@@ -68,7 +82,7 @@ const procCtx = proc.getContext('2d', { willReadFrequently: true })!;
 const tracker = new CaptureTracker();
 let busy = false;
 let reqId = 0;
-let last: { face: FaceReading | null; regions: Region[]; update: TrackUpdate } | null = null;
+let last: { face: FaceReading | null; colors: Color[]; update: TrackUpdate } | null = null;
 let fps = 0;
 let lastFrameT = 0;
 
@@ -115,13 +129,14 @@ function drawSim(t: number) {
     simState,
     guided
       ? {
+          // held roughly on the square, the way a hand does it: a bit small or big, turned, off-center
           front,
           up,
-          distance: 8.9,
-          pitch: 3 * Math.sin(simFace * 1.7) + 25 * wobble * Math.sin(t / 120),
-          yaw: 3 * Math.sin(simFace * 2.1) + 25 * wobble * Math.sin(t / 150),
-          roll: 4 * Math.sin(simFace * 1.3) + 0.4 * Math.sin(t / 700),
-          shift: [5 * Math.sin(simFace * 2.9) + Math.sin(t / 90) * 30 * wobble, 4 * Math.cos(simFace * 1.9) + Math.cos(t / 110) * 20 * wobble],
+          distance: 8.9 + 1.1 * Math.sin(simFace * 2.3),
+          pitch: 4 * Math.sin(simFace * 1.7) + 25 * wobble * Math.sin(t / 120),
+          yaw: 4 * Math.sin(simFace * 2.1) + 25 * wobble * Math.sin(t / 150),
+          roll: 8 * Math.sin(simFace * 1.3) + 0.4 * Math.sin(t / 700),
+          shift: [9 * Math.sin(simFace * 2.9) + Math.sin(t / 90) * 30 * wobble, 8 * Math.cos(simFace * 1.9) + Math.cos(t / 110) * 20 * wobble],
         }
       : {
           front,
@@ -214,17 +229,28 @@ function tick(t: number) {
   drawOverlay(w, h, t);
 }
 
-// Guide mode: read the 9 cells under the square, every frame. No detection, so it is instant.
+// Guide mode: the face is somewhere near the square, so only the square and its surroundings are
+// looked at. The grid is fitted to where the face really is, then its 9 cells are read.
 function tickGuide(el: CanvasImageSource, w: number, h: number, t: number) {
+  if (t - guideAt < GUIDE_INTERVAL) return;
+  guideAt = t;
   const sq = guideSquare(w, h);
-  guideCtx.drawImage(el, sq.x, sq.y, sq.size, sq.size, 0, 0, GUIDE_PX, GUIDE_PX);
-  const reading = readGuide(guideCtx.getImageData(0, 0, GUIDE_PX, GUIDE_PX), { x: 0, y: 0, size: GUIDE_PX });
+  const m = sq.size * GUIDE_MARGIN;
+  guideCtx.fillStyle = '#000';
+  guideCtx.fillRect(0, 0, GUIDE_CANVAS, GUIDE_CANVAS);
+  guideCtx.drawImage(el, sq.x - m, sq.y - m, sq.size + 2 * m, sq.size + 2 * m, 0, 0, GUIDE_CANVAS, GUIDE_CANVAS);
+  const img = guideCtx.getImageData(0, 0, GUIDE_CANVAS, GUIDE_CANVAS);
+  const t0 = performance.now();
+  const fit = fitGuide(img, guideSq);
+  const reading = readGuide(img, guideSq, fit);
+  perf.textContent = `${(performance.now() - t0).toFixed(0)} ms/frame`;
   const update = steady.update(reading, t);
-  guide = { reading, update };
-  const key = reading.stickers.map((s) => s.color + (uncertain(s) ? '?' : '')).join('');
+  const colors = nameLive(reading.stickers.map((s) => s.rgb));
+  guide = { reading, colors, update, fit };
+  const key = reading.stickers.map((s, i) => colors[i] + (uncertain(s) ? '?' : '')).join('');
   if (key !== liveKey) {
     liveKey = key;
-    renderLive(reading.colors, reading.stickers.map(uncertain));
+    renderLive(colors, reading.stickers.map(uncertain));
   }
   if (update.fire && auto.checked) captureGuide(false);
   if (flash && t > flash.until) flash = null;
@@ -255,7 +281,7 @@ function captureGuide(manual: boolean) {
     if (manual) statusEl.textContent = 'All 6 faces are scanned. Tap a face below to scan it again.';
     return;
   }
-  slots[idx] = { capture, colors: reading.colors };
+  slots[idx] = { capture, colors: guide.colors };
   flash = { kind: 'captured', until: now + 1500 };
   statusEl.textContent = dup >= 0 ? `Scanned face ${idx + 1} again ✓` : `Captured face ${filled()} of 6 ✓${filled() < 6 ? ' Turn to the next face.' : ''}`;
   onCapture();
@@ -263,33 +289,34 @@ function captureGuide(manual: boolean) {
 
 worker.onmessage = (e) => {
   busy = false;
-  const { face, regions, ms } = e.data as { face: FaceReading | null; regions: Region[]; ms: number };
+  const { face, ms } = e.data as { face: FaceReading | null; ms: number };
   if (mode === 'idle' || activeScan() !== 'free') return;
   const now = performance.now();
   if (lastFrameT) fps = 0.8 * fps + 0.2 * (1000 / (now - lastFrameT));
   lastFrameT = now;
   perf.textContent = `${ms.toFixed(0)} ms/frame · ${fps.toFixed(0)} fps`;
   const update = tracker.update(face, now);
-  last = { face, regions, update };
-  renderLive(face?.colors ?? null, face?.stickers.map(uncertain));
-  renderStatus(face, update);
+  const colors = face ? nameLive(face.stickers.map((s) => s.rgb)) : [];
+  last = { face, colors, update };
+  renderLive(face ? colors : null, face?.stickers.map(uncertain));
+  renderStatus(face, colors, update);
   if (update.capture) {
     const capture = captureOf(update.capture);
     const dup = findDuplicate(capture.labs, slots.map((s) => s?.capture.labs));
-    const idx = dup >= 0 ? dup : slots.indexOf(null);
-    if (idx < 0) return;
-    slots[idx] = { capture, colors: update.capture.colors, key: update.capture.colors[4] };
+    const idx = slots.indexOf(null);
+    if (dup >= 0) statusEl.textContent = 'This face is already scanned. Turn to another face.';
+    if (dup >= 0 || idx < 0) return;
+    slots[idx] = { capture, colors: update.capture.colors };
     onCapture();
   }
 };
 
 // ---------------------------------------------------------------- UI
 
-function renderStatus(face: FaceReading | null, u: TrackUpdate) {
+function renderStatus(face: FaceReading | null, colors: Color[], u: TrackUpdate) {
   if (!face) statusEl.textContent = 'Looking for a face…';
-  else if (u.status === 'steadying') statusEl.textContent = `Hold still… ${COLOR_NAMES[face.colors[4]]} center`;
-  else if (u.status === 'captured') statusEl.textContent = `Captured the ${COLOR_NAMES[face.colors[4]]} face ✓ Turn to the next one.`;
-  else if (u.status === 'duplicate') statusEl.textContent = `Already have the ${COLOR_NAMES[face.colors[4]]} face. Tap it below to rescan.`;
+  else if (u.status === 'steadying') statusEl.textContent = `Reading the ${COLOR_NAMES[colors[4]]} face…`;
+  else if (u.status === 'captured') statusEl.textContent = `Captured the ${COLOR_NAMES[colors[4]]} face ✓ Turn to the next one.`;
 }
 
 function miniFace(colors: Color[] | null, unsure: boolean[] = []): HTMLElement {
@@ -320,9 +347,9 @@ function renderCaptured() {
     slot.classList.toggle('filled', !!s);
     slot.disabled = !s;
     slot.onclick = () => {
-      if (s?.key) tracker.forget(s.key);
       slots[i] = null;
       steady.reset();
+      tracker.reset();
       renderCaptured();
       reviewEl.classList.add('hidden');
     };
@@ -334,6 +361,7 @@ function renderCaptured() {
 
 let audio: AudioContext | null = null;
 function onCapture() {
+  renameSlots();
   renderCaptured();
   if (filled() === 6) runReview();
   else reviewEl.classList.add('hidden');
@@ -396,13 +424,33 @@ function drawGuide(ctx: CanvasRenderingContext2D, w: number, dpr: number, t: num
   ctx.stroke();
   ctx.globalAlpha = 1;
   if (!guide) return;
-  // the colour read in each cell, as a dot in its corner so the sticker itself stays visible
-  guide.reading.stickers.forEach((s, i) => {
-    const cx = x + ((i % 3) + 0.17) * pitch;
-    const cy = y + (Math.floor(i / 3) + 0.17) * pitch;
+  // The grid as fitted to the face, with the colour read in each cell. Fit coordinates are in the
+  // small guide canvas; map them back onto the square on screen.
+  const g = size / GUIDE_PX;
+  const map = ([px, py]: number[]): [number, number] => [x + (px - guideSq.x) * g, y + (py - guideSq.y) * g];
+  const [tl, tr, br, bl] = fitCorners(guideSq, guide.fit).map(map);
+  const at = (u: number, v: number): [number, number] => {
+    const top = [tl[0] + (tr[0] - tl[0]) * u, tl[1] + (tr[1] - tl[1]) * u];
+    const bot = [bl[0] + (br[0] - bl[0]) * u, bl[1] + (br[1] - bl[1]) * u];
+    return [top[0] + (bot[0] - top[0]) * v, top[1] + (bot[1] - top[1]) * v];
+  };
+  if (guide.update.clear) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2 * dpr;
     ctx.beginPath();
-    ctx.arc(cx, cy, pitch * 0.09, 0, Math.PI * 2);
-    ctx.fillStyle = CSS_HEX[s.color];
+    for (const i of [0, 1, 2, 3]) {
+      ctx.moveTo(...at(i / 3, 0));
+      ctx.lineTo(...at(i / 3, 1));
+      ctx.moveTo(...at(0, i / 3));
+      ctx.lineTo(...at(1, i / 3));
+    }
+    ctx.stroke();
+  }
+  guide.reading.stickers.forEach((s, i) => {
+    const [cx, cy] = at(((i % 3) + 0.5) / 3, (Math.floor(i / 3) + 0.5) / 3);
+    ctx.beginPath();
+    ctx.arc(cx, cy, pitch * 0.1, 0, Math.PI * 2);
+    ctx.fillStyle = CSS_HEX[guide!.colors[i]];
     ctx.fill();
     ctx.lineWidth = 2 * dpr;
     ctx.strokeStyle = uncertain(s) ? '#ff3b30' : 'rgba(0,0,0,0.7)';
@@ -410,8 +458,9 @@ function drawGuide(ctx: CanvasRenderingContext2D, w: number, dpr: number, t: num
   });
   const p = guide.update.progress;
   if (auto.checked && !flash && p > 0 && p < 1 && filled() < 6) {
+    const [cx, cy] = at(0.5, 0.5);
     ctx.beginPath();
-    ctx.arc(x + size / 2, y + size / 2, pitch * 0.42, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+    ctx.arc(cx, cy, pitch * 0.3, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
     ctx.lineWidth = 4 * dpr;
     ctx.strokeStyle = '#ffffff';
     ctx.stroke();
@@ -424,18 +473,10 @@ function drawDetected(ctx: CanvasRenderingContext2D, dpr: number) {
   ctx.save();
   ctx.scale(k, k);
   const lw = 1 / k;
-  if (debug.checked) {
-    ctx.fillStyle = 'rgba(255,0,255,0.8)';
-    for (const r of last.regions) {
-      ctx.beginPath();
-      ctx.arc(r.cx, r.cy, 3 * dpr * lw * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
   const f = last.face;
   if (f) {
     const st = last.update.status;
-    const color = st === 'captured' ? '#2ecc71' : st === 'duplicate' ? '#f5a623' : '#ffffff';
+    const color = st === 'captured' ? '#2ecc71' : '#ffffff';
     ctx.lineWidth = 3 * dpr * lw;
     ctx.strokeStyle = color;
     ctx.beginPath();
@@ -443,10 +484,10 @@ function drawDetected(ctx: CanvasRenderingContext2D, dpr: number) {
     ctx.closePath();
     ctx.stroke();
     const pitch = Math.hypot(f.corners[0][0] - f.corners[1][0], f.corners[0][1] - f.corners[1][1]) / 3;
-    for (const s of f.stickers) {
+    for (const [i, s] of f.stickers.entries()) {
       ctx.beginPath();
       ctx.arc(s.center[0], s.center[1], pitch * 0.18, 0, Math.PI * 2);
-      ctx.fillStyle = CSS_HEX[s.color];
+      ctx.fillStyle = CSS_HEX[last.colors[i]];
       ctx.fill();
       ctx.lineWidth = 2 * dpr * lw;
       ctx.strokeStyle = s.margin < 10 ? '#ff3b30' : 'rgba(0,0,0,0.6)';
@@ -549,7 +590,7 @@ for (const input of document.querySelectorAll<HTMLInputElement>('input[name="sca
   input.checked = input.value === scanMode;
   input.onchange = () => {
     scanMode = input.value as ScanMode;
-    localStorage.setItem('scan-mode', scanMode);
+    localStorage.setItem('scan-mode-v2', scanMode);
     simSwitchAt = performance.now();
     renderScanMode();
   };

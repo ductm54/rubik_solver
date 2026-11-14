@@ -67,14 +67,99 @@ export interface Classified {
 }
 
 /**
- * Nearest reference colour for one sticker. With RGB given, compares colour proportions (robust to
- * the sticker being dimly lit) plus a little lightness; otherwise uses Lab.
+ * Colour of one sticker seen alone (the live preview; the whole-cube reading later rebalances all
+ * 54 against each other). With RGB given it goes by hue and saturation, which hold up when the
+ * camera over- or under-exposes: a washed-out orange is still reddish, not white. Without RGB it
+ * is the nearest reference colour in Lab.
+ *
+ * A sticker judged alone cannot settle red against orange in every light; nameTogether() names
+ * the stickers of a face (or of several) against each other and is what the readers use.
  */
 export function classifySticker(lab: Lab, refs: Record<Color, Lab> = REFERENCE_LAB, rgb?: RGB): Classified {
-  const dist = (c: Color) =>
-    rgb ? chromaDistance(rgb, REFERENCE_RGB[c]) * 300 + Math.abs(lab[0] - refs[c][0]) * 0.15 : stickerDistance(lab, refs[c]);
-  const d = COLORS.map((c) => ({ c, d: dist(c) })).sort((x, y) => x.d - y.d);
+  if (rgb) return classifyByHue(rgb, RED_ORANGE);
+  const d = COLORS.map((c) => ({ c, d: stickerDistance(lab, refs[c]) })).sort((x, y) => x.d - y.d);
   return { color: d[0].c, distance: d[0].d, margin: d[1].d - d[0].d };
+}
+
+const WHITE_SATURATION = 0.2;
+/**
+ * Hue ranges in degrees. Measured on one cube under four lights: red -7..17, orange 23..45,
+ * yellow 50..70, green 91..172 (overexposed green looks mint), blue 207..237. Red and orange
+ * nearly touch, so their boundary is adjusted to the stickers in view when both are there.
+ */
+const RED_START = -22;
+const RED_ORANGE = 20;
+const HUE_STARTS: [number, Color][] = [
+  [53, 'Y'],
+  [78, 'G'],
+  [188, 'B'],
+  [275, 'R'],
+];
+
+/** Hue in degrees, with the reds kept together around 0 (-22..338), and saturation 0..1. */
+function hueOf([r, g, b]: RGB): { hue: number; sat: number } {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return { hue: 0, sat: 0 };
+  let hue = max === r ? ((g - b) / (max - min)) * 60 : max === g ? 120 + ((b - r) / (max - min)) * 60 : 240 + ((r - g) / (max - min)) * 60;
+  if (hue >= 360 + RED_START) hue -= 360;
+  return { hue, sat: (max - min) / max };
+}
+
+/**
+ * Where red ends and orange begins for a set of stickers seen together (a face, or all faces
+ * captured so far): if the reddish ones fall into two groups, the boundary is the gap between
+ * them (`found`); otherwise the usual one. The camera's exposure moves both colours along the
+ * hue circle, but red always stays below orange. Measured gaps between the two: 18 degrees or
+ * more; within one colour: 6 or less.
+ */
+export function redOrangeSplit(rgbs: RGB[]): { split: number; found: boolean } {
+  const hues = rgbs
+    .map(hueOf)
+    .filter((h) => h.sat >= 0.3 && h.hue >= RED_START && h.hue < HUE_STARTS[0][0])
+    .map((h) => h.hue)
+    .sort((a, b) => a - b);
+  let gap = 10;
+  let split = RED_ORANGE;
+  let found = false;
+  for (let i = 1; i < hues.length; i++) {
+    if (hues[i] - hues[i - 1] > gap) {
+      gap = hues[i] - hues[i - 1];
+      split = (hues[i] + hues[i - 1]) / 2;
+      found = true;
+    }
+  }
+  return { split, found };
+}
+
+/** Preview colours for stickers seen together, with the red / orange boundary fitted to them. */
+export function nameTogether(rgbs: RGB[]): Color[] {
+  const { split, found } = redOrangeSplit(rgbs);
+  return rgbs.map((rgb) => classifyByHue(rgb, split, !found).color);
+}
+
+/**
+ * @param paleRedIsOrange With nothing to compare against, a pale reddish sticker is taken for an
+ *   overexposed orange (it clips to salmon, while a real red stays saturated). When both groups
+ *   are in view the hue decides alone: in low light a real red goes pale too.
+ */
+function classifyByHue(rgb: RGB, redOrange: number, paleRedIsOrange = true): Classified {
+  const { hue, sat } = hueOf(rgb);
+  // margin: how far the reading is from the nearest decision line, on a scale where 10 is safe
+  const whiteGap = Math.abs(sat - WHITE_SATURATION) * 100;
+  if (sat < WHITE_SATURATION) return { color: 'W', distance: sat * 100, margin: whiteGap };
+  if (hue < HUE_STARTS[0][0]) {
+    // red or orange
+    let margin = Math.min(whiteGap, Math.abs(hue - redOrange), HUE_STARTS[0][0] - hue);
+    if (hue >= redOrange) return { color: 'O', distance: 0, margin };
+    if (!paleRedIsOrange) return { color: 'R', distance: 0, margin };
+    margin = Math.min(margin, Math.abs(sat - 0.55) * 60);
+    return { color: sat < 0.55 ? 'O' : 'R', distance: 0, margin };
+  }
+  let k = 0;
+  while (k + 1 < HUE_STARTS.length && hue >= HUE_STARTS[k + 1][0]) k++;
+  const end = k + 1 < HUE_STARTS.length ? HUE_STARTS[k + 1][0] : 360 + RED_START;
+  return { color: HUE_STARTS[k][1], distance: 0, margin: Math.min(whiteGap, hue - HUE_STARTS[k][0], end - hue) };
 }
 
 /**
