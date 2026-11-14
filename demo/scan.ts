@@ -1,14 +1,17 @@
 import { COLORS, type Color, type CubeState, FACES, applyMoves, randomMoves, solvedState } from '../src/core/cube';
 import { validate } from '../src/core/validate';
-import { captureOf, readCube } from '../src/scan/readCube';
+import { type Capture, captureOf, readCube } from '../src/scan/readCube';
 import type { FaceReading, Region } from '../src/vision/detect';
+import { type GuideReading, type SteadyUpdate, SteadyDetector, findDuplicate, guideSquare, readGuide } from '../src/vision/guide';
 import { neighboursOf, renderCube } from '../src/vision/synth';
 import { CaptureTracker, type TrackUpdate } from '../src/vision/tracker';
 import { createNet, encodeCube } from './net';
 
 const COLOR_NAMES: Record<Color, string> = { W: 'white', Y: 'yellow', G: 'green', B: 'blue', R: 'red', O: 'orange' };
 const CSS: Record<Color, string> = { W: 'var(--W)', Y: 'var(--Y)', G: 'var(--G)', B: 'var(--B)', R: 'var(--R)', O: 'var(--O)' };
-const PROC_MAX = 360; // longest side of the frame given to the detector
+const CSS_HEX: Record<Color, string> = { W: '#ffffff', Y: '#ffd500', G: '#009b48', B: '#0046ad', R: '#b71234', O: '#ff5800' };
+const PROC_MAX = 360; // longest side of the frame given to the free-hand detector
+const GUIDE_PX = 120; // the guide square is read at this size
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const video = $<HTMLVideoElement>('video');
@@ -23,12 +26,43 @@ const live = $('live');
 const capturedEl = $('captured');
 const countEl = $('count');
 const debug = $<HTMLInputElement>('debug');
+const auto = $<HTMLInputElement>('auto');
 const btnCamera = $<HTMLButtonElement>('btn-camera');
 const btnSim = $<HTMLButtonElement>('btn-sim');
+const btnCapture = $<HTMLButtonElement>('btn-capture');
 
 type Mode = 'idle' | 'camera' | 'sim' | 'photo';
+/** guide: line the face up with a fixed square. free: find the face anywhere in the frame. */
+type ScanMode = 'guide' | 'free';
 let mode: Mode = 'idle';
+let scanMode: ScanMode = localStorage.getItem('scan-mode') === 'free' ? 'free' : 'guide';
 let stream: MediaStream | null = null;
+
+/** A photo cannot be lined up with the square, so it always uses the free-hand detector. */
+const activeScan = (): ScanMode => (mode === 'photo' ? 'free' : scanMode);
+
+// Captured faces, in the order they were scanned. Which face each one is gets decided at the end
+// from all six centers together, so a single odd center reading cannot mislabel a face.
+interface Slot {
+  capture: Capture;
+  /** Colours for the thumbnail: the single-face guess, replaced by the whole-cube reading. */
+  colors: Color[];
+  /** Center colour the free-hand tracker filed this face under. */
+  key?: Color;
+}
+const slots: (Slot | null)[] = [null, null, null, null, null, null];
+const filled = () => slots.filter(Boolean).length;
+
+// guide mode
+const guideCanvas = document.createElement('canvas');
+guideCanvas.width = guideCanvas.height = GUIDE_PX;
+const guideCtx = guideCanvas.getContext('2d', { willReadFrequently: true })!;
+const steady = new SteadyDetector();
+let guide: { reading: GuideReading; update: SteadyUpdate } | null = null;
+let flash: { kind: 'captured' | 'duplicate'; until: number } | null = null;
+let liveKey = '';
+
+// free-hand mode
 const proc = document.createElement('canvas');
 const procCtx = proc.getContext('2d', { willReadFrequently: true })!;
 const tracker = new CaptureTracker();
@@ -58,9 +92,9 @@ async function startCamera() {
   setMode('camera');
 }
 
-// Simulated cube: a random scrambled cube rendered in 3D. It shows one face at a time, tilted so
-// a strip of the side above shows, with some hand jitter, and turns to the next face after each
-// capture.
+// Simulated cube: a random scrambled cube rendered in 3D, with a blue logo on the white center.
+// It shows one face at a time with some hand jitter and turns to the next face after each capture.
+// Guide mode: straight on, filling the square. Free-hand: anywhere, tilted so a side strip shows.
 const simState = applyMoves(solvedState(), randomMoves(25));
 let simFace = 0;
 let simSwitchAt = 0;
@@ -76,19 +110,37 @@ function drawSim(t: number) {
   const front = FACES[simFace % 6];
   const up = neighboursOf(front)[(simFace * 3 + 1) % 4];
   const wobble = Math.max(0, 1 - (t - simSwitchAt) / 900); // settles after switching faces
+  const guided = scanMode === 'guide';
   const img = renderCube(
     simState,
-    {
-      front,
-      up,
-      pitch: 22 + 10 * wobble * Math.sin(t / 120),
-      yaw: 4 * Math.sin(simFace * 2.1) + 12 * wobble * Math.sin(t / 150),
-      roll: 12 * Math.sin(simFace * 1.3) + 0.6 * Math.sin(t / 700),
-      shift: [Math.sin(t / 90) * 14 * wobble, Math.cos(t / 110) * 10 * wobble],
-    },
-    { noise: 4 },
+    guided
+      ? {
+          front,
+          up,
+          distance: 8.9,
+          pitch: 3 * Math.sin(simFace * 1.7) + 25 * wobble * Math.sin(t / 120),
+          yaw: 3 * Math.sin(simFace * 2.1) + 25 * wobble * Math.sin(t / 150),
+          roll: 4 * Math.sin(simFace * 1.3) + 0.4 * Math.sin(t / 700),
+          shift: [5 * Math.sin(simFace * 2.9) + Math.sin(t / 90) * 30 * wobble, 4 * Math.cos(simFace * 1.9) + Math.cos(t / 110) * 20 * wobble],
+        }
+      : {
+          front,
+          up,
+          pitch: 22 + 10 * wobble * Math.sin(t / 120),
+          yaw: 4 * Math.sin(simFace * 2.1) + 12 * wobble * Math.sin(t / 150),
+          roll: 12 * Math.sin(simFace * 1.3) + 0.6 * Math.sin(t / 700),
+          shift: [Math.sin(t / 90) * 14 * wobble, Math.cos(t / 110) * 10 * wobble],
+        },
+    { noise: 4, logo: [25, 70, 200] },
   );
   sim.getContext('2d')!.putImageData(new ImageData(img.data as Uint8ClampedArray<ArrayBuffer>, img.width, img.height), 0, 0);
+}
+function simNextFace() {
+  if (mode !== 'sim' || filled() === 6) return;
+  setTimeout(() => {
+    simFace = (simFace + 1) % 6;
+    simSwitchAt = performance.now();
+  }, 500);
 }
 
 function loadPhoto(file: File) {
@@ -105,6 +157,7 @@ function stopAll() {
   stream = null;
   video.srcObject = null;
   last = null;
+  guide = null;
 }
 
 function setMode(m: Mode) {
@@ -116,7 +169,21 @@ function setMode(m: Mode) {
   btnCamera.textContent = m === 'camera' ? 'Restart camera' : 'Start camera';
   const { w, h } = sourceSize();
   if (w && h) stage.style.aspectRatio = `${w} / ${h}`;
-  statusEl.textContent = 'Looking for a face…';
+  renderScanMode();
+}
+
+function renderScanMode() {
+  const g = activeScan() === 'guide';
+  for (const el of document.querySelectorAll<HTMLElement>('[data-scan]')) el.classList.toggle('hidden', el.dataset.scan !== (g ? 'guide' : 'free'));
+  btnCapture.disabled = mode === 'idle';
+  last = null;
+  guide = null;
+  flash = null;
+  liveKey = '';
+  steady.reset();
+  perf.textContent = '';
+  renderLive(null);
+  if (mode !== 'idle') statusEl.textContent = g ? 'Line a face up with the grid' : 'Looking for a face…';
 }
 
 function sourceSize(): { w: number; h: number; el: CanvasImageSource | null } {
@@ -133,7 +200,8 @@ function tick(t: number) {
   if (mode === 'sim') drawSim(t);
   const { w, h, el } = sourceSize();
   if (!el || !w || !h) return;
-  if (!busy) {
+  if (activeScan() === 'guide') tickGuide(el, w, h, t);
+  else if (!busy) {
     const k = PROC_MAX / Math.max(w, h);
     proc.width = Math.round(w * k);
     proc.height = Math.round(h * k);
@@ -143,22 +211,76 @@ function tick(t: number) {
     reqId++;
     worker.postMessage({ id: reqId, width: proc.width, height: proc.height, buffer: data.data.buffer }, [data.data.buffer]);
   }
-  drawOverlay();
+  drawOverlay(w, h, t);
+}
+
+// Guide mode: read the 9 cells under the square, every frame. No detection, so it is instant.
+function tickGuide(el: CanvasImageSource, w: number, h: number, t: number) {
+  const sq = guideSquare(w, h);
+  guideCtx.drawImage(el, sq.x, sq.y, sq.size, sq.size, 0, 0, GUIDE_PX, GUIDE_PX);
+  const reading = readGuide(guideCtx.getImageData(0, 0, GUIDE_PX, GUIDE_PX), { x: 0, y: 0, size: GUIDE_PX });
+  const update = steady.update(reading, t);
+  guide = { reading, update };
+  const key = reading.stickers.map((s) => s.color + (uncertain(s) ? '?' : '')).join('');
+  if (key !== liveKey) {
+    liveKey = key;
+    renderLive(reading.colors, reading.stickers.map(uncertain));
+  }
+  if (update.fire && auto.checked) captureGuide(false);
+  if (flash && t > flash.until) flash = null;
+  if (!flash) {
+    if (filled() === 6) statusEl.textContent = 'All 6 faces are scanned. Tap a face below to scan it again.';
+    else if (!update.clear) statusEl.textContent = 'Line a face up with the grid';
+    else if (!auto.checked) statusEl.textContent = 'Press Capture';
+    else if (update.progress < 1) statusEl.textContent = 'Hold still…';
+  }
+}
+const uncertain = (s: { margin: number; purity?: number }) => s.margin < 10 || (s.purity ?? 1) < 0.6;
+
+/** Capture what is under the guide now. A manual capture of a face already scanned replaces it. */
+function captureGuide(manual: boolean) {
+  if (!guide || activeScan() !== 'guide') return;
+  const { reading } = guide;
+  const capture = captureOf({ stickers: reading.stickers });
+  const dup = findDuplicate(capture.labs, slots.map((s) => s?.capture.labs));
+  const now = performance.now();
+  if (dup >= 0 && !manual) {
+    flash = { kind: 'duplicate', until: now + 1500 };
+    statusEl.textContent = 'This face is already scanned. Turn to another face.';
+    simNextFace();
+    return;
+  }
+  const idx = dup >= 0 ? dup : slots.indexOf(null);
+  if (idx < 0) {
+    if (manual) statusEl.textContent = 'All 6 faces are scanned. Tap a face below to scan it again.';
+    return;
+  }
+  slots[idx] = { capture, colors: reading.colors };
+  flash = { kind: 'captured', until: now + 1500 };
+  statusEl.textContent = dup >= 0 ? `Scanned face ${idx + 1} again ✓` : `Captured face ${filled()} of 6 ✓${filled() < 6 ? ' Turn to the next face.' : ''}`;
+  onCapture();
 }
 
 worker.onmessage = (e) => {
   busy = false;
   const { face, regions, ms } = e.data as { face: FaceReading | null; regions: Region[]; ms: number };
+  if (mode === 'idle' || activeScan() !== 'free') return;
   const now = performance.now();
   if (lastFrameT) fps = 0.8 * fps + 0.2 * (1000 / (now - lastFrameT));
   lastFrameT = now;
   perf.textContent = `${ms.toFixed(0)} ms/frame · ${fps.toFixed(0)} fps`;
-  if (mode === 'idle') return;
   const update = tracker.update(face, now);
   last = { face, regions, update };
-  renderLive(face);
+  renderLive(face?.colors ?? null, face?.stickers.map(uncertain));
   renderStatus(face, update);
-  if (update.capture) onCapture(update.capture);
+  if (update.capture) {
+    const capture = captureOf(update.capture);
+    const dup = findDuplicate(capture.labs, slots.map((s) => s?.capture.labs));
+    const idx = dup >= 0 ? dup : slots.indexOf(null);
+    if (idx < 0) return;
+    slots[idx] = { capture, colors: update.capture.colors, key: update.capture.colors[4] };
+    onCapture();
+  }
 };
 
 // ---------------------------------------------------------------- UI
@@ -170,52 +292,51 @@ function renderStatus(face: FaceReading | null, u: TrackUpdate) {
   else if (u.status === 'duplicate') statusEl.textContent = `Already have the ${COLOR_NAMES[face.colors[4]]} face. Tap it below to rescan.`;
 }
 
-function miniFace(colors: Color[] | null, uncertain: boolean[] = []): HTMLElement {
+function miniFace(colors: Color[] | null, unsure: boolean[] = []): HTMLElement {
   const g = document.createElement('div');
   g.className = 'mini-grid';
   for (let i = 0; i < 9; i++) {
     const c = document.createElement('span');
     if (colors) {
       c.style.background = CSS[colors[i]];
-      if (uncertain[i]) c.classList.add('uncertain');
+      if (unsure[i]) c.classList.add('uncertain');
     }
     g.append(c);
   }
   return g;
 }
 
-function renderLive(face: FaceReading | null) {
-  live.replaceChildren(miniFace(face?.colors ?? null, face?.stickers.map((s) => s.margin < 10) ?? []));
+function renderLive(colors: Color[] | null, unsure: boolean[] = []) {
+  live.replaceChildren(miniFace(colors, unsure));
 }
 
 function renderCaptured() {
   capturedEl.replaceChildren();
-  for (const c of COLORS) {
+  slots.forEach((s, i) => {
     const slot = document.createElement('button');
     slot.className = 'slot';
-    const f = tracker.captured.get(c);
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.background = CSS[c];
-    slot.append(f ? miniFace(f.colors) : miniFace(null), dot);
-    slot.title = f ? `Rescan the ${COLOR_NAMES[c]} face` : `${COLOR_NAMES[c]} face not captured yet`;
-    slot.classList.toggle('filled', !!f);
-    slot.disabled = !f;
+    slot.append(miniFace(s?.colors ?? null));
+    slot.title = s ? `Scan face ${i + 1} again` : `Face ${i + 1} not scanned yet`;
+    slot.classList.toggle('filled', !!s);
+    slot.disabled = !s;
     slot.onclick = () => {
-      tracker.forget(c);
+      if (s?.key) tracker.forget(s.key);
+      slots[i] = null;
+      steady.reset();
       renderCaptured();
       reviewEl.classList.add('hidden');
     };
-    if (f?.strip) slot.classList.add('has-strip');
+    if (s?.capture.strip) slot.classList.add('has-strip');
     capturedEl.append(slot);
-  }
-  countEl.textContent = `${tracker.captured.size} / 6`;
+  });
+  countEl.textContent = `${filled()} / 6`;
 }
 
 let audio: AudioContext | null = null;
-function onCapture(face: FaceReading) {
+function onCapture() {
   renderCaptured();
-  if (tracker.captured.size === 6) runReview();
+  if (filled() === 6) runReview();
+  else reviewEl.classList.add('hidden');
   navigator.vibrate?.(60);
   try {
     audio ??= new AudioContext();
@@ -230,31 +351,74 @@ function onCapture(face: FaceReading) {
   } catch {
     /* no audio */
   }
-  if (mode === 'sim' && tracker.captured.size < 6) {
-    // move to a face we don't have yet
-    setTimeout(() => {
-      for (let k = 1; k <= 6; k++) {
-        const next = (simFace + k) % 6;
-        if (!tracker.captured.has(simState[FACES[next]][4])) {
-          simFace = next;
-          break;
-        }
-      }
-      simSwitchAt = performance.now();
-    }, 500);
-  }
-  void face;
+  simNextFace();
 }
 
-function drawOverlay() {
+function drawOverlay(w: number, h: number, t: number) {
   const rect = overlay.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  if (overlay.width !== Math.round(rect.width * dpr)) {
+  if (overlay.width !== Math.round(rect.width * dpr) || overlay.height !== Math.round(rect.height * dpr)) {
     overlay.width = Math.round(rect.width * dpr);
     overlay.height = Math.round(rect.height * dpr);
   }
   const ctx = overlay.getContext('2d')!;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
+  if (activeScan() === 'guide') drawGuide(ctx, w, dpr, t);
+  else drawDetected(ctx, dpr);
+}
+
+function drawGuide(ctx: CanvasRenderingContext2D, w: number, dpr: number, t: number) {
+  const k = overlay.width / w;
+  const sq = guideSquare(w, overlay.height / k);
+  const x = sq.x * k;
+  const y = sq.y * k;
+  const size = sq.size * k;
+  const pitch = size / 3;
+  // dim everything outside the square
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath();
+  ctx.rect(0, 0, overlay.width, overlay.height);
+  ctx.rect(x, y, size, size);
+  ctx.fill('evenodd');
+  const color = flash && t < flash.until ? (flash.kind === 'captured' ? '#2ecc71' : '#f5a623') : '#ffffff';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3 * dpr;
+  ctx.strokeRect(x, y, size, size);
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath();
+  for (const i of [1, 2]) {
+    ctx.moveTo(x + i * pitch, y);
+    ctx.lineTo(x + i * pitch, y + size);
+    ctx.moveTo(x, y + i * pitch);
+    ctx.lineTo(x + size, y + i * pitch);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (!guide) return;
+  // the colour read in each cell, as a dot in its corner so the sticker itself stays visible
+  guide.reading.stickers.forEach((s, i) => {
+    const cx = x + ((i % 3) + 0.17) * pitch;
+    const cy = y + (Math.floor(i / 3) + 0.17) * pitch;
+    ctx.beginPath();
+    ctx.arc(cx, cy, pitch * 0.09, 0, Math.PI * 2);
+    ctx.fillStyle = CSS_HEX[s.color];
+    ctx.fill();
+    ctx.lineWidth = 2 * dpr;
+    ctx.strokeStyle = uncertain(s) ? '#ff3b30' : 'rgba(0,0,0,0.7)';
+    ctx.stroke();
+  });
+  const p = guide.update.progress;
+  if (auto.checked && !flash && p > 0 && p < 1 && filled() < 6) {
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, pitch * 0.42, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+    ctx.lineWidth = 4 * dpr;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+  }
+}
+
+function drawDetected(ctx: CanvasRenderingContext2D, dpr: number) {
   if (!last || !proc.width) return;
   const k = overlay.width / proc.width;
   ctx.save();
@@ -300,8 +464,6 @@ function drawOverlay() {
   ctx.restore();
 }
 
-const CSS_HEX: Record<Color, string> = { W: '#ffffff', Y: '#ffd500', G: '#009b48', B: '#0046ad', R: '#b71234', O: '#ff5800' };
-
 // ---------------------------------------------------------------- review / manual fix
 
 const reviewEl = $('review');
@@ -315,17 +477,19 @@ let alternatives: CubeState[] = [];
 let altIndex = 0;
 
 function runReview() {
-  const captures = COLORS.map((c) => tracker.captured.get(c)).filter((f): f is FaceReading => !!f).map(captureOf);
-  const r = readCube(captures);
+  const r = readCube(slots.map((s) => s!.capture));
+  // Thumbnails now show the whole-cube reading (centers matched one-to-one, 9 of each colour).
+  slots.forEach((s, i) => (s!.colors = r.faces[i]));
+  renderCaptured();
   alternatives = r.states;
   altIndex = 0;
   net.set(r.guess);
   const how = r.usedStrips
     ? `Face rotations came from neighbour strips on ${r.usedStrips} of 6 faces${r.combinationsTried > 1 ? `, plus a search of ${r.combinationsTried} combinations` : ''}.`
-    : `No usable neighbour strips, so all ${r.combinationsTried.toLocaleString()} face-rotation combinations were tried.`;
+    : `Each face's rotation was worked out by trying all ${r.combinationsTried.toLocaleString()} combinations.`;
   if (r.states.length === 1) reviewSummary.textContent = `Read a valid cube. ${how}`;
   else if (r.states.length > 1)
-    reviewSummary.textContent = `${r.states.length} valid cubes match these faces. ${how} Check against your cube, or rescan a face with the cube tilted so a side strip shows.`;
+    reviewSummary.textContent = `${r.states.length} valid cubes match these faces. ${how} Check each one against your cube.`;
   else
     reviewSummary.textContent = `No valid cube matches; a sticker was probably misread. Showing the closest guess: compare it with your cube and fix the wrong stickers.`;
   btnAlt.classList.toggle('hidden', r.states.length < 2);
@@ -374,8 +538,26 @@ $<HTMLInputElement>('file').onchange = (e) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (file) loadPhoto(file);
 };
+btnCapture.onclick = () => captureGuide(true);
+stage.onclick = () => captureGuide(true);
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || (e.target as HTMLElement).closest('button, input, a, label')) return;
+  e.preventDefault();
+  captureGuide(true);
+});
+for (const input of document.querySelectorAll<HTMLInputElement>('input[name="scan-mode"]')) {
+  input.checked = input.value === scanMode;
+  input.onchange = () => {
+    scanMode = input.value as ScanMode;
+    localStorage.setItem('scan-mode', scanMode);
+    simSwitchAt = performance.now();
+    renderScanMode();
+  };
+}
 $('btn-clear').onclick = () => {
   tracker.reset();
+  steady.reset();
+  slots.fill(null);
   renderCaptured();
   reviewEl.classList.add('hidden');
 };
@@ -385,8 +567,8 @@ if (!navigator.mediaDevices?.getUserMedia) {
   btnCamera.title = 'Camera needs HTTPS and a browser that supports getUserMedia';
 }
 
-renderLive(null);
+renderScanMode();
 renderCaptured();
 requestAnimationFrame(tick);
 // For automated tests / debugging.
-Object.assign(window, { scanner: { tracker, simState, get mode() { return mode; }, getNet: () => encodeCube(net.get()) } });
+Object.assign(window, { scanner: { tracker, slots, simState, get mode() { return mode; }, getNet: () => encodeCube(net.get()) } });

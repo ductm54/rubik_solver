@@ -17,6 +17,9 @@ export const CAMERA_RGB: Record<Color, RGB> = {
   O: [245, 110, 30],
 };
 
+/** Logo size as a fraction of the sticker pitch (real logos fill about half of the sticker). */
+const LOGO_RADIUS = 0.27;
+
 export interface SynthOptions {
   width?: number;
   height?: number;
@@ -32,6 +35,8 @@ export interface SynthOptions {
   /** Deterministic random source. */
   rand?: () => number;
   clutter?: boolean;
+  /** Colour of a brand logo (a disc) drawn in the middle of a white center sticker. */
+  logo?: RGB;
 }
 
 export function renderFace(colors: Color[], o: SynthOptions = {}): RGBAImage {
@@ -92,6 +97,7 @@ export function renderFace(colors: Color[], o: SynthOptions = {}): RGBAImage {
             const d = Math.hypot(fu - 0.65, fv - 0.35);
             if (d < 0.15) c = [255, 255, 255];
           }
+          if (o.logo && k === 4 && colors[4] === 'W' && Math.hypot(fu - 0.5, fv - 0.5) < LOGO_RADIUS) c = [...o.logo] as RGB;
         } else c = [22, 22, 24];
       } else {
         // background: soft gradient + clutter
@@ -158,6 +164,8 @@ export interface CubeRenderOptions {
   gap?: number;
   clutter?: boolean;
   rand?: () => number;
+  /** Colour of a brand logo (a disc) drawn in the middle of the white center sticker. */
+  logo?: RGB;
 }
 
 /** Rotation taking cube coordinates (x→R, y→U, z→F) to camera coordinates (x right, y down, z forward). */
@@ -244,7 +252,9 @@ export function renderCube(state: CubeState, pose: CubePose, o: CubeRenderOption
         const nc = mulV(R, n as V3);
         const lambert = Math.max(0, (nc[0] * light[0] + nc[1] * light[1] + nc[2] * light[2]) / ln);
         const shade = 0.6 + 0.4 * lambert;
-        c = inside ? (CAMERA_RGB[state[face][row * 3 + col]].map((v) => v * shade) as RGB) : [22, 22, 24];
+        const isLogo = o.logo && row === 1 && col === 1 && state[face][4] === 'W' && Math.hypot(fu - 0.5, fv - 0.5) < LOGO_RADIUS;
+        const base = isLogo ? o.logo! : CAMERA_RGB[state[face][row * 3 + col]];
+        c = inside ? (base.map((v) => v * shade) as RGB) : [22, 22, 24];
       } else {
         const g = 120 + 60 * (x / W) + 20 * Math.sin(y / 17);
         c = [g * 0.95, g, g * 1.05];
