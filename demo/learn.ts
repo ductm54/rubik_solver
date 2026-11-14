@@ -203,6 +203,29 @@ function stepItem(s: SolveStep, i: number): HTMLLIElement {
 /** All pieces shown normally (a mask, once set, overrides the plain stickering setting). */
 const FULL_MASK = 'EDGES:------------,CORNERS:--------,CENTERS:------';
 
+// Step highlighting (grey out pieces the step doesn't work on), remembered per browser.
+const HIGHLIGHT_KEY = 'learn.highlight';
+let highlight = true;
+try {
+  highlight = localStorage.getItem(HIGHLIGHT_KEY) !== 'off';
+} catch {
+  /* storage unavailable: default on */
+}
+const optHighlight = $<HTMLInputElement>('opt-highlight');
+optHighlight.checked = highlight;
+optHighlight.onchange = () => {
+  highlight = optHighlight.checked;
+  try {
+    localStorage.setItem(HIGHLIGHT_KEY, highlight ? 'on' : 'off');
+  } catch {
+    /* not remembered */
+  }
+  if (plan && view !== 'whole') {
+    const mask = plan.steps[view].mask;
+    player.experimentalStickeringMaskOrbits = highlight && mask ? mask : FULL_MASK;
+  }
+};
+
 const tokens = (alg: string) => alg.split(/\s+/).filter(Boolean);
 const len = (i: number) => tokens(plan!.steps[i].alg).length;
 
@@ -239,7 +262,7 @@ async function load(next: 'whole' | number, g: number) {
   } else {
     player.experimentalSetupAlg = [planScramble, ...steps.slice(0, next).map((s) => s.alg)].filter(Boolean).join(' ');
     player.alg = steps[next].alg;
-    if (steps[next].mask) player.experimentalStickeringMaskOrbits = steps[next].mask!;
+    if (highlight && steps[next].mask) player.experimentalStickeringMaskOrbits = steps[next].mask!;
     else player.experimentalStickeringMaskOrbits = FULL_MASK;
   }
   renderNav();
