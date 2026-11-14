@@ -66,9 +66,14 @@ export interface Classified {
   margin: number;
 }
 
-/** Nearest reference colour for one sticker. */
-export function classifySticker(lab: Lab, refs: Record<Color, Lab> = REFERENCE_LAB): Classified {
-  const d = COLORS.map((c) => ({ c, d: stickerDistance(lab, refs[c]) })).sort((x, y) => x.d - y.d);
+/**
+ * Nearest reference colour for one sticker. With RGB given, compares colour proportions (robust to
+ * the sticker being dimly lit) plus a little lightness; otherwise uses Lab.
+ */
+export function classifySticker(lab: Lab, refs: Record<Color, Lab> = REFERENCE_LAB, rgb?: RGB): Classified {
+  const dist = (c: Color) =>
+    rgb ? chromaDistance(rgb, REFERENCE_RGB[c]) * 300 + Math.abs(lab[0] - refs[c][0]) * 0.15 : stickerDistance(lab, refs[c]);
+  const d = COLORS.map((c) => ({ c, d: dist(c) })).sort((x, y) => x.d - y.d);
   return { color: d[0].c, distance: d[0].d, margin: d[1].d - d[0].d };
 }
 
@@ -108,4 +113,14 @@ export function classifyBalanced(labs: Lab[]): Color[] {
   }
   const match = hungarian(cost);
   return match.map((slot) => centerColors[Math.floor(slot / 9)]);
+}
+
+/**
+ * Brightness-independent colour difference: compares the proportions r:g:b. Shading (a side face
+ * turned away from the light) scales all channels together, so a dim orange still matches orange.
+ */
+export function chromaDistance(a: RGB, b: RGB): number {
+  const sa = a[0] + a[1] + a[2] || 1;
+  const sb = b[0] + b[1] + b[2] || 1;
+  return Math.hypot(a[0] / sa - b[0] / sb, a[1] / sa - b[1] / sb, a[2] / sa - b[2] / sb);
 }

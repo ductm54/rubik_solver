@@ -10,8 +10,8 @@
  *   5. normalise the labelling so row 0 is at the top of the image, then sample the middle of each
  *      sticker in Lab, dropping glare / outlier pixels
  */
-import type { Color } from '../core/cube';
-import { type Lab, type RGB, classifySticker, rgbToLab } from './color';
+import type { Color, EdgeSide } from '../core/cube';
+import { type Lab, type RGB, classifySticker, deltaE, rgbToLab } from './color';
 import { type Homography, type Point, applyH, fitHomography } from './homography';
 
 export interface RGBAImage {
@@ -24,6 +24,17 @@ export interface Region {
   cx: number;
   cy: number;
   area: number;
+  /** Long / short axis ratio. */
+  aspect: number;
+  /** Mean colour of the region. */
+  rgb: RGB;
+}
+
+export interface StripReading {
+  /** Edge of the face (as seen in the image) that the strip touches. */
+  edge: EdgeSide;
+  /** 3 stickers of the neighbouring side, aligned with the face's edge stickers listed clockwise. */
+  stickers: { center: Point; lab: Lab; rgb: RGB; color: Color }[];
 }
 
 export interface StickerReading {
@@ -53,6 +64,8 @@ export interface FaceReading {
   residual: number;
   /** Laplacian variance inside the face (higher = sharper). */
   sharpness: number;
+  /** Strip of a neighbouring side, when the cube is tilted enough to show one. */
+  strip?: StripReading;
 }
 
 export interface DetectOptions {
@@ -100,7 +113,7 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
   // Image border counts as edge so regions touching it are dropped below.
 
   // 2. regions
-  const regions = findRegions(mask, W, H);
+  const { squares: regions } = findRegions(mask, W, H, data);
 
   // 3. grid search
   const best = findGrid(regions);
@@ -126,7 +139,7 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
     for (let col = 0; col < 3; col++) {
       const center = applyH(Hm, [col, row]);
       const { lab, rgb } = sampleSticker(data, W, H, Hm, col, row);
-      const cls = classifySticker(lab);
+      const cls = classifySticker(lab, undefined, rgb);
       const found = regions.some((r) => Math.hypot(r.cx - center[0], r.cy - center[1]) < 0.3 * pitch);
       stickers.push({ center, lab, rgb, color: cls.color, margin: cls.margin, found });
     }
@@ -141,6 +154,7 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
       found: stickers.filter((s) => s.found).length,
       residual: best.residual,
       sharpness: laplacianVariance(grey, W, H, corners),
+      strip: sampleStrip(data, W, H, Hm, pitch),
     },
     regions,
   };
@@ -213,12 +227,17 @@ function dilate(src: Uint8Array, W: number, H: number): Uint8Array {
 }
 
 /** Connected non-edge regions (4-connectivity) that look like a filled square. */
-function findRegions(mask: Uint8Array, W: number, H: number): Region[] {
+function findRegions(
+  mask: Uint8Array,
+  W: number,
+  H: number,
+  data: Uint8ClampedArray | Uint8Array,
+): { squares: Region[] } {
   const N = W * H;
   const label = new Int32Array(N).fill(-1);
   const minArea = Math.max(25, N * 0.0006);
   const maxArea = N * 0.08;
-  const out: Region[] = [];
+  const squares: Region[] = [];
   const stack = new Int32Array(N);
   for (let start = 0; start < N; start++) {
     if (mask[start] || label[start] !== -1) continue;
@@ -231,6 +250,9 @@ function findRegions(mask: Uint8Array, W: number, H: number): Region[] {
     let sxx = 0;
     let syy = 0;
     let sxy = 0;
+    let sr = 0;
+    let sg = 0;
+    let sb = 0;
     let touches = false;
     while (sp) {
       const i = stack[--sp];
@@ -242,6 +264,9 @@ function findRegions(mask: Uint8Array, W: number, H: number): Region[] {
       sxx += x * x;
       syy += y * y;
       sxy += x * y;
+      sr += data[i * 4];
+      sg += data[i * 4 + 1];
+      sb += data[i * 4 + 2];
       if (x <= 1 || y <= 1 || x >= W - 2 || y >= H - 2) touches = true;
       // neighbours (border pixels are always mask=1, so no bounds checks needed beyond them)
       const nb = [i - 1, i + 1, i - W, i + W];
@@ -263,13 +288,132 @@ function findRegions(mask: Uint8Array, W: number, H: number): Region[] {
     const disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - det));
     const l1 = tr / 2 + disc;
     const l2 = tr / 2 - disc;
-    if (l2 <= 0 || Math.sqrt(l1 / l2) > 2.2) continue;
+    if (l2 <= 0) continue;
+    const aspect = Math.sqrt(l1 / l2);
     // A filled rectangle has area = 12·sqrt(det); ragged or hollow shapes fall short / over.
     const fill = n / (12 * Math.sqrt(det));
-    if (fill < 0.8 || fill > 1.12) continue;
-    out.push({ cx, cy, area: n });
+    if (fill < 0.8 || fill > 1.12 || aspect > 2.2) continue;
+    squares.push({ cx, cy, area: n, aspect, rgb: [sr / n, sg / n, sb / n] });
+  }
+  return { squares };
+}
+
+/**
+ * Look just beyond each edge of the face for the visible strip of the neighbouring side (shown
+ * when the cube is tilted). For each of the 3 sticker positions along an edge, march outward
+ * along a few parallel lines: a strip shows as a short run of sticker colour between dark cube
+ * body pixels. Background is rejected because its run does not end close to the edge.
+ * Distances are in the face's grid units (one sticker pitch), extrapolated past the edge.
+ */
+function sampleStrip(
+  data: Uint8ClampedArray | Uint8Array,
+  W: number,
+  H: number,
+  Hm: Homography,
+  pitch: number,
+): StripReading | undefined {
+  const STEP = 0.02;
+  const MAX_O = 1.0;
+  const pixelPerUnit = pitch;
+  const edges: { edge: EdgeSide; at: (slot: number, o: number) => Point }[] = [
+    { edge: 'top', at: (t, o) => [t, -0.5 - o] },
+    { edge: 'right', at: (t, o) => [2.5 + o, t] },
+    { edge: 'bottom', at: (t, o) => [2 - t, 2.5 + o] },
+    { edge: 'left', at: (t, o) => [-0.5 - o, 2 - t] },
+  ];
+  const sample = (g: Point): RGB | null => {
+    const [x, y] = applyH(Hm, g);
+    if (x < 0 || y < 0 || x > W - 2 || y > H - 2) return null;
+    return bilinear(data, W, x, y);
+  };
+  const isDark = (rgb: RGB) => {
+    const max = Math.max(...rgb);
+    const min = Math.min(...rgb);
+    return max < 70 && max - min < 35;
+  };
+
+  let best: { edge: EdgeSide; stickers: StripReading['stickers']; score: number } | undefined;
+  for (const e of edges) {
+    const stickers: StripReading['stickers'] = [];
+    const slotLens: number[] = [];
+    let lengthSum = 0;
+    for (let slot = 0; slot < 3; slot++) {
+      const runs: { len: number; colors: RGB[]; mid: Point }[] = [];
+      for (const dt of [-0.15, 0, 0.15]) {
+        const t = slot + dt;
+        // March from just inside the face's own edge sticker, across the dark seam, then
+        // along the neighbour's first row until dark again or a clear colour change.
+        const O0 = -0.12;
+        const n = Math.round((MAX_O - O0) / STEP);
+        const line: RGB[] = [];
+        const labs: Lab[] = [];
+        let start = -1;
+        let end = -1;
+        let sawDark = false;
+        for (let k = 0; k <= n; k++) {
+          const rgb = sample(e.at(t, O0 + k * STEP));
+          if (!rgb) break;
+          line.push(rgb);
+          labs.push(rgbToLab(rgb));
+          const dark = isDark(rgb);
+          if (start < 0) {
+            if (dark) sawDark = true;
+            else if (sawDark) start = k;
+            else if (O0 + k * STEP > 0.15) break; // no seam near the edge: not a cube edge
+          } else if (dark) {
+            end = k;
+            break;
+          } else if (k - start >= 2) {
+            // colour change against the run so far (rows can touch with no visible gap)
+            const ref = labs[start + Math.floor((k - start) / 2)];
+            if (deltaE(labs[k], ref) > 22 && deltaE(labs[Math.min(k, labs.length - 1)], labs[k - 1]) > 10) {
+              end = k;
+              break;
+            }
+          }
+        }
+        if (start < 0 || end < 0 || O0 + start * STEP > 0.3) continue;
+        const len = (end - start) * STEP;
+        if (len * pixelPerUnit < 2) continue; // under 2 px: too thin to read
+        const inner = line.slice(start + Math.floor((end - start) * 0.25), end - Math.floor((end - start) * 0.25));
+        if (!inner.length) continue;
+        const mid = O0 + ((start + end) / 2) * STEP;
+        runs.push({ len, colors: inner, mid: applyH(Hm, e.at(t, mid)) });
+      }
+      if (runs.length < 2) break;
+      const colors = runs.flatMap((r) => r.colors);
+      const rgb = [0, 1, 2].map((c) => median(colors.map((x) => x[c]))) as RGB;
+      const lab = rgbToLab(rgb);
+      const slotLen = runs.reduce((a, r) => a + r.len, 0) / runs.length;
+      slotLens.push(slotLen);
+      lengthSum += slotLen;
+      stickers.push({ center: runs[Math.floor(runs.length / 2)].mid, rgb: rgb.map(Math.round) as RGB, lab, color: classifySticker(lab, undefined, rgb).color });
+    }
+    if (stickers.length !== 3) continue;
+    if (Math.max(...slotLens) > 2 * Math.min(...slotLens)) continue; // a real strip is an even band
+    if (!best || lengthSum > best.score) best = { edge: e.edge, stickers, score: lengthSum };
+  }
+  return best && { edge: best.edge, stickers: best.stickers };
+}
+
+function bilinear(data: Uint8ClampedArray | Uint8Array, W: number, x: number, y: number): RGB {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const out: RGB = [0, 0, 0];
+  for (let c = 0; c < 3; c++) {
+    const p = (y0 * W + x0) * 4 + c;
+    const top = data[p] * (1 - fx) + data[p + 4] * fx;
+    const bot = data[p + W * 4] * (1 - fx) + data[p + W * 4 + 4] * fx;
+    out[c] = top * (1 - fy) + bot * fy;
   }
   return out;
+}
+
+function median(v: number[]): number {
+  const s = [...v].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
 }
 
 interface GridFit {

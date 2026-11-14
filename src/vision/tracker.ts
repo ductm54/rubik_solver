@@ -4,7 +4,7 @@
  * reported as a duplicate instead.
  */
 import type { Color } from '../core/cube';
-import type { FaceReading } from './detect';
+import type { FaceReading, StripReading } from './detect';
 import type { Point } from './homography';
 
 export type TrackStatus = 'searching' | 'steadying' | 'captured' | 'duplicate';
@@ -26,7 +26,7 @@ export interface TrackerOptions {
 
 export class CaptureTracker {
   readonly captured = new Map<Color, FaceReading>();
-  private start: { t: number; corners: Point[]; colors: string } | null = null;
+  private start: { t: number; corners: Point[]; colors: string; strip?: StripReading } | null = null;
   private lastCaptureKey = '';
   private opts: Required<TrackerOptions>;
 
@@ -62,16 +62,20 @@ export class CaptureTracker {
       ? Math.max(...face.corners.map((c, i) => Math.hypot(c[0] - this.start!.corners[i][0], c[1] - this.start!.corners[i][1])))
       : 0;
     if (!this.start || this.start.colors !== key || drift > this.opts.maxDrift * size) {
-      this.start = { t, corners: face.corners.map((c) => [...c] as Point), colors: key };
+      this.start = { t, corners: face.corners.map((c) => [...c] as Point), colors: key, strip: face.strip };
       return { status: 'steadying', progress: 0 };
     }
+    // Remember a neighbour strip seen at any point while the face was held steady.
+    if (face.strip) this.start.strip = face.strip;
     const progress = Math.min(1, (t - this.start.t) / this.opts.steadyMs);
     if (progress < 1) return { status: 'steadying', progress };
 
+    const strip = face.strip ?? this.start.strip;
     this.start = null;
     this.lastCaptureKey = key;
     if (this.captured.has(center)) return { status: 'duplicate', progress: 1 };
-    this.captured.set(center, face);
-    return { status: 'captured', progress: 1, capture: face };
+    const capture = strip ? { ...face, strip } : face;
+    this.captured.set(center, capture);
+    return { status: 'captured', progress: 1, capture };
   }
 }

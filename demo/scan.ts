@@ -1,7 +1,10 @@
-import { COLORS, type Color, applyMoves, randomMoves, solvedState, rotateFace, FACES } from '../src/core/cube';
+import { COLORS, type Color, type CubeState, FACES, applyMoves, randomMoves, solvedState } from '../src/core/cube';
+import { validate } from '../src/core/validate';
+import { captureOf, readCube } from '../src/scan/readCube';
 import type { FaceReading, Region } from '../src/vision/detect';
-import { renderFace } from '../src/vision/synth';
+import { neighboursOf, renderCube } from '../src/vision/synth';
 import { CaptureTracker, type TrackUpdate } from '../src/vision/tracker';
+import { createNet, encodeCube } from './net';
 
 const COLOR_NAMES: Record<Color, string> = { W: 'white', Y: 'yellow', G: 'green', B: 'blue', R: 'red', O: 'orange' };
 const CSS: Record<Color, string> = { W: 'var(--W)', Y: 'var(--Y)', G: 'var(--G)', B: 'var(--B)', R: 'var(--R)', O: 'var(--O)' };
@@ -55,32 +58,36 @@ async function startCamera() {
   setMode('camera');
 }
 
-// Simulated cube: a random scrambled cube; shows one face at a time with hand jitter and moves to
-// the next face a moment after each capture.
+// Simulated cube: a random scrambled cube rendered in 3D. It shows one face at a time, tilted so
+// a strip of the side above shows, with some hand jitter, and turns to the next face after each
+// capture.
 const simState = applyMoves(solvedState(), randomMoves(25));
 let simFace = 0;
 let simSwitchAt = 0;
 function startSim() {
   stopAll();
   simFace = 0;
-  sim.width = 320;
-  sim.height = 240;
+  simSwitchAt = performance.now();
+  sim.width = 360;
+  sim.height = 270;
   setMode('sim');
 }
 function drawSim(t: number) {
-  const f = FACES[simFace % 6];
-  const turns = simFace % 4;
-  const colors = rotateFace(simState[f], turns);
+  const front = FACES[simFace % 6];
+  const up = neighboursOf(front)[(simFace * 3 + 1) % 4];
   const wobble = Math.max(0, 1 - (t - simSwitchAt) / 900); // settles after switching faces
-  const jx = Math.sin(t / 90) * 14 * wobble + Math.sin(t / 700) * 0.6;
-  const jy = Math.cos(t / 110) * 10 * wobble;
-  const a = 0.15 * Math.sin(simFace * 1.7) + 0.2 * wobble * Math.sin(t / 130);
-  const half = 62;
-  const corners = ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as [number, number][]).map(([x, y]) => [
-    160 + jx + half * (x * Math.cos(a) - y * Math.sin(a)) * (1 + 0.06 * x * y * Math.sin(simFace)),
-    120 + jy + half * (x * Math.sin(a) + y * Math.cos(a)),
-  ]) as [[number, number], [number, number], [number, number], [number, number]];
-  const img = renderFace(colors, { corners, noise: 5, clutter: false });
+  const img = renderCube(
+    simState,
+    {
+      front,
+      up,
+      pitch: 22 + 10 * wobble * Math.sin(t / 120),
+      yaw: 4 * Math.sin(simFace * 2.1) + 12 * wobble * Math.sin(t / 150),
+      roll: 12 * Math.sin(simFace * 1.3) + 0.6 * Math.sin(t / 700),
+      shift: [Math.sin(t / 90) * 14 * wobble, Math.cos(t / 110) * 10 * wobble],
+    },
+    { noise: 4 },
+  );
   sim.getContext('2d')!.putImageData(new ImageData(img.data as Uint8ClampedArray<ArrayBuffer>, img.width, img.height), 0, 0);
 }
 
@@ -178,7 +185,7 @@ function miniFace(colors: Color[] | null, uncertain: boolean[] = []): HTMLElemen
 }
 
 function renderLive(face: FaceReading | null) {
-  live.replaceChildren(miniFace(face?.colors ?? null, face?.stickers.map((s) => s.margin < 8) ?? []));
+  live.replaceChildren(miniFace(face?.colors ?? null, face?.stickers.map((s) => s.margin < 10) ?? []));
 }
 
 function renderCaptured() {
@@ -197,7 +204,9 @@ function renderCaptured() {
     slot.onclick = () => {
       tracker.forget(c);
       renderCaptured();
+      reviewEl.classList.add('hidden');
     };
+    if (f?.strip) slot.classList.add('has-strip');
     capturedEl.append(slot);
   }
   countEl.textContent = `${tracker.captured.size} / 6`;
@@ -206,6 +215,7 @@ function renderCaptured() {
 let audio: AudioContext | null = null;
 function onCapture(face: FaceReading) {
   renderCaptured();
+  if (tracker.captured.size === 6) runReview();
   navigator.vibrate?.(60);
   try {
     audio ??= new AudioContext();
@@ -220,7 +230,7 @@ function onCapture(face: FaceReading) {
   } catch {
     /* no audio */
   }
-  if (mode === 'sim') {
+  if (mode === 'sim' && tracker.captured.size < 6) {
     // move to a face we don't have yet
     setTimeout(() => {
       for (let k = 1; k <= 6; k++) {
@@ -275,7 +285,7 @@ function drawOverlay() {
       ctx.fillStyle = CSS_HEX[s.color];
       ctx.fill();
       ctx.lineWidth = 2 * dpr * lw;
-      ctx.strokeStyle = s.margin < 8 ? '#ff3b30' : 'rgba(0,0,0,0.6)';
+      ctx.strokeStyle = s.margin < 10 ? '#ff3b30' : 'rgba(0,0,0,0.6)';
       ctx.stroke();
     }
     if (st === 'steadying') {
@@ -292,6 +302,66 @@ function drawOverlay() {
 
 const CSS_HEX: Record<Color, string> = { W: '#ffffff', Y: '#ffd500', G: '#009b48', B: '#0046ad', R: '#b71234', O: '#ff5800' };
 
+// ---------------------------------------------------------------- review / manual fix
+
+const reviewEl = $('review');
+const reviewSummary = $('review-summary');
+const reviewStatus = $('review-status');
+const btnAlt = $<HTMLButtonElement>('btn-alt');
+const btnScramble = $<HTMLAnchorElement>('btn-scramble');
+const net = createNet($('net'), $('palette'), (s) => renderReviewStatus(s));
+let alternatives: CubeState[] = [];
+let altIndex = 0;
+
+function runReview() {
+  const captures = COLORS.map((c) => tracker.captured.get(c)).filter((f): f is FaceReading => !!f).map(captureOf);
+  const r = readCube(captures);
+  alternatives = r.states;
+  altIndex = 0;
+  net.set(r.guess);
+  const how = r.usedStrips
+    ? `Face rotations came from neighbour strips on ${r.usedStrips} of 6 faces${r.combinationsTried > 1 ? `, plus a search of ${r.combinationsTried} combinations` : ''}.`
+    : `No usable neighbour strips, so all ${r.combinationsTried.toLocaleString()} face-rotation combinations were tried.`;
+  if (r.states.length === 1) reviewSummary.textContent = `Read a valid cube. ${how}`;
+  else if (r.states.length > 1)
+    reviewSummary.textContent = `${r.states.length} valid cubes match these faces. ${how} Check against your cube, or rescan a face with the cube tilted so a side strip shows.`;
+  else
+    reviewSummary.textContent = `No valid cube matches; a sticker was probably misread. Showing the closest guess: compare it with your cube and fix the wrong stickers.`;
+  btnAlt.classList.toggle('hidden', r.states.length < 2);
+  renderReviewStatus(net.get());
+  reviewEl.classList.remove('hidden');
+  reviewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderReviewStatus(s: CubeState) {
+  const v = validate(s);
+  reviewStatus.className = `status ${v.ok ? 'ok' : 'bad'}`;
+  reviewStatus.replaceChildren();
+  if (v.ok) reviewStatus.textContent = 'Valid cube ✓';
+  else {
+    const ul = document.createElement('ul');
+    for (const e of v.errors) {
+      const li = document.createElement('li');
+      li.textContent = e;
+      ul.append(li);
+    }
+    reviewStatus.append(ul);
+  }
+  btnScramble.href = `./index.html#cube=${encodeCube(s)}&from=scan`;
+  btnScramble.classList.toggle('disabled', !v.ok);
+  btnScramble.setAttribute('aria-disabled', String(!v.ok));
+}
+
+btnAlt.onclick = () => {
+  altIndex = (altIndex + 1) % alternatives.length;
+  net.set(alternatives[altIndex]);
+  renderReviewStatus(net.get());
+  btnAlt.textContent = `Next possibility (${altIndex + 1}/${alternatives.length})`;
+};
+btnScramble.onclick = (e) => {
+  if (btnScramble.classList.contains('disabled')) e.preventDefault();
+};
+
 // ---------------------------------------------------------------- wiring
 
 btnCamera.onclick = () => void startCamera();
@@ -303,6 +373,7 @@ $<HTMLInputElement>('file').onchange = (e) => {
 $('btn-clear').onclick = () => {
   tracker.reset();
   renderCaptured();
+  reviewEl.classList.add('hidden');
 };
 video.addEventListener('loadedmetadata', () => setMode('camera'));
 if (!navigator.mediaDevices?.getUserMedia) {
@@ -314,4 +385,4 @@ renderLive(null);
 renderCaptured();
 requestAnimationFrame(tick);
 // For automated tests / debugging.
-Object.assign(window, { scanner: { tracker, get mode() { return mode; } } });
+Object.assign(window, { scanner: { tracker, simState, get mode() { return mode; }, getNet: () => encodeCube(net.get()) } });

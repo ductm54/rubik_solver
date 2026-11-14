@@ -128,3 +128,12 @@ footer a { color: inherit; }
 .slot.filled .dot { opacity: 1; }
 .slot .mini-grid span { border-radius: 2px; }
 @media (max-width: 480px) { .captured { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* --- review */
+.span-all { grid-column: 1 / -1; }
+.review-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 8px; }
+@media (min-width: 900px) { .review-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+a.button-like { text-decoration: none; }
+a.primary.button-like { color: var(--accent-text); border-color: var(--accent); }
+a.disabled { opacity: 0.45; pointer-events: none; }
+.slot.has-strip::after { content: ''; position: absolute; left: 30%; right: 30%; bottom: 2px; height: 3px; border-radius: 2px; background: var(--accent); }

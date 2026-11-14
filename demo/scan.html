@@ -13,7 +13,7 @@
         <a href="./scan.html" aria-current="page">Scan</a>
       </nav>
       <h1>Cube Face Scanner</h1>
-      <p class="sub">Phase 1 demo: hold one face of the cube up to the camera. Each face is captured once it is steady.</p>
+      <p class="sub">Show each of the 6 faces to the camera, in any order and any rotation. Tilt the cube a little so a strip of the next side shows; that pins the face's rotation.</p>
     </header>
 
     <main>
@@ -50,7 +50,28 @@
           <button id="btn-clear" class="ghost small">Clear</button>
         </div>
         <div id="captured" class="captured"></div>
-        <p class="hint">Tap a captured face to rescan it. Phase 2 will assemble the 6 faces into a cube and hand it to the scramble finder.</p>
+        <p class="hint">Tap a captured face to rescan it. A small bar under a face means a neighbour strip was seen.</p>
+      </section>
+
+      <section id="review" class="card span-all hidden">
+        <div class="row between">
+          <h2>Review cube</h2>
+          <div class="row gap wrap">
+            <button id="btn-alt" class="ghost hidden">Next possibility</button>
+            <a id="btn-scramble" class="primary button-like" href="./index.html">Find scramble →</a>
+          </div>
+        </div>
+        <p id="review-summary" class="hint"></p>
+        <div class="review-grid">
+          <div>
+            <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour"></div>
+            <div id="net" class="net" aria-label="Cube net"></div>
+          </div>
+          <div>
+            <div id="review-status" class="status" aria-live="polite"></div>
+            <p class="hint">If a sticker was misread, tap a colour and then the sticker to fix it. Centers are fixed: white top (U), green front (F).</p>
+          </div>
+        </div>
       </section>
     </main>
 
