@@ -1,19 +1,18 @@
 /**
- * Auto-capture: a face is captured once it has been seen steady (same colours, corners barely
- * moving, sharp enough) for `steadyMs`. A face whose center colour was already captured is
- * reported as a duplicate instead.
+ * Auto-capture for free-hand scanning: a detected face is captured once it has been seen steady
+ * (same colours, corners barely moving, sharp enough) for `steadyMs`. It fires once per hold;
+ * whether that face was already scanned is for the caller to decide.
  */
-import type { Color } from '../core/cube';
 import type { FaceReading, StripReading } from './detect';
 import type { Point } from './homography';
 
-export type TrackStatus = 'searching' | 'steadying' | 'captured' | 'duplicate';
+export type TrackStatus = 'searching' | 'steadying' | 'captured';
 
 export interface TrackUpdate {
   status: TrackStatus;
   /** 0..1 while steadying. */
   progress: number;
-  /** Set on the frame a new face is captured. */
+  /** Set on the frame the face is captured. */
   capture?: FaceReading;
 }
 
@@ -25,7 +24,6 @@ export interface TrackerOptions {
 }
 
 export class CaptureTracker {
-  readonly captured = new Map<Color, FaceReading>();
   private start: { t: number; corners: Point[]; colors: string; strip?: StripReading } | null = null;
   private lastCaptureKey = '';
   private opts: Required<TrackerOptions>;
@@ -35,13 +33,7 @@ export class CaptureTracker {
   }
 
   reset(): void {
-    this.captured.clear();
     this.start = null;
-    this.lastCaptureKey = '';
-  }
-
-  forget(center: Color): void {
-    this.captured.delete(center);
     this.lastCaptureKey = '';
   }
 
@@ -52,11 +44,8 @@ export class CaptureTracker {
       return { status: 'searching', progress: 0 };
     }
     const key = face.colors.join('');
-    const center = face.colors[4];
-    if (this.captured.has(center) && key === this.lastCaptureKey) {
-      // Still looking at the face we just captured.
-      return { status: 'captured', progress: 1 };
-    }
+    // Still looking at the face we just captured.
+    if (key === this.lastCaptureKey) return { status: 'captured', progress: 1 };
     const size = Math.hypot(face.corners[0][0] - face.corners[2][0], face.corners[0][1] - face.corners[2][1]);
     const drift = this.start
       ? Math.max(...face.corners.map((c, i) => Math.hypot(c[0] - this.start!.corners[i][0], c[1] - this.start!.corners[i][1])))
@@ -73,9 +62,6 @@ export class CaptureTracker {
     const strip = face.strip ?? this.start.strip;
     this.start = null;
     this.lastCaptureKey = key;
-    if (this.captured.has(center)) return { status: 'duplicate', progress: 1 };
-    const capture = strip ? { ...face, strip } : face;
-    this.captured.set(center, capture);
-    return { status: 'captured', progress: 1, capture };
+    return { status: 'captured', progress: 1, capture: strip ? { ...face, strip } : face };
   }
 }

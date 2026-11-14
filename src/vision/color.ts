@@ -67,14 +67,48 @@ export interface Classified {
 }
 
 /**
- * Nearest reference colour for one sticker. With RGB given, compares colour proportions (robust to
- * the sticker being dimly lit) plus a little lightness; otherwise uses Lab.
+ * Colour of one sticker seen alone (the live preview; the whole-cube reading later rebalances all
+ * 54 against each other). With RGB given it goes by hue and saturation, which hold up when the
+ * camera over- or under-exposes: a washed-out orange is still reddish, not white. Without RGB it
+ * is the nearest reference colour in Lab.
  */
 export function classifySticker(lab: Lab, refs: Record<Color, Lab> = REFERENCE_LAB, rgb?: RGB): Classified {
-  const dist = (c: Color) =>
-    rgb ? chromaDistance(rgb, REFERENCE_RGB[c]) * 300 + Math.abs(lab[0] - refs[c][0]) * 0.15 : stickerDistance(lab, refs[c]);
-  const d = COLORS.map((c) => ({ c, d: dist(c) })).sort((x, y) => x.d - y.d);
+  if (rgb) return classifyByHue(rgb);
+  const d = COLORS.map((c) => ({ c, d: stickerDistance(lab, refs[c]) })).sort((x, y) => x.d - y.d);
   return { color: d[0].c, distance: d[0].d, margin: d[1].d - d[0].d };
+}
+
+const WHITE_SATURATION = 0.2;
+/** Hue ranges in degrees, starting at red. Green runs far into cyan: overexposed green looks mint. */
+const HUE_STARTS: [number, Color][] = [
+  [-22, 'R'],
+  [10, 'O'],
+  [40, 'Y'],
+  [75, 'G'],
+  [188, 'B'],
+  [275, 'R'],
+];
+
+function classifyByHue([r, g, b]: RGB): Classified {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max ? (max - min) / max : 0;
+  // margin: how far the reading is from the nearest decision line, on a scale where 10 is safe
+  const whiteGap = Math.abs(sat - WHITE_SATURATION) * 100;
+  if (sat < WHITE_SATURATION) return { color: 'W', distance: sat * 100, margin: whiteGap };
+  let hue = max === r ? ((g - b) / (max - min)) * 60 : max === g ? 120 + ((b - r) / (max - min)) * 60 : 240 + ((r - g) / (max - min)) * 60;
+  if (hue >= 338) hue -= 360;
+  let k = 0;
+  while (k + 1 < HUE_STARTS.length && hue >= HUE_STARTS[k + 1][0]) k++;
+  let color = HUE_STARTS[k][1];
+  const end = k + 1 < HUE_STARTS.length ? HUE_STARTS[k + 1][0] : 338;
+  let margin = Math.min(whiteGap, hue - HUE_STARTS[k][0], end - hue);
+  // An overexposed orange clips to a pale salmon with a red hue; a real red stays saturated.
+  if (color === 'R' && k === 0) {
+    if (sat < 0.55) color = 'O';
+    margin = Math.min(margin, Math.abs(sat - 0.55) * 60);
+  }
+  return { color, distance: 0, margin };
 }
 
 /**
