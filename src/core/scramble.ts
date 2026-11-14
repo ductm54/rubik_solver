@@ -10,6 +10,7 @@ import {
   STANDARD_SCHEME,
   applyMoves,
   formatAlg,
+  fromFacelets,
   invertAlg,
   parseAlg,
   solvedState,
@@ -59,6 +60,19 @@ export function generateScramble(state: CubeState): ScrambleResult {
     throw new Error('Internal error: generated scramble does not reproduce the cube');
   }
   return { scramble, solution, moveCount: scrambleMoves.length };
+}
+
+/**
+ * Random-state scramble (as WCA scramblers do): a uniformly random reachable cube, then the
+ * scramble that produces it. Every scramble is about 18-21 moves.
+ */
+export function randomStateScramble(): ScrambleResult {
+  initSolver();
+  for (;;) {
+    const state = fromFacelets(Cube.random().asString());
+    const r = generateScramble(state);
+    if (r.moveCount >= 15) return r; // skip the astronomically rare near-solved states
+  }
 }
 
 export { STANDARD_SCHEME };

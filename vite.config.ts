@@ -28,6 +28,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'demo/index.html'),
         scan: resolve(import.meta.dirname, 'demo/scan.html'),
+        timer: resolve(import.meta.dirname, 'demo/timer.html'),
       },
     },
   },

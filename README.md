@@ -9,9 +9,13 @@ Done so far:
   auto-capture ([demo](https://ductm54.github.io/rubik_solver/scan.html)).
 - **Phase 2**: free-hand 6-face scan: faces in any order and rotation, neighbour-strip
   orientation, whole-cube colour reading, a review / manual fix screen, and hand-off to the
-  scramble page. Plan: [Rubik Cube Scanner App — Plan](https://claude.ai/artifact/K7kwAwiXBCjcMvoC7A37Yv).
+  scramble page.
+- **Phase 3**: timer with WCA inspection (+2 after 15 s, DNF after 17 s), hold-and-release start,
+  random-state scrambles, solve history with ao5 / ao12 / ao100, a history chart, penalties and
+  notes, csTimer import / export, saved in IndexedDB
+  ([demo](https://ductm54.github.io/rubik_solver/timer.html)). Plan: [Rubik Cube Scanner App — Plan](https://claude.ai/artifact/K7kwAwiXBCjcMvoC7A37Yv).
 
-**Live demo:** https://ductm54.github.io/rubik_solver/ · scanner: https://ductm54.github.io/rubik_solver/scan.html
+**Live demo:** https://ductm54.github.io/rubik_solver/ · scanner: https://ductm54.github.io/rubik_solver/scan.html · timer: https://ductm54.github.io/rubik_solver/timer.html
 
 ## Develop
 
@@ -35,6 +39,11 @@ npm run build    # static site in dist/
 | `src/vision/tracker.ts` | Auto-capture once a face is steady for 300 ms; duplicate-center detection |
 | `src/vision/synth.ts` | Synthetic camera frames: a flat face (perspective, tint, glare, noise, clutter) and a ray-cast 3D cube for tilted views with visible side strips; used by tests and the simulated-cube mode |
 | `src/scan/readCube.ts` | 6 captures → cube: centers name the faces, exactly 9 per colour, strips matched by colour proportions, `assemble()`, best guess for manual fixing |
+| `src/timer/machine.ts` | Timer state machine: inspection, hold-to-ready, false starts, +2 / DNF from inspection |
+| `src/timer/stats.ts` | Solve records, time formatting, WCA averages (5% trimmed, DNF rules), rolling and best aoN |
+| `src/timer/cstimer.ts` | csTimer export / import (all sessions) |
+| `src/timer/store.ts` | Solve storage: IndexedDB, in-memory fallback; one interface for SQLite later |
+| `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
 | `demo/scan.*` | Camera page: overlay, live reading, six captured-face slots; also a simulated cube and photo upload |
 | `demo/` | 2D net editor, Generate button, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
 | `tests/` | Move-engine checks and the five Phase 0 acceptance tests |

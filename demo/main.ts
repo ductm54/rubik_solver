@@ -42,6 +42,7 @@ function clearOutput() {
   meta.textContent = '';
   btnCopy.disabled = true;
   player.alg = '';
+  $('btn-time').classList.add('hidden');
 }
 
 function onStateChange() {
@@ -84,6 +85,9 @@ worker.onmessage = (e) => {
     : 'Nothing to do: the cube is solved.';
   btnCopy.disabled = !d.scramble;
   player.alg = d.scramble;
+  const btnTime = $<HTMLAnchorElement>('btn-time');
+  btnTime.href = `./timer.html#${new URLSearchParams({ scramble: d.scramble, source: cameFromScan ? 'scan' : 'manual' })}`;
+  btnTime.classList.toggle('hidden', !d.scramble);
 };
 
 btnGenerate.onclick = () => {
@@ -101,6 +105,7 @@ btnCopy.onclick = async () => {
 };
 
 // Cube passed in the URL (from the scanner, or a shared link): #cube=<54 letters URFDLB>
+const cameFromScan = location.hash.includes('from=scan');
 const fromHash = decodeCube(/cube=([A-Z]{54})/.exec(location.hash)?.[1] ?? '');
 if (fromHash) net.set(fromHash);
 renderStatus();

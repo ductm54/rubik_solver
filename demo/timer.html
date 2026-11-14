@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Cube Timer</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body class="timer-page">
+    <header>
+      <nav class="tabs">
+        <a href="./index.html">Scramble</a>
+        <a href="./scan.html">Scan</a>
+        <a href="./timer.html" aria-current="page">Timer</a>
+      </nav>
+    </header>
+
+    <main class="timer-main">
+      <section class="card span-all scramble-card dimmable">
+        <div class="row between">
+          <div class="row gap wrap">
+            <h2>Scramble</h2>
+            <span id="source" class="tag hidden"></span>
+          </div>
+          <div class="row gap">
+            <button id="btn-copy-scramble" class="ghost small">Copy</button>
+            <button id="btn-new" class="ghost small" disabled>New scramble</button>
+          </div>
+        </div>
+        <div class="scramble-row">
+          <code id="scramble" class="scramble-text">Loading solver…</code>
+          <div id="preview" class="preview" aria-label="Scrambled cube preview"></div>
+        </div>
+      </section>
+
+      <section class="card span-all pad-card">
+        <div id="pad" class="pad" tabindex="0" role="button" aria-label="Timer: hold and release to start, tap to stop">
+          <div id="clock" class="clock">0.00</div>
+          <div id="hint" class="pad-hint">Hold space or touch here and release to start inspection</div>
+        </div>
+        <div id="last" class="last dimmable hidden">
+          <span id="last-time" class="last-time"></span>
+          <div class="row gap wrap">
+            <button class="ghost small" data-pen="none">OK</button>
+            <button class="ghost small" data-pen="+2">+2</button>
+            <button class="ghost small" data-pen="DNF">DNF</button>
+            <input id="last-note" class="note" placeholder="Note" maxlength="200" />
+            <button id="btn-delete-last" class="ghost small danger">Delete</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card dimmable">
+        <h2>Statistics</h2>
+        <div id="stats" class="stats-grid"></div>
+      </section>
+
+      <section class="card dimmable">
+        <div class="row between">
+          <h2>History</h2>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div id="chart" class="chart"></div>
+      </section>
+
+      <section class="card span-all dimmable">
+        <div class="row between">
+          <h2>Solves <span id="count" class="muted"></span></h2>
+          <div class="row gap wrap">
+            <label class="check"><input id="opt-inspection" type="checkbox" checked /> 15 s inspection</label>
+            <button id="btn-export" class="ghost small">Export (csTimer)</button>
+            <label class="ghost small button-like">Import<input id="file-import" type="file" accept=".txt,.json,application/json" hidden /></label>
+            <button id="btn-clear-all" class="ghost small danger">Clear all</button>
+          </div>
+        </div>
+        <p id="io-status" class="hint" aria-live="polite"></p>
+        <div class="table-wrap">
+          <table class="solves">
+            <thead>
+              <tr><th>#</th><th>Time</th><th>ao5</th><th>ao12</th><th class="hide-sm">Scramble</th><th class="hide-sm">Date</th><th></th></tr>
+            </thead>
+            <tbody id="solves"></tbody>
+          </table>
+        </div>
+        <button id="btn-more" class="ghost small hidden" style="margin-top: 10px">Show all</button>
+        <p id="storage-note" class="hint"></p>
+      </section>
+    </main>
+    <div id="tooltip" class="tooltip hidden" role="tooltip"></div>
+    <script type="module" src="./timer.ts"></script>
+  </body>
+</html>
