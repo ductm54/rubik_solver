@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vitest/config';
 
 /**
@@ -23,6 +24,12 @@ export default defineConfig({
     outDir: '../dist',
     emptyOutDir: true,
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'demo/index.html'),
+        scan: resolve(import.meta.dirname, 'demo/scan.html'),
+      },
+    },
   },
   worker: {
     format: 'es',
