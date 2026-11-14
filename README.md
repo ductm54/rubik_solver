@@ -103,6 +103,6 @@ npm run build    # static site in dist/
 - **F2L algorithms** come from a shortest-path search over the 150 places a pair can be, using only
   triggers that leave the cross and other slots alone (R U R', F' U F, R' F R F', ...), so every case is
   covered and each algorithm is checked, at the cost of some differing from the usual published ones.
-- **Deploys:** `.github/workflows/deploy.yml` runs tests, builds and publishes `dist/` to GitHub
-  Pages on every push to `main` or `claude/**`. In the repo's **Settings → Pages**, set
+- **Deploys:** `.github/workflows/deploy.yml` runs tests and builds on every push and pull
+  request, and publishes `dist/` to GitHub Pages on pushes to the default branch. In the repo's **Settings → Pages**, set
   **Source** to **GitHub Actions** once.
