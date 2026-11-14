@@ -192,6 +192,29 @@ describe('CFOP solver', () => {
     expect(plan.steps.every((s) => s.mask?.startsWith('EDGES:'))).toBe(true);
   });
 
+  it('advanced F2L: no rotations, solves the cube, fewer moves than standard', () => {
+    let std = 0;
+    let adv = 0;
+    const t = performance.now();
+    for (let n = 0; n < 60; n++) {
+      const state = applyMoves(solved, randomMoves(25));
+      const a = solveCfop(state, { crossColors: ['W'], f2l: 'advanced', oll: 'full', pll: 'full' });
+      const b = solveCfop(state, { crossColors: ['W'], f2l: 'standard', oll: 'full', pll: 'full' });
+      let st = state;
+      for (const step of a.steps) st = applyMoves(st, step.alg);
+      const arr = toColorArray(st);
+      expect([0, 1, 2, 3, 4, 5].every((f) => arr.slice(f * 9, f * 9 + 9).every((c) => c === arr[f * 9 + 4]))).toBe(true);
+      const f2l = a.steps.filter((s) => s.stage === 'f2l');
+      expect(f2l.length).toBe(4);
+      expect(f2l.every((s) => !/[xyz]/.test(s.alg))).toBe(true);
+      const sum = (p: typeof a) => p.steps.filter((s) => s.stage === 'f2l').reduce((x, s) => x + s.moves, 0);
+      std += sum(b);
+      adv += sum(a);
+    }
+    expect(adv).toBeLessThan(std);
+    expect((performance.now() - t) / 60).toBeLessThan(200);
+  });
+
   it('handles a solved cube', () => {
     const plan = solveCfop(solved, { crossColors: ['W'], oll: '2look', pll: '2look' });
     let st = solved;
