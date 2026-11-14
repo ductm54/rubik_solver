@@ -1,0 +1,25 @@
+{
+ "source": "Phone video by the repository owner: the stickerless cube turned by hand in low light over a pale crumpled cloth, phone held sideways. 10 frames per second, shrunk to 480 x 270.",
+ "fps": 10,
+ "frames": 127,
+ "faces": [
+  "BWRWRYGOY",
+  "WGOBWOGOY",
+  "OYRBORWBG",
+  "OYOWYYRGW",
+  "YGGGGWBRB",
+  "WOBRBBRRY"
+ ],
+ "shown": [
+  0,
+  1.2,
+  4.1,
+  6.9,
+  8.7,
+  11.0
+ ],
+ "brief": [
+  0
+ ],
+ "note": "faces: the 9 colours of each face in the order shown, row by row as seen. shown: when each face first comes into view, in seconds. brief: faces in view for under half a second (the video starts as the first face is being turned away), too short to capture. The 54 stickers form a valid cube. In the last face the reds are pale (saturation 0.32 to 0.47)."
+}

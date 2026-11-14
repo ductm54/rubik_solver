@@ -10,7 +10,7 @@
  * All plain TypeScript: runs in a Web Worker or in Node tests.
  */
 import type { Color, EdgeSide } from '../core/cube';
-import { type Lab, type RGB, classifySticker, deltaE, rgbToLab, robustColor } from './color';
+import { type Lab, type RGB, classifySticker, deltaE, nameTogether, rgbToLab, robustColor } from './color';
 import { FLAT_SPREAD, type FoundFace, findFace, isFace, refinePlacement } from './faceSearch';
 import { type Placement, placementCorners } from './grid';
 import { type Homography, type Point, applyH, fitHomography } from './homography';
@@ -107,6 +107,8 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
       stickers.push({ center: applyH(Hm, [col, row]), lab, rgb, color: cls.color, margin: cls.margin, found: found.score.spread[row * 3 + col] <= FLAT_SPREAD });
     }
   }
+  // red against orange is settled within the face, not sticker by sticker
+  nameTogether(stickers.map((st) => st.rgb)).forEach((c, i) => (stickers[i].color = c));
   const { cx, cy, pitch, rot } = found;
   return {
     face: {

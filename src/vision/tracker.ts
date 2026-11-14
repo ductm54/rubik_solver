@@ -9,7 +9,7 @@
  * any single frame. It fires once per hold; whether that face was already scanned is for the
  * caller to decide.
  */
-import { type Lab, type RGB, classifySticker, stickerDistance } from './color';
+import { type Lab, type RGB, classifySticker, nameTogether, stickerDistance } from './color';
 import type { FaceReading, StripReading } from './detect';
 
 export type TrackStatus = 'searching' | 'steadying' | 'captured';
@@ -87,6 +87,7 @@ export class CaptureTracker {
       const cls = classifySticker(lab, undefined, rgb);
       return { ...s, lab, rgb, color: cls.color, margin: cls.margin };
     });
+    nameTogether(stickers.map((st) => st.rgb)).forEach((c, i) => (stickers[i].color = c));
     const strip = face.strip ?? h.strip;
     return { status: 'captured', progress: 1, capture: { ...face, stickers, colors: stickers.map((s) => s.color), ...(strip ? { strip } : {}) } };
   }

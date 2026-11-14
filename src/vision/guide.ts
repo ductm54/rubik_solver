@@ -8,7 +8,7 @@
  *   findDuplicate()  whether a face was already captured, in any rotation
  */
 import type { Color } from '../core/cube';
-import { type Lab, type RGB, classifySticker, robustColor, stickerDistance } from './color';
+import { type Lab, type RGB, classifySticker, nameTogether, robustColor, stickerDistance } from './color';
 import type { RGBAImage } from './detect';
 
 export interface GuideSquare {
@@ -202,6 +202,7 @@ export function readGuide(img: RGBAImage, sq: GuideSquare, fit: GuideFit = NOMIN
       stickers.push({ lab, rgb, color: cls.color, margin: cls.margin, purity });
     }
   }
+  nameTogether(stickers.map((st) => st.rgb)).forEach((c, i) => (stickers[i].color = c));
   return { stickers, colors: stickers.map((s) => s.color) };
 }
 

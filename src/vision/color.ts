@@ -72,10 +72,11 @@ export interface Classified {
  * camera over- or under-exposes: a washed-out orange is still reddish, not white. Without RGB it
  * is the nearest reference colour in Lab.
  *
- * @param redOrange hue in degrees where red ends and orange begins (see redOrangeSplit)
+ * A sticker judged alone cannot settle red against orange in every light; nameTogether() names
+ * the stickers of a face (or of several) against each other and is what the readers use.
  */
-export function classifySticker(lab: Lab, refs: Record<Color, Lab> = REFERENCE_LAB, rgb?: RGB, redOrange = RED_ORANGE): Classified {
-  if (rgb) return classifyByHue(rgb, redOrange);
+export function classifySticker(lab: Lab, refs: Record<Color, Lab> = REFERENCE_LAB, rgb?: RGB): Classified {
+  if (rgb) return classifyByHue(rgb, RED_ORANGE);
   const d = COLORS.map((c) => ({ c, d: stickerDistance(lab, refs[c]) })).sort((x, y) => x.d - y.d);
   return { color: d[0].c, distance: d[0].d, margin: d[1].d - d[0].d };
 }
@@ -108,34 +109,41 @@ function hueOf([r, g, b]: RGB): { hue: number; sat: number } {
 /**
  * Where red ends and orange begins for a set of stickers seen together (a face, or all faces
  * captured so far): if the reddish ones fall into two groups, the boundary is the gap between
- * them; otherwise the usual one. The camera's exposure moves both colours along the hue circle,
- * but red always stays below orange.
+ * them (`found`); otherwise the usual one. The camera's exposure moves both colours along the
+ * hue circle, but red always stays below orange. Measured gaps between the two: 18 degrees or
+ * more; within one colour: 6 or less.
  */
-export function redOrangeSplit(rgbs: RGB[]): number {
+export function redOrangeSplit(rgbs: RGB[]): { split: number; found: boolean } {
   const hues = rgbs
     .map(hueOf)
-    // vivid only: a washed-out sticker's hue is not to be trusted
-    .filter((h) => h.sat >= 0.55 && h.hue >= RED_START && h.hue < HUE_STARTS[0][0])
+    .filter((h) => h.sat >= 0.3 && h.hue >= RED_START && h.hue < HUE_STARTS[0][0])
     .map((h) => h.hue)
     .sort((a, b) => a - b);
-  let gap = 7;
+  let gap = 10;
   let split = RED_ORANGE;
+  let found = false;
   for (let i = 1; i < hues.length; i++) {
     if (hues[i] - hues[i - 1] > gap) {
       gap = hues[i] - hues[i - 1];
       split = (hues[i] + hues[i - 1]) / 2;
+      found = true;
     }
   }
-  return split;
+  return { split, found };
 }
 
 /** Preview colours for stickers seen together, with the red / orange boundary fitted to them. */
 export function nameTogether(rgbs: RGB[]): Color[] {
-  const split = redOrangeSplit(rgbs);
-  return rgbs.map((rgb) => classifyByHue(rgb, split).color);
+  const { split, found } = redOrangeSplit(rgbs);
+  return rgbs.map((rgb) => classifyByHue(rgb, split, !found).color);
 }
 
-function classifyByHue(rgb: RGB, redOrange: number): Classified {
+/**
+ * @param paleRedIsOrange With nothing to compare against, a pale reddish sticker is taken for an
+ *   overexposed orange (it clips to salmon, while a real red stays saturated). When both groups
+ *   are in view the hue decides alone: in low light a real red goes pale too.
+ */
+function classifyByHue(rgb: RGB, redOrange: number, paleRedIsOrange = true): Classified {
   const { hue, sat } = hueOf(rgb);
   // margin: how far the reading is from the nearest decision line, on a scale where 10 is safe
   const whiteGap = Math.abs(sat - WHITE_SATURATION) * 100;
@@ -144,7 +152,7 @@ function classifyByHue(rgb: RGB, redOrange: number): Classified {
     // red or orange
     let margin = Math.min(whiteGap, Math.abs(hue - redOrange), HUE_STARTS[0][0] - hue);
     if (hue >= redOrange) return { color: 'O', distance: 0, margin };
-    // An overexposed orange clips to a pale salmon with a red hue; a real red stays saturated.
+    if (!paleRedIsOrange) return { color: 'R', distance: 0, margin };
     margin = Math.min(margin, Math.abs(sat - 0.55) * 60);
     return { color: sat < 0.55 ? 'O' : 'R', distance: 0, margin };
   }

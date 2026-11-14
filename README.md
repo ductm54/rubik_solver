@@ -80,7 +80,8 @@ npm run build    # static site in dist/
   TypeScript instead of a ~10 MB download, and it runs unchanged in Node, so it is tested there.
 - **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
   overexposed stickered cube, cube-free views, and a phone video of the
-  cube being turned by hand (two of them, replayed frame by frame the way the page does it). Each photo is shrunk to video sizes for
+  cube being turned by hand (three of them, in different light, replayed frame by frame the
+  way the page does it). Each photo is shrunk to video sizes for
   free-hand, and re-framed the way a hand holds a cube in front of a
   phone (up to 20% too small or big, turned 10°, a quarter sticker off-center, slightly blurred)
   and the whole cube must come out right. The earlier synthetic-image tests passed while real
@@ -114,7 +115,9 @@ npm run build    # static site in dist/
   always have a sticker 90 or more apart. A repeat is a face with no sticker far off.
 - **Preview colours.** Before the whole cube is known, stickers are named by hue. This cube's red
   sits at hue -7 to 17 and its orange at 23 to 45 depending on the light, so the boundary between
-  them is set by the gap between the reddish stickers seen so far, when there are two groups.
+  them is set by the gap between the reddish stickers in view (within a face, and across the
+  faces captured so far) when there are two groups. In low light a red goes pale; with an orange
+  in view to compare against it is still named red.
 - **Free-hand limits.** White stickers against a white background weaken the outline. The fit is a
   square, so a face tilted far away from the camera is read less reliably. A view held between
   two faces can be captured as a face; the cube then does not validate.

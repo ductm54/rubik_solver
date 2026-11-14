@@ -7,6 +7,7 @@
  *   no-cube           views without a cube face
  *   moyu-video        a phone video of the stickerless cube being turned by hand
  *   moyu-video-2      another, in dim warm light, with the white side solved and a reflection
+ *   moyu-video-3      another, in low light over a pale cloth, phone held sideways
  */
 import { describe, expect, it } from 'vitest';
 import { type Color, FACES } from '../src/core/cube';
@@ -236,9 +237,11 @@ describe('free-hand detection, real photos', () => {
   });
 });
 
-for (const name of ['moyu-video', 'moyu-video-2']) {
+for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3']) {
   describe(`free-hand scan of a real video (cube turned by hand, never held still): ${name}`, () => {
     const video = loadVideo(name);
+    // the faces that are in view long enough to capture, in the order shown
+    const held = video.faces.map((_, k) => k).filter((k) => !video.brief.includes(k));
 
     /** What the scan page does with a camera: follow the face, capture steady readings, drop repeats. */
     const done = new Map<number, ReturnType<typeof run>>();
@@ -248,7 +251,6 @@ for (const name of ['moyu-video', 'moyu-video-2']) {
       const tracker = new CaptureTracker();
       const captures: { t: number; capture: Capture; alone: string; together: string }[] = [];
       let seen = 0;
-      let repeats = 0;
       let i = 0;
       for (const frame of video.frames()) {
         if (i++ % skip) continue;
@@ -258,21 +260,26 @@ for (const name of ['moyu-video', 'moyu-video-2']) {
         const u = tracker.update(face, t);
         if (!u.capture) continue;
         const capture = captureOf(u.capture);
-        if (findDuplicate(capture.labs, captures.map((c) => c.capture.labs)) >= 0) {
-          repeats++;
-          continue;
-        }
+        if (findDuplicate(capture.labs, captures.map((c) => c.capture.labs)) >= 0) continue;
         // the preview as the page shows it: named together with the faces captured before
         const together = nameTogether([...captures.flatMap((c) => c.capture.rgbs!), ...capture.rgbs!]).slice(-9).join('');
         captures.push({ t, capture, alone: u.capture.colors.join(''), together });
       }
-      return { captures, seen, repeats, frames: Math.ceil(i / skip) };
+      return { captures, seen, frames: Math.ceil(i / skip) };
     }
 
-    it('captures all six faces in one pass, in the order shown, and reads the whole cube', () => {
+    /** All six faces for the whole-cube reading: the captures, plus a single frame of each brief face. */
+    function sixFaces(captures: { capture: Capture }[]): Capture[] {
+      const six = captures.map((c) => c.capture);
+      const frames = [...video.frames()];
+      for (const k of video.brief) six.splice(k, 0, captureOf(detectFace(frames[Math.round(video.shown[k] * video.fps)]).face!));
+      return six;
+    }
+
+    it('captures every face held in view, in the order shown, and reads the whole cube', () => {
       const { captures, seen, frames } = scan();
-      expect(captures).toHaveLength(6);
-      const r = readCube(captures.map((c) => c.capture));
+      expect(captures).toHaveLength(held.length);
+      const r = readCube(sixFaces(captures));
       expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
       expect(r.states).toHaveLength(1);
       // a face is in view for most of the video; the rest is turning
@@ -281,23 +288,24 @@ for (const name of ['moyu-video', 'moyu-video-2']) {
 
     it('captures each face within a second of it coming into view', () => {
       const { captures } = scan();
-      captures.forEach((c, k) => {
-        expect(c.t / 1000).toBeGreaterThanOrEqual(video.shown[k]);
-        expect(c.t / 1000 - video.shown[k]).toBeLessThan(1);
+      captures.forEach((c, n) => {
+        expect(c.t / 1000).toBeGreaterThanOrEqual(video.shown[held[n]]);
+        expect(c.t / 1000 - video.shown[held[n]]).toBeLessThan(1);
       });
     }, 60_000);
 
     it('still works on a slow phone that manages 5 frames per second', () => {
       const { captures } = scan(2);
-      expect(captures).toHaveLength(6);
-      const r = readCube(captures.map((c) => c.capture));
+      expect(captures).toHaveLength(held.length);
+      const r = readCube(sixFaces(captures));
       expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
     }, 60_000);
 
     it('the live preview names every sticker right, before the whole cube is known', () => {
       const { captures } = scan();
-      expect(captures.map((c) => c.together)).toEqual(video.faces);
-      expect(captures.map((c) => c.alone)).toEqual(video.faces);
+      const truth = held.map((k) => video.faces[k]);
+      expect(captures.map((c) => c.together)).toEqual(truth);
+      expect(captures.map((c) => c.alone)).toEqual(truth);
     }, 60_000);
   });
 }
