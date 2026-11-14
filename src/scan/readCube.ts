@@ -138,7 +138,7 @@ function bestGuess(scans: ScannedFace[], faceOf: FaceName[]): CubeState {
 }
 
 /** Capture data from a detector reading. */
-export function captureOf(face: FaceReading): Capture {
+export function captureOf(face: Pick<FaceReading, 'strip'> & { stickers: { lab: Lab; rgb: RGB }[] }): Capture {
   return {
     labs: face.stickers.map((s) => s.lab),
     rgbs: face.stickers.map((s) => s.rgb),

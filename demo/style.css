@@ -113,6 +113,11 @@ footer a { color: inherit; }
 .stage #sim { image-rendering: auto; }
 .placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: #9a9aa2; padding: 16px; text-align: center; }
 .stats { margin-top: 10px; font-size: 14px; }
+.scan-modes { margin-top: 12px; align-items: center; }
+.scan-modes .hint { margin: 0; }
+.capture-row { margin-top: 10px; gap: 10px; align-items: center; }
+.capture-row .check { margin-top: 0; }
+.stage { cursor: pointer; }
 .check { display: flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); }
 
 .mini { margin-top: 12px; }

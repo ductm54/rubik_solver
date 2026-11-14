@@ -11,7 +11,7 @@
  *      sticker in Lab, dropping glare / outlier pixels
  */
 import type { Color, EdgeSide } from '../core/cube';
-import { type Lab, type RGB, classifySticker, deltaE, rgbToLab } from './color';
+import { type Lab, type RGB, classifySticker, deltaE, rgbToLab, robustColor } from './color';
 import { type Homography, type Point, applyH, fitHomography } from './homography';
 
 export interface RGBAImage {
@@ -599,7 +599,11 @@ function isConvex(p: Point[]): boolean {
   return true;
 }
 
-/** Robust colour of one sticker: a 5 × 5 lattice over its middle half, outliers (glare) dropped. */
+/**
+ * Robust colour of one sticker: a 5 × 5 lattice over its middle half, outliers (glare) dropped.
+ * The center sticker often carries a brand logo in its middle, so it is read from a ring near its
+ * border instead.
+ */
 function sampleSticker(
   data: Uint8ClampedArray | Uint8Array,
   W: number,
@@ -608,29 +612,26 @@ function sampleSticker(
   col: number,
   row: number,
 ): { lab: Lab; rgb: RGB } {
-  const samples: { lab: Lab; rgb: RGB }[] = [];
-  for (let i = 0; i < 5; i++) {
-    for (let j = 0; j < 5; j++) {
-      const [x, y] = applyH(Hm, [col - 0.22 + i * 0.11, row - 0.22 + j * 0.11]);
+  const ring = col === 1 && row === 1;
+  const n = ring ? 7 : 5;
+  const step = 0.11;
+  const half = ((n - 1) / 2) * step;
+  const samples: RGB[] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const du = i * step - half;
+      const dv = j * step - half;
+      if (ring && Math.max(Math.abs(du), Math.abs(dv)) < half - 1e-9) continue;
+      const [x, y] = applyH(Hm, [col + du, row + dv]);
       const xi = Math.round(x);
       const yi = Math.round(y);
       if (xi < 0 || yi < 0 || xi >= W || yi >= H) continue;
       const p = (yi * W + xi) * 4;
-      const rgb: RGB = [data[p], data[p + 1], data[p + 2]];
-      samples.push({ rgb, lab: rgbToLab(rgb) });
+      samples.push([data[p], data[p + 1], data[p + 2]]);
     }
   }
-  if (!samples.length) return { lab: [0, 0, 0], rgb: [0, 0, 0] };
-  const med = (k: number) => {
-    const v = samples.map((s) => s.lab[k]).sort((a, b) => a - b);
-    return v[Math.floor(v.length / 2)];
-  };
-  const m: Lab = [med(0), med(1), med(2)];
-  const keep = samples.filter((s) => Math.hypot(s.lab[0] - m[0], s.lab[1] - m[1], s.lab[2] - m[2]) < 18);
-  const use = keep.length >= 5 ? keep : samples;
-  const avg = <T extends number[]>(get: (s: (typeof use)[0]) => T) =>
-    [0, 1, 2].map((k) => use.reduce((s, x) => s + get(x)[k], 0) / use.length) as unknown as T;
-  return { lab: avg((s) => s.lab), rgb: avg((s) => s.rgb).map(Math.round) as RGB };
+  const { lab, rgb } = robustColor(samples);
+  return { lab, rgb };
 }
 
 function laplacianVariance(grey: Float32Array, W: number, H: number, corners: Point[]): number {

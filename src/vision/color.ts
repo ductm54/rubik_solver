@@ -98,21 +98,33 @@ export function classifyBalanced(labs: Lab[]): Color[] {
   if (labs.length !== 54) throw new Error('Need 54 stickers');
   const centers = [0, 1, 2, 3, 4, 5].map((f) => labs[f * 9 + 4]);
   const centerColors = assignCenters(centers);
-  // 54 × 54 cost: column k is a slot of colour (center) floor(k / 9).
-  const cost = labs.map((lab) => {
-    const row: number[] = [];
+  // 54 × 54 cost: column k is a slot of colour (center) floor(k / 9). The centers are the first
+  // references; then each colour's reference becomes the mean of the stickers given to it, so one
+  // odd center reading (a logo, a glare spot) does not skew the whole colour.
+  let refs = centers;
+  let groups: number[] = [];
+  for (let iter = 0; iter < 3; iter++) {
+    const cost = labs.map((lab) => {
+      const row: number[] = [];
+      for (let face = 0; face < 6; face++) {
+        const d = stickerDistance(lab, refs[face]);
+        for (let k = 0; k < 9; k++) row.push(d);
+      }
+      return row;
+    });
+    // Centers must stay on their own colour.
     for (let face = 0; face < 6; face++) {
-      const d = stickerDistance(lab, centers[face]);
-      for (let k = 0; k < 9; k++) row.push(d);
+      for (let k = 0; k < 54; k++) if (Math.floor(k / 9) !== face) cost[face * 9 + 4][k] = 1e6;
     }
-    return row;
-  });
-  // Centers must stay on their own colour.
-  for (let face = 0; face < 6; face++) {
-    for (let k = 0; k < 54; k++) if (Math.floor(k / 9) !== face) cost[face * 9 + 4][k] = 1e6;
+    const next = hungarian(cost).map((slot) => Math.floor(slot / 9));
+    if (next.every((g, i) => g === groups[i])) break;
+    groups = next;
+    refs = centers.map((_, face) => {
+      const members = labs.filter((__, i) => groups[i] === face);
+      return [0, 1, 2].map((k) => members.reduce((s, m) => s + m[k], 0) / members.length) as Lab;
+    });
   }
-  const match = hungarian(cost);
-  return match.map((slot) => centerColors[Math.floor(slot / 9)]);
+  return groups.map((g) => centerColors[g]);
 }
 
 /**
@@ -123,4 +135,41 @@ export function chromaDistance(a: RGB, b: RGB): number {
   const sa = a[0] + a[1] + a[2] || 1;
   const sb = b[0] + b[1] + b[2] || 1;
   return Math.hypot(a[0] / sa - b[0] / sb, a[1] / sa - b[1] / sb, a[2] / sa - b[2] / sb);
+}
+
+export interface RobustColor {
+  lab: Lab;
+  rgb: RGB;
+  /** Share of the samples that agree with the result (1 = one flat colour). */
+  purity: number;
+}
+
+/**
+ * The main colour of a patch of pixels: the sample with the most similar samples around it, then
+ * the mean of that group. Unlike a mean or median this never blends two colours, so glare, a logo,
+ * the gap between stickers or a finger are ignored as long as the real colour is the largest group.
+ */
+export function robustColor(samples: RGB[]): RobustColor {
+  if (!samples.length) return { lab: [0, 0, 0], rgb: [0, 0, 0], purity: 0 };
+  const labs = samples.map(rgbToLab);
+  const n = labs.length;
+  const votes = new Uint16Array(n);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (deltaE(labs[i], labs[j]) < 12) {
+        votes[i]++;
+        votes[j]++;
+      }
+    }
+  }
+  let seed = 0;
+  for (let i = 1; i < n; i++) if (votes[i] > votes[seed]) seed = i;
+  const use: number[] = [];
+  for (let i = 0; i < n; i++) if (deltaE(labs[i], labs[seed]) < 16) use.push(i);
+  const mean = (get: (i: number) => number[]) => [0, 1, 2].map((k) => use.reduce((s, i) => s + get(i)[k], 0) / use.length);
+  return {
+    lab: mean((i) => labs[i]) as Lab,
+    rgb: mean((i) => samples[i]).map(Math.round) as RGB,
+    purity: use.length / n,
+  };
 }

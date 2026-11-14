@@ -33,8 +33,9 @@ jobs:
           path: dist
 
   deploy:
-    # Deploy from pushes only (PRs just run tests + build).
-    if: github.event_name != 'pull_request'
+    # Deploy from the default branch only: the github-pages environment rejects other branches.
+    # Feature branches and PRs just run tests + build.
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
     needs: build
     runs-on: ubuntu-latest
     environment:
