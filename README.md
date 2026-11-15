@@ -10,8 +10,7 @@ Done so far:
 - **Phase 2**: free-hand 6-face scan: faces in any order and rotation, neighbour-strip
   orientation, whole-cube colour reading, a review / manual fix screen, and hand-off to the
   scramble page.
-  The scanner now defaults to a **guide frame**: line a face up roughly with a square and the
-  grid snaps to it. Free-hand, the default, finds the face anywhere in the picture. Center
+  The scanner finds the face anywhere in the picture. Center
   stickers are read around their edge, so a brand logo in the middle does not change the colour.
 - **Phase 3**: timer with WCA inspection (+2 after 15 s, DNF after 17 s), hold-and-release start,
   random-state scrambles, solve history with ao5 / ao12 / ao100, a history chart, penalties and
@@ -52,9 +51,8 @@ npm run build    # static site in dist/
 | `src/vision/detect.ts` | `detectFace(frame)`: `findFace`, then 9 Lab colour readings with glare rejection (center on a ring), and a neighbour strip when one shows |
 | `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms), re-searches the whole frame every third frame or when the colours change, and believes a plain white face only where a cube was just seen |
 | `src/vision/color.ts` | sRGB → Lab, sticker distance, nearest-colour reading, `classifyBalanced` (centers as references, exactly 9 per colour, Hungarian assignment) |
-| `src/vision/guide.ts` | Guide-frame scanning: `fitGuide(frame, square)` finds where the face really sits near the square, `readGuide` reads its 9 cells (center cell on a ring, to skip logos), `SteadyDetector` for auto-capture, `findDuplicate` to spot a face scanned twice in any rotation |
+| `src/vision/duplicate.ts` | `findDuplicate` to spot a face scanned twice in any rotation |
 | `src/vision/tracker.ts` | Free-hand auto-capture: fires once the same nine colours have been read for 350 ms, even while the cube moves; the capture is the average over that time |
-| `src/vision/synth.ts` | Synthetic camera frames: a flat face (perspective, tint, glare, noise, clutter) and a ray-cast 3D cube for tilted views with visible side strips; used only by the simulated-cube mode |
 | `src/scan/readCube.ts` | 6 captures → cube: centers name the faces, exactly 9 per colour, strips matched by colour proportions, `assemble()`, best guess for manual fixing |
 | `src/timer/machine.ts` | Timer state machine: inspection, hold-to-ready, false starts, +2 / DNF from inspection |
 | `src/timer/stats.ts` | Solve records, time formatting, WCA averages (5% trimmed, DNF rules), rolling and best aoN |
@@ -70,7 +68,7 @@ npm run build    # static site in dist/
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
-| `demo/scan.*` | Camera page: free-hand or guide frame mode, overlay, live reading, six captured-face slots; also a simulated cube (with a logo on the white center) and upload of several photos (read one after another) or a video (played like the camera) |
+| `demo/scan.*` | Camera page: free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
 | `demo/` | 2D net editor, Generate button, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
 | `tests/` | Cube, solver and timer tests; `scan-real.test.ts` runs the scanner on the real photos in `tests/fixtures` |
 
@@ -81,19 +79,9 @@ npm run build    # static site in dist/
 - **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
   overexposed stickered cube, cube-free views, and a phone video of the
   cube being turned by hand (three of them, in different light, replayed frame by frame the
-  way the page does it). Each photo is shrunk to video sizes for
-  free-hand, and re-framed the way a hand holds a cube in front of a
-  phone (up to 20% too small or big, turned 10°, a quarter sticker off-center, slightly blurred)
-  and the whole cube must come out right. The earlier synthetic-image tests passed while real
-  cubes failed, so they are gone; the synthetic renderer only feeds the "Simulated cube" button.
+  way the page does it). Each photo is shrunk to video sizes and the whole cube must come out
+  right. The earlier synthetic-image tests passed while real cubes failed, so they are gone.
 
-- **Guide frame.** The second mode: you hold a face roughly in a square on screen. Nobody
-  holds a cube exactly on a grid, so the grid is fitted to the face first: it tries sizes, turns
-  and offsets near the square and keeps the one where all 9 cells are flat colours (a cell that
-  straddles two stickers is not flat). This needs no gaps between stickers, so it works on
-  stickerless cubes, in about 10 ms per reading. A face is captured after it holds still for
-  0.45 s, or on a tap. Faces can be shown in any order and rotation; rotations come from the search
-  below (one answer for about 99% of random cubes, otherwise "Next possibility").
 - **Free-hand detection without gaps.** The first detector looked for sticker-sized square regions
   between edges. On a stickerless cube same-coloured neighbours merge into one region and border
   stickers merge with a similar background; on the real photos it found about half the faces at

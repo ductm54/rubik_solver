@@ -3,7 +3,7 @@ import { validate } from '../src/core/validate';
 import { type Capture, captureOf, readCube } from '../src/scan/readCube';
 import { type RGB, nameTogether } from '../src/vision/color';
 import type { FaceReading } from '../src/vision/detect';
-import { findDuplicate } from '../src/vision/guide';
+import { findDuplicate } from '../src/vision/duplicate';
 import { CaptureTracker, type TrackUpdate } from '../src/vision/tracker';
 import { createNet, encodeCube } from './net';
 
