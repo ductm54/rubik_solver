@@ -11,7 +11,7 @@
  */
 import type { Color, EdgeSide } from '../core/cube';
 import { type Lab, type RGB, classifySticker, deltaE, nameTogether, rgbToLab, robustColor } from './color';
-import { FLAT_SPREAD, type FoundFace, findFace, isFace, refinePlacement } from './faceSearch';
+import { FLAT_SPREAD, type FoundFace, findFace, isFace, isSolvedSide, refinePlacement } from './faceSearch';
 import { type Placement, placementCorners } from './grid';
 import { type Homography, type Point, applyH, fitHomography } from './homography';
 
@@ -82,7 +82,7 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
   let found: FoundFace | null = null;
   if (opts.previous) {
     const again = refinePlacement(img, opts.previous, 6, 3);
-    if (isFace(again.score) || again.plain) found = again;
+    if (isFace(again.score) || isSolvedSide(img, again)) found = again;
   }
   if (!found && (!opts.previous || opts.searchIfLost !== false)) found = findFace(img);
   if (!found) return { face: null };

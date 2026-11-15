@@ -9,9 +9,13 @@
  *   2. try every position, size and turn; keep the placements whose cells are flat, show at
  *      least two colours and have an outline on all four sides
  *   3. fine-tune the best few by sampling the pixels directly, first small, then at full size
+ *
+ * A face that is all one colour (a solved side) is looked for only when no other face is found.
+ * It needs a stronger outline, and seams between its nine cells in the full-size frame: without
+ * those it is one sticker of a scrambled face, or a sheet of paper.
  */
 import type { RGBAImage } from './detect';
-import { CELL_HALF, OUTLINE_REACH, type Placement, type PlacementScore, scorePlacement } from './grid';
+import { CELL_HALF, OUTLINE_REACH, type Placement, type PlacementScore, cellSteps, scorePlacement, seamSteps } from './grid';
 
 /** A cell whose colour spread is above this is not one sticker. */
 export const FLAT_SPREAD = 24;
@@ -26,10 +30,17 @@ const MIN_OUTLINE = 10.6;
 const MIN_PLAIN_OUTLINE = 11.2;
 /** Cells closer in colour than this are one colour. */
 const SAME_COLOUR = 60;
+/** A one-colour face shows a seam at least this clear on half of the borders between its cells... */
+const MIN_SEAM = 6;
+/** ...and this many times clearer than the same measurement across the middle of its cells. */
+const SEAM_OVER_CELL = 1.5;
 
 export interface FoundFace extends Placement {
   score: PlacementScore;
-  /** True for a face that is all one colour (found by its outline alone). */
+  /**
+   * True for a placement that is all one colour with an outline around it. That is a solved side
+   * only if it also has seams (see isSolvedSide).
+   */
   plain: boolean;
   /** Lower is better. */
   cost: number;
@@ -92,10 +103,10 @@ function colourRange(s: PlacementScore): number {
 
 /**
  * Whether a measured placement looks like a face that is all one colour (a solved side). Its
- * cells say nothing, since any plain surface is nine flat cells, so everything rests on the
- * outline: a clear step on all 12 outer cell edges, bar one. A wall or a table top has no such
- * outline; a sheet of paper or a tile does, which is why the caller should also ask for a cube
- * to have been seen there (see FaceFollower).
+ * cells say nothing, since any plain surface is nine flat cells, so this rests on the outline: a
+ * clear step on all 12 outer cell edges, bar one. A wall or a table top has no such outline. A
+ * single sticker of a scrambled face, a sheet of paper and a floor tile do, so this is only half
+ * of the test: see isSolvedSide.
  */
 export function isPlainFace(s: PlacementScore): boolean {
   if (!s.inside) return false;
@@ -106,6 +117,39 @@ export function isPlainFace(s: PlacementScore): boolean {
   if (colourRange(s) > SAME_COLOUR) return false;
   if (s.outline.filter((x) => x > OUTLINE_STEP).length < 11) return false;
   return outlineStrength(s) >= MIN_PLAIN_OUTLINE;
+}
+
+/**
+ * Whether the picture shows seams between the nine cells of a placement: on at least half of the
+ * 12 borders between neighbouring cells, and clearer there than across the middle of the cells,
+ * where glare and noise bend the colour too.
+ *
+ * Measured on the real photos and videos, at face widths from 30 to 200 px, taking the middle
+ * value of the 12 borders: a solved white side scores 7 to 39, which is 2.3 to 13 times its
+ * cells' level (1.3 times at the smallest size); borders between two stickers of one colour
+ * usually score 15 to 60, for every colour. Of 1,800 single stickers that pass isPlainFace, those
+ * of the stickerless cube score 4.7 at most, and those of the overexposed stickered cube up to 9
+ * but never more than their cells' level.
+ */
+export function hasSeams(img: RGBAImage, p: Placement): boolean {
+  const seam = middle(seamSteps(img, p));
+  return seam >= MIN_SEAM && seam >= SEAM_OVER_CELL * (middle(cellSteps(img, p)) + 1);
+}
+
+function middle(values: number[]): number {
+  const v = [...values].sort((a, b) => a - b);
+  const h = v.length >> 1;
+  return v.length % 2 ? v[h] : (v[h - 1] + v[h]) / 2;
+}
+
+/**
+ * Whether a placement found in `img` is a solved side: all one colour with an outline, and made
+ * of nine pieces. The seams are what tell it from one sticker of a scrambled face, which is also
+ * a flat square with other colours all round it. Seams are too thin to see in the shrunk frame,
+ * so this is for placements settled in the full frame.
+ */
+export function isSolvedSide(img: RGBAImage, f: FoundFace): boolean {
+  return f.plain && hasSeams(img, f);
 }
 
 interface Small {
@@ -416,23 +460,24 @@ for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) for (const ds of [-1, 
 export function findFace(img: RGBAImage): FoundFace | null {
   const small = shrinkFrame(img);
   const found = coarseSearch(small, 4);
+  /** Carry a placement from the small frame back to the full frame and settle it there. */
+  const settle = (f: FoundFace): FoundFace =>
+    small.k === 1 ? f : refinePlacement(img, { cx: (f.cx + 0.5) / small.k - 0.5, cy: (f.cy + 0.5) / small.k - 0.5, pitch: f.pitch / small.k, rot: f.rot }, 6, 2, 0.5);
   let best: FoundFace | null = null;
   for (const c of found.mixed) {
     const fine = refinePlacement(small.image, c, 5);
     if (!isFace(fine.score)) continue;
     if (!best || fine.cost < best.cost) best = fine;
   }
-  // Only when no face with several colours is in view: one that is all one colour.
-  if (!best) {
-    for (const c of found.plain) {
-      const fine = refinePlacement(small.image, c, 5);
-      if (!fine.plain) continue;
-      if (!best || fine.cost < best.cost) best = fine;
-    }
+  if (best) {
+    const full = settle(best);
+    return isFace(full.score) || isSolvedSide(img, full) ? full : null;
   }
-  if (!best) return null;
-  if (small.k === 1) return best;
-  // carry the placement back to the full frame and settle it there
-  const full = refinePlacement(img, { cx: (best.cx + 0.5) / small.k - 0.5, cy: (best.cy + 0.5) / small.k - 0.5, pitch: best.pitch / small.k, rot: best.rot }, 6, 2, 0.5);
-  return isFace(full.score) || full.plain ? full : null;
+  // Only when no face with several colours is in view: one that is all one colour.
+  const plain = found.plain.map((c) => refinePlacement(small.image, c, 5)).filter((f) => f.plain);
+  for (const fine of plain.sort((a, b) => a.cost - b.cost)) {
+    const full = settle(fine);
+    if (isSolvedSide(img, full)) return full;
+  }
+  return null;
 }
