@@ -38,8 +38,8 @@ describe('Beginner method', () => {
       expect(['DFR', 'DLF', 'DBL', 'DRB', 'DF', 'DR', 'DB', 'DL'].every((p) => pieceSolved(l1, cubie(p)))).toBe(true);
       const l2 = last.get('middle') ?? l1;
       expect(['FR', 'FL', 'BL', 'BR', 'DFR', 'DLF', 'DBL', 'DRB'].every((p) => pieceSolved(l2, cubie(p)))).toBe(true);
-      // Only the algorithms the method teaches (plus U turns, cube turns and the cross).
-      for (const s of plan.steps) if (s.stage === 'top') expect(s.alg).not.toMatch(/\bB\b/);
+      // Beginners turn the cube instead of turning B: no B turn anywhere.
+      for (const s of plan.steps) expect(parseAlg(s.alg).some((m) => m.base === 'B')).toBe(false);
     }
   });
 

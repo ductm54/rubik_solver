@@ -249,10 +249,12 @@ export function solveXCross(st: Stickers, max: number): Move[] | null {
  * Beginner cross: one edge at a time. For a set of cross edges (bit k = HOMES[k]), a table of
  * exact distances to "those edges home, the others anywhere", by BFS from all such states.
  */
-const subsetDist = new Map<number, Int8Array>();
+const subsetDist = new Map<string, Int8Array>();
 
-function subsetTable(set: number): Int8Array {
-  const hit = subsetDist.get(set);
+/** With `noBack`, distances with U, R, F, D, L turns only (beginners turn the cube instead of B). */
+function subsetTable(set: number, noBack = false): Int8Array {
+  const key = `${set}${noBack ? 'nb' : ''}`;
+  const hit = subsetDist.get(key);
   if (hit) return hit;
   if (!dist) build();
   const home = HOMES.map((h) => EF_INDEX.get(h[0])!);
@@ -268,6 +270,7 @@ function subsetTable(set: number): Int8Array {
   while (head < tail) {
     const c = queue[head++];
     for (let m = 0; m < FACE_MOVES.length; m++) {
+      if (noBack && FACE_MOVES[m].base === 'B') continue;
       const n = step(c, m);
       if (t[n] < 0) {
         t[n] = t[c] + 1;
@@ -275,7 +278,7 @@ function subsetTable(set: number): Int8Array {
       }
     }
   }
-  subsetDist.set(set, t);
+  subsetDist.set(key, t);
   return t;
 }
 
@@ -287,10 +290,10 @@ export function crossEdgesDone(st: Stickers): number[] {
 
 /**
  * Fewest moves that put cross edge `edge` in place while the edges in `keep` stay (or end up) in
- * place; of those, the easiest to execute.
+ * place; of those, the easiest to execute. With `noBack`, no B turns.
  */
-export function solveCrossEdge(st: Stickers, keep: number[], edge: number): Move[] {
-  const t = subsetTable([...keep, edge].reduce((a, k) => a | (1 << k), 0));
+export function solveCrossEdge(st: Stickers, keep: number[], edge: number, noBack = false): Move[] {
+  const t = subsetTable([...keep, edge].reduce((a, k) => a | (1 << k), 0), noBack);
   const path: number[] = [];
   const out: Move[][] = [];
   const dfs = (code: number, lastFace: number) => {
@@ -302,6 +305,7 @@ export function solveCrossEdge(st: Stickers, keep: number[], edge: number): Move
     for (let m = 0; m < FACE_MOVES.length && out.length < MAX_OPTIONS; m++) {
       const face = faceOfMove(m);
       if (face === lastFace || face + 3 === lastFace) continue;
+      if (noBack && FACE_MOVES[m].base === 'B') continue;
       const n = step(code, m);
       if (t[n] !== d - 1) continue;
       path.push(m);
