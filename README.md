@@ -27,8 +27,9 @@ Done so far:
   (turn the cube, one front-right case at a time) or advanced (no turns, no B moves, any slot, best pair order, pseudo-slotting when it is shorter), OLL 2-look
   or full 57, PLL 2-look or full 21. The settings view is built from each method's own setting list,
   ready for more methods. **Step 0** says how to hold the cube during inspection: which colour on
-  the bottom and which in front, chosen so the solve is short and the cross (or XCross) needs few
-  or no B turns.
+  the bottom and which in front, chosen so the solve is short and the cross (or XCross) is easy to
+  execute: few or no regrips and B turns. It also says which grip to start with, and the cross
+  step says where each regrip is.
 
 **Live demo:** https://ductm54.github.io/rubik_solver/ · timer: https://ductm54.github.io/rubik_solver/timer.html · learn: https://ductm54.github.io/rubik_solver/learn.html
 
@@ -64,11 +65,12 @@ npm run build    # static site in dist/
 | `src/solve/types.ts`, `methods.ts` | Method interface (settings definitions + `solve`) and the method registry |
 | `src/solve/pieces.ts` | Piece lookup on a 54-sticker array, relative to the current centers |
 | `src/solve/mask.ts` | cubing.js stickering masks per step (any cross colour) |
-| `src/solve/cfop/cross.ts` | Optimal cross: 24⁴ distance table by BFS. Optimal XCross (cross + one pair): iterative deepening, cut by the cross table and a 24⁴ table per slot. Of the shortest solutions, the one with the fewest B turns |
+| `src/solve/cfop/cross.ts` | Optimal cross: 24⁴ distance table by BFS. Optimal XCross (cross + one pair): iterative deepening, cut by the cross table and a 24⁴ table per slot. Of the shortest solutions, the easiest to execute |
+| `src/solve/cfop/grip.ts` | Regrip model: each hand's thumb is in front, on top or on the bottom; a table of the turns each hand reaches from there; the fewest regrips for a move sequence, with the first grip and where to regrip. The table and the two costs are the place to adjust it to your own finger tricks |
 | `src/solve/cfop/f2l.ts` | F2L pairs: y-turn to front-right, take stuck pieces out, then the shortest trigger sequence for the case (all 150 pair placements, ≤ 11 moves) |
 | `src/solve/cfop/f2lAdvanced.ts` | Advanced F2L: per-slot trigger tables for all 576 pair places (triggers from R, L, F, U and wide/slice r, l, f, S; never B), stuck pieces handled in the same search, every pair order tried, pseudo-slotting (all four pairs made with the bottom layer turned by D, D2 or D') used when it saves moves |
 | `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
-| `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest, counting each B turn in the cross as 4 extra moves |
+| `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest, counting each regrip in the cross as 3 extra moves and each B turn as 2 |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
 | `demo/scan.ts` | Scan panel on the front page (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
@@ -142,10 +144,14 @@ npm run build    # static site in dist/
   full; about 48 with all 6 cross colours allowed. Advanced F2L takes about 21 moves instead of 26; the advanced cross (XCross, about 7 moves) saves about 3 moves
   with standard F2L and about 1 with advanced F2L
   (about 50 in total with full OLL / PLL, 44 with all colours). Each solve takes 2-10 ms in the worker.
-- **B turns in the cross**: step 0 picks the side in front (and, of the shortest crosses, the one)
-  that keeps the cross off the back face. With one cross colour about 70% of crosses and XCrosses
-  have no B turn and about 2% have two or more (20% and 25-30% when only the length counted), for
-  about half a move more per solve; with all 6 colours about 85% have none.
+- **Regrips in the cross**: `grip.ts` estimates the regrips a sequence needs from where each
+  thumb is (front, top or bottom) and which turns the fingers reach from there. It is a model of
+  the usual right-handed finger tricks, not a measurement. Step 0 picks the side in front, and of
+  the shortest crosses the one, that needs the fewest: a regrip counts as 3 extra moves, a B turn
+  as 2 more even within reach (after R or L'). With one cross colour about 85-90% of crosses (75%
+  of XCrosses) need no regrip and none need more than two; about 55% (45%) have no B turn and
+  about 5% have two or more (20% and 25-30% when only the length counted). It costs 0.2-0.4 moves
+  per solve.
 - **F2L algorithms** come from a shortest-path search over the 150 places a pair can be, using only
   triggers that leave the cross and other slots alone (R U R', F' U F, R' F R F', ...), so every case is
   covered and each algorithm is checked, at the cost of some differing from the usual published ones.

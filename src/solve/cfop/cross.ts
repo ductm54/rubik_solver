@@ -1,5 +1,6 @@
 /**
- * Optimal cross on the D face, and optimal XCross (cross plus one F2L pair in one go).
+ * Optimal cross on the D face, and optimal XCross (cross plus one F2L pair in one go). Of the
+ * shortest solutions, the one that is easiest to execute: fewest regrips and B turns (see grip.ts).
  *
  * Cross: The 4 cross edges are tracked by where their D-coloured sticker
  * is (24 edge facelets each), giving a 24⁴ table of exact distances built once by BFS.
@@ -7,6 +8,7 @@
 import { type Move, applyMovesToArray, movePerm, parseAlg } from '../../core/cube';
 import { CORNERS, EDGES, type Stickers, cubie, locate } from '../pieces';
 import { SLOTS, SLOT_PIECES } from './f2l';
+import { effort } from './grip';
 
 const EDGE_FACELETS = EDGES.flat();
 const EF_INDEX = new Map(EDGE_FACELETS.map((f, i) => [f, i]));
@@ -63,40 +65,50 @@ export function crossDistance(st: Stickers): number {
   return dist![crossCode(st)];
 }
 
-/** Turns of the B face: the awkward ones, which step 0 (how the cube is held) tries to avoid. */
-export const backTurns = (moves: readonly Move[]) => moves.filter((m) => m.base === 'B').length;
-
-const B_FACE = 5; // index of B in FACE_MOVES, 3 moves per face
 const faceOfMove = (m: number) => Math.floor(m / 3);
+/** No more solutions than this are compared (the first ones found). */
+const MAX_OPTIONS = 2000;
 
-/** An optimal (fewest moves) cross solution for the D face; of those, one with the fewest B turns. */
-export function solveCross(st: Stickers): Move[] {
+/** The easiest to execute of some solutions (the first of equal ones). */
+function easiest(options: Move[][]): Move[] {
+  let best = options[0];
+  let bestCost = Infinity;
+  for (const o of options) {
+    const cost = effort(o);
+    if (cost < bestCost) (best = o), (bestCost = cost);
+  }
+  return best;
+}
+
+/** Every optimal (fewest moves) cross solution for the D face. */
+function crossOptions(st: Stickers): Move[][] {
   if (!dist) build();
   const path: number[] = [];
-  let best: number[] | null = null;
-  let bestBack = Infinity;
-  const dfs = (code: number, back: number, lastFace: number) => {
+  const out: Move[][] = [];
+  const dfs = (code: number, lastFace: number) => {
     const d = dist![code];
     if (d === 0) {
-      best = [...path];
-      bestBack = back;
+      out.push(path.map((m) => FACE_MOVES[m]));
       return;
     }
-    for (let m = 0; m < FACE_MOVES.length && bestBack > 0; m++) {
+    for (let m = 0; m < FACE_MOVES.length && out.length < MAX_OPTIONS; m++) {
       const face = faceOfMove(m);
       // Opposite faces in one order only: the other order is the same solution.
       if (face === lastFace || face + 3 === lastFace) continue;
-      const b = back + (face === B_FACE ? 1 : 0);
-      if (b >= bestBack) continue;
       const n = step(code, m);
       if (dist![n] !== d - 1) continue;
       path.push(m);
-      dfs(n, b, face);
+      dfs(n, face);
       path.pop();
     }
   };
-  dfs(crossCode(st), 0, -1);
-  return best!.map((m) => FACE_MOVES[m]);
+  dfs(crossCode(st), -1);
+  return out;
+}
+
+/** An optimal (fewest moves) cross solution for the D face; of those, the easiest to execute. */
+export function solveCross(st: Stickers): Move[] {
+  return easiest(crossOptions(st));
 }
 
 /*
@@ -104,8 +116,8 @@ export function solveCross(st: Stickers): Move[] {
  * A branch is cut when neither the cross table nor, for any slot, a table of exact distances for
  * that slot's corner, its edge and the two cross edges next to it (24⁴ each) leaves enough moves.
  *
- * Every solution of the shortest length is looked at, and for each side face the one that turns
- * that face least is kept: whichever side ends up at the back, there is a solution that suits it.
+ * Every solution of the shortest length is kept, so that the easiest one can be picked for
+ * whichever side is in front.
  */
 const CORNER_FACELETS = CORNERS.flat();
 const CF_INDEX = new Map(CORNER_FACELETS.map((f, i) => [f, i]));
@@ -156,12 +168,10 @@ const Y_TURNS = ['y', 'y2', "y'"].map((r) => {
   }
   return { rot: parseAlg(r), map };
 });
-/** The side faces, as face numbers of FACE_MOVES (R, F, L, B). */
-const SIDE_FACES = [1, 2, 4, 5];
-/** Per cube: the shortest solutions, one per side face (the one turning that face least), or null. */
+/** Per cube: all the shortest solutions, or null. */
 const xcrossCache = new Map<string, Move[][] | null>();
 
-/** All the shortest XCross solutions worth keeping (see above), or null over `max` moves. */
+/** All the shortest XCross solutions, or null when it takes more than `max` moves. */
 function xcrossOptions(st: Stickers, max: number): Move[][] | null {
   // The same cube held with another side in front has the same answers, with the faces renamed.
   const key = `${max}:${st.join('')}`;
@@ -191,23 +201,15 @@ function xcrossOptions(st: Stickers, max: number): Move[][] | null {
     }
     return best;
   };
-  // Turns of each face on the current path, and per side face the best solution so far.
-  const turns = new Uint8Array(6);
-  const bestTurns = SIDE_FACES.map(() => Infinity);
-  const best: (number[] | null)[] = SIDE_FACES.map(() => null);
+  const out: Move[][] = [];
   const dfs = (code: number, d: number, left: number, lastFace: number) => {
-    // Only go on where some side face is still turned less than in the best solution for it.
-    if (SIDE_FACES.every((f, i) => turns[f] >= bestTurns[i])) return;
     const h = need(code, d);
     if (h === 0) {
-      const solution = [...path];
-      SIDE_FACES.forEach((f, i) => {
-        if (turns[f] < bestTurns[i]) (bestTurns[i] = turns[f]), (best[i] = solution);
-      });
+      out.push(path.map((m) => FACE_MOVES[m]));
       return;
     }
     if (h > left) return;
-    for (let m = 0; m < FACE_MOVES.length; m++) {
+    for (let m = 0; m < FACE_MOVES.length && out.length < MAX_OPTIONS; m++) {
       const face = faceOfMove(m);
       // Not the same face twice, and opposite faces in one order only.
       if (face === lastFace || face + 3 === lastFace) continue;
@@ -216,9 +218,7 @@ function xcrossOptions(st: Stickers, max: number): Move[][] | null {
         es[d + 1][k] = next[m][es[d][k]];
       }
       path.push(m);
-      turns[face]++;
       dfs(step(code, m), d + 1, left - 1, face);
-      turns[face]--;
       path.pop();
     }
   };
@@ -226,7 +226,7 @@ function xcrossOptions(st: Stickers, max: number): Move[][] | null {
   let found: Move[][] | null = null;
   for (let depth = need(start, 0); depth <= max && !found; depth++) {
     dfs(start, 0, depth, -1);
-    if (best[0]) found = [...new Set(best)].map((p) => p!.map((m) => FACE_MOVES[m]));
+    if (out.length) found = out;
   }
   if (xcrossCache.size > 200) xcrossCache.clear();
   xcrossCache.set(key, found);
@@ -235,10 +235,9 @@ function xcrossOptions(st: Stickers, max: number): Move[][] | null {
 
 /**
  * The shortest way to solve the cross together with at least one F2L pair (of the shortest ones,
- * one with the fewest B turns), or null when that takes more than `max` moves.
+ * the easiest to execute), or null when that takes more than `max` moves.
  */
 export function solveXCross(st: Stickers, max: number): Move[] | null {
   const options = xcrossOptions(st, max);
-  if (!options) return null;
-  return options.reduce((a, b) => (backTurns(b) < backTurns(a) ? b : a));
+  return options && easiest(options);
 }
