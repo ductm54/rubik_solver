@@ -15,7 +15,9 @@ import { validate } from '../src/core/validate';
 import { type Capture, captureOf, readCube } from '../src/scan/readCube';
 import { type Lab, nameTogether } from '../src/vision/color';
 import { detectFace } from '../src/vision/detect';
+import { isSolvedSide, refinePlacement } from '../src/vision/faceSearch';
 import { FaceFollower } from '../src/vision/follow';
+import { type Placement, placePoint } from '../src/vision/grid';
 import { CaptureTracker } from '../src/vision/tracker';
 import { findDuplicate } from '../src/vision/duplicate';
 import { type PhotoFace, loadNoCube, loadSet, loadVideo, shrink } from './helpers/image';
@@ -81,6 +83,34 @@ describe('free-hand detection, real photos', () => {
         expect(detectFace(shrink(n.image, max).image).face, `${n.name} at ${max}px`).toBeNull();
       }
     }
+  });
+
+  it('one sticker of a face is not taken for a solved side: it has no seams in it', () => {
+    let squares = 0;
+    for (const faces of Object.values(SETS)) {
+      for (const facePx of [60, 90, 140, 200]) {
+        for (const f of faces) {
+          const side = Math.hypot(f.corners[1][0] - f.corners[0][0], f.corners[1][1] - f.corners[0][1]);
+          const { image, scale } = shrink(f.image, Math.round((Math.max(f.image.width, f.image.height) * facePx) / side));
+          const whole: Placement = {
+            cx: (f.corners.reduce((a, c) => a + c[0], 0) / 4) * scale,
+            cy: (f.corners.reduce((a, c) => a + c[1], 0) / 4) * scale,
+            pitch: facePx / 3,
+            rot: Math.atan2(f.corners[1][1] - f.corners[0][1], f.corners[1][0] - f.corners[0][0]),
+          };
+          // a 3 × 3 grid laid over each sticker on its own, settled the way the detector does it
+          for (let k = 0; k < 9; k++) {
+            const [cx, cy] = placePoint(whole, (k % 3) - 1, Math.floor(k / 3) - 1);
+            const one = refinePlacement(image, { ...whole, cx, cy, pitch: whole.pitch / 3 }, 6);
+            // many stickers are a flat square with other colours all round, like a solved side
+            if (!one.plain) continue;
+            squares++;
+            expect(isSolvedSide(image, one), `${f.name} at ${facePx}px, sticker ${k}`).toBe(false);
+          }
+        }
+      }
+    }
+    expect(squares).toBeGreaterThan(100); // of 432
   });
 
   it('follows a face from one frame to the next', () => {
@@ -168,6 +198,25 @@ for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3']) {
       expect(r.states).toHaveLength(1);
       // a face is in view for most of the video; the rest is turning
       expect(seen / frames).toBeGreaterThan(0.5);
+    }, 60_000);
+
+    it('never takes one sticker for a solved side', () => {
+      // Whatever is reported as a one-colour face must be as big as the cube's other faces. While
+      // a layer is being turned no whole face is in view, and single stickers used to be reported.
+      const widths: number[] = [];
+      const plain: { frame: number; pitch: number }[] = [];
+      let i = 0;
+      for (const frame of video.frames()) {
+        i++;
+        const face = detectFace(frame).face;
+        if (face?.plain) plain.push({ frame: i, pitch: face.placement.pitch });
+        else if (face) widths.push(face.placement.pitch);
+      }
+      const usual = widths.sort((a, b) => a - b)[widths.length >> 1];
+      expect(plain.filter((f) => f.pitch < 0.6 * usual)).toEqual([]);
+      // the second video is the one with a solved side
+      if (name === 'moyu-video-2') expect(plain.length).toBeGreaterThanOrEqual(15);
+      else expect(plain).toEqual([]);
     }, 60_000);
 
     it('captures each face within a second of it coming into view', () => {

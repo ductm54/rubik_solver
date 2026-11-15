@@ -137,3 +137,103 @@ export function scorePlacement(img: RGBAImage, p: Placement, lattice = 5): Place
   }
   return { spread, mean, outline, inside };
 }
+
+/** How far to either side of a border between two cells the seam is looked for, in pitches. */
+const SEAM_REACH = 0.2;
+/** How far from the border the two cells' own colours are taken, in pitches. */
+const SEAM_FLAT = 0.36;
+
+/**
+ * How clearly each of the 12 borders between neighbouring cells shows a seam: the gap between two
+ * pieces, seen as a dark groove or as the bright rounded edge of a piece. Each value is the
+ * largest colour difference between the pixels near the border and the two cells beside it. The
+ * cells' colours are joined by a straight line, so a face that gets darker towards one side shows
+ * no seam.
+ *
+ * Nine pieces of one colour have seams between them. One piece does not, and neither does a
+ * sheet of paper. The pixels are averaged along the border first, which keeps the seam and
+ * cancels the noise.
+ */
+export function seamSteps(img: RGBAImage, p: Placement): number[] {
+  return stepsAcross(img, p, [-0.5, 0.5]);
+}
+
+/**
+ * The same measurement as seamSteps taken where no seam can be: across the middle of each cell,
+ * 18 values. It shows how much the picture's noise, or glare on a sticker, bends the colour
+ * without any seam, which is what a seam has to stand out from.
+ */
+export function cellSteps(img: RGBAImage, p: Placement): number[] {
+  return stepsAcross(img, p, [-1, 0, 1]);
+}
+
+/**
+ * For lines across the face at each of `centres` (in pitches from its middle), in both directions
+ * and in each of the three rows or columns: how far the colour near the line strays from a
+ * straight blend of the colours on either side of it.
+ */
+function stepsAcross(img: RGBAImage, p: Placement, centres: number[]): number[] {
+  const { width: W, height: H, data } = img;
+  const c = Math.cos(p.rot) * p.pitch;
+  const s = Math.sin(p.rot) * p.pitch;
+  // samples across the line (about one per pixel) and lines along it
+  const n = Math.max(3, Math.round(SEAM_FLAT * p.pitch));
+  const near = Math.max(1, Math.round((SEAM_REACH / SEAM_FLAT) * n));
+  const ends = Math.max(1, Math.round(n / 4));
+  const lines = Math.max(3, Math.min(9, Math.round(0.56 * p.pitch)));
+  const size = 2 * n + 1;
+  const profile = new Float64Array(size * 3);
+  const out: number[] = [];
+  for (const upright of [true, false]) {
+    for (const along of [-1, 0, 1]) {
+      for (const across of centres) {
+        profile.fill(0);
+        let got = 0;
+        for (let j = 0; j < lines; j++) {
+          const a = along + (j / (lines - 1) - 0.5) * 0.56;
+          const at: number[] = [];
+          for (let i = -n; i <= n; i++) {
+            const t = across + (i / n) * SEAM_FLAT;
+            const u = upright ? t : a;
+            const v = upright ? a : t;
+            const x = Math.round(p.cx + u * c - v * s);
+            const y = Math.round(p.cy + u * s + v * c);
+            if (x < 0 || y < 0 || x >= W || y >= H) break;
+            at.push((y * W + x) * 4);
+          }
+          if (at.length < size) continue;
+          got++;
+          for (let i = 0; i < size; i++) {
+            profile[i * 3] += data[at[i]];
+            profile[i * 3 + 1] += data[at[i] + 1];
+            profile[i * 3 + 2] += data[at[i] + 2];
+          }
+        }
+        if (!got) {
+          out.push(0);
+          continue;
+        }
+        // the colours on either side: the outer few samples at each end
+        const from = [0, 0, 0];
+        const to = [0, 0, 0];
+        for (let i = 0; i < ends; i++) {
+          for (let ch = 0; ch < 3; ch++) {
+            from[ch] += profile[i * 3 + ch] / ends;
+            to[ch] += profile[(size - 1 - i) * 3 + ch] / ends;
+          }
+        }
+        const first = (ends - 1) / 2;
+        const span = size - 1 - 2 * first;
+        let step = 0;
+        for (let i = n - near; i <= n + near; i++) {
+          const f = (i - first) / span;
+          let d = 0;
+          for (let ch = 0; ch < 3; ch++) d += ((profile[i * 3 + ch] - (from[ch] * (1 - f) + to[ch] * f)) / got) ** 2;
+          step = Math.max(step, Math.sqrt(d));
+        }
+        out.push(step);
+      }
+    }
+  }
+  return out;
+}

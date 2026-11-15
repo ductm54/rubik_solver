@@ -46,8 +46,8 @@ npm run build    # static site in dist/
 | `src/core/validate.ts` | Colour counts, real pieces, each piece once, twist / flip / parity checks with readable errors |
 | `src/core/orient.ts` | `assemble(scans)`: faces in any order and rotation (+ optional neighbour strip) → every valid cube state |
 | `src/core/scramble.ts` | Kociemba two-phase solve (`cubejs`), invert, self-check that the scramble rebuilds the input |
-| `src/vision/grid.ts` | A 3 × 3 face placed by position, size and turn, and its two measurements: how flat each cell is, and how strong the outline around the face is |
-| `src/vision/faceSearch.ts` | `findFace(frame)`: tries every position, size and turn on a shrunk frame (integral images), keeps placements with flat cells and an outline, fine-tunes the best |
+| `src/vision/grid.ts` | A 3 × 3 face placed by position, size and turn, and its measurements: how flat each cell is, how strong the outline around the face is, and how clearly the seams between the cells show |
+| `src/vision/faceSearch.ts` | `findFace(frame)`: tries every position, size and turn on a shrunk frame (integral images), keeps placements with flat cells and an outline, fine-tunes the best; a one-colour face must also show seams |
 | `src/vision/detect.ts` | `detectFace(frame)`: `findFace`, then 9 Lab colour readings with glare rejection (center on a ring), and a neighbour strip when one shows |
 | `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms), re-searches the whole frame every third frame or when the colours change, and believes a plain white face only where a cube was just seen |
 | `src/vision/color.ts` | sRGB → Lab, sticker distance, nearest-colour reading, `classifyBalanced` (centers as references, exactly 9 per colour, Hungarian assignment) |
@@ -94,10 +94,20 @@ npm run build    # static site in dist/
   the detector read every face steadily for 1.3 to 2.2 s, yet only 2 of 6 were captured. Now the
   reading has to hold still, not the cube, and all six are captured within a second of coming
   into view, down to 5 frames per second.
-- **A side that is all one colour** (a solved side) has nothing inside it to go by, so it is found by
-  its outline alone: a clear step on at least 11 of its 12 outer cell edges. A sheet of paper or
-  a floor tile has that too, so a vivid one is accepted as it is, and a white one only where a
-  cube was seen in the last 4 seconds. Show another face first if the white side is solved.
+- **A side that is all one colour** (a solved side) has no colour changes inside it to go by, so it
+  is found by its outline (a clear step on at least 11 of its 12 outer cell edges) and by the
+  seams between its nine pieces. A floor tile can have both, so a vivid side is accepted as it is,
+  and a white one only where a cube was seen in the last 4 seconds. Show another face first if the
+  white side is solved.
+- **One sticker is not a solved side.** A single sticker of a scrambled face is also a flat square
+  with other colours all round it. While a layer was being turned, or the face was tilted, no
+  whole face was found and one sticker was reported as a solved side instead: in 4 frames of the
+  test videos, and a still photo of such a moment was captured as a face. What a sticker lacks is
+  seams. On each of the 12 borders between cells the scanner measures how far the colour strays
+  from a straight blend of the two cells (a dark groove, or the bright rounded edge of a piece),
+  and compares that with the same measurement across the middle of the cells, where glare and
+  noise bend the colour too. On the real photos and videos, none of 1,800 single stickers passes,
+  and the solved white side passes in every frame down to a face 50 px wide.
 - **Repeats.** The light on a turning cube changes, so the same face read twice is not the same
   numbers (on real video: up to 35 apart on one sticker, 24 on average). Two different faces
   always have a sticker 90 or more apart. A repeat is a face with no sticker far off.
@@ -108,7 +118,8 @@ npm run build    # static site in dist/
   in view to compare against it is still named red.
 - **Free-hand limits.** White stickers against a white background weaken the outline. The fit is a
   square, so a face tilted far away from the camera is read less reliably. A view held between
-  two faces can be captured as a face; the cube then does not validate.
+  two faces can be captured as a face; the cube then does not validate. A solved side needs its
+  seams to show, so it is not found when it is very small in the picture or out of focus.
 - **Logos and colour reading.** Each cell's colour is its largest group of similar pixels, never a
   blend, so a logo, glare or a sticker gap is ignored unless it covers most of the cell. The center
   cell is also sampled on a ring that skips its middle. Faces are named at the end by matching the 6

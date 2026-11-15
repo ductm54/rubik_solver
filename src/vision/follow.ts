@@ -6,9 +6,10 @@
  * read differ from the last frame, and on every third frame regardless.
  *
  * It also decides when to believe a face that is all one colour. Such a face is found by its
- * outline alone, and so is a sheet of paper or a floor tile. A vivid one (red, orange, yellow,
- * green, blue) is taken as it is, because plain vivid squares are rare. A white one is only
- * taken where a cube was seen moments before: the user turned the cube and its white side came up.
+ * outline and the seams between its pieces, and a floor tile or a window can have those too. A
+ * vivid one (red, orange, yellow, green, blue) is taken as it is, because vivid squares with
+ * lines across them are rare. A white one is only taken where a cube was seen moments before:
+ * the user turned the cube and its white side came up.
  */
 import { type FaceReading, type RGBAImage, detectFace } from './detect';
 
