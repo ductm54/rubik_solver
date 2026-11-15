@@ -13,6 +13,8 @@ import {
 import { CPLL, EPLL, PLL } from '../src/solve/cfop/algs/pll';
 import { EO, OCLL, OLL, type AlgEntry } from '../src/solve/cfop/algs/oll';
 import { CFOP, solveCfop } from '../src/solve/cfop';
+import { crossDistance, solveCross, solveXCross } from '../src/solve/cfop/cross';
+import { LEFT_HAND, RIGHT_HAND, backTurns, countRegrips, effort, planGrip } from '../src/solve/cfop/grip';
 import { crossSolved, f2lTable, slotSolved, SLOTS } from '../src/solve/cfop/f2l';
 import { buildTable, matchLL, stageDone } from '../src/solve/cfop/ll';
 
@@ -176,15 +178,78 @@ describe('CFOP solver', () => {
     expect(total / count).toBeLessThan(75);
   });
 
-  it('more cross colours never make the solve longer', () => {
+  /** The moves of the cross (or XCross) step of a plan. */
+  const crossOf = (plan: ReturnType<typeof solveCfop>) => parseAlg(plan.steps.find((s) => s.stage === 'cross')!.alg);
+
+  it('more cross colours never make the solve worse (moves, plus the regrips and B turns of the cross)', () => {
+    const cost = (plan: ReturnType<typeof solveCfop>) => plan.moves + effort(crossOf(plan));
     for (let n = 0; n < 20; n++) {
       const state = applyMoves(solved, randomMoves(25));
       const one = solveCfop(state, { crossColors: ['W'], oll: 'full', pll: 'full' });
       const all = solveCfop(state, { crossColors: ['W', 'Y', 'G', 'B', 'R', 'O'], oll: 'full', pll: 'full' });
-      expect(all.moves).toBeLessThanOrEqual(one.moves);
+      expect(cost(all)).toBeLessThanOrEqual(cost(one));
     }
   });
 
+  it('cross and XCross: of the shortest solutions, the easiest to execute', () => {
+    const turns = ['U', 'R', 'F', 'D', 'L', 'B'].flatMap((b) => [b, `${b}2`, `${b}'`]);
+    for (let n = 0; n < 40; n++) {
+      const st = toColorArray(applyMoves(solved, randomMoves(25)));
+      const cross = solveCross(st);
+      expect(cross.length).toBe(crossDistance(st));
+      expect(crossSolved(applyMovesToArray(st, cross))).toBe(true);
+      // Brute force: the least effort (regrips and B turns) over every shortest cross.
+      const least = (s: typeof st, done: string[]): number => {
+        const d = crossDistance(s);
+        if (d === 0) return effort(parseAlg(done.join(' ')));
+        let best = Infinity;
+        for (const t of turns) {
+          const next = applyMovesToArray(s, t);
+          if (crossDistance(next) === d - 1) best = Math.min(best, least(next, [...done, t]));
+        }
+        return best;
+      };
+      if (cross.length <= 6) expect(effort(cross)).toBe(least(st, []));
+      // A B turn that can be the first move is the first move.
+      expect(cross[0]?.base === 'F' && cross[1]?.base === 'B').toBe(false);
+      // XCross: the same length whichever side is in front.
+      const x = solveXCross(st, 10);
+      const sides = ['y', 'y2', "y'"].map((r) => solveXCross(applyMovesToArray(st, r), 10));
+      for (const other of sides) expect(other?.length).toBe(x?.length);
+      if (x) {
+        const after = applyMovesToArray(st, x);
+        expect(crossSolved(after) && SLOTS.some((s) => slotSolved(after, s))).toBe(true);
+      }
+    }
+  });
+
+  it('step 0 holds the cube so that the cross and the XCross need few regrips and B turns', () => {
+    let seed = 11;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (const cross of ['standard', 'advanced'] as const) {
+      const N = 60;
+      let smooth = 0;
+      let noBack = 0;
+      for (let n = 0; n < N; n++) {
+        const state = applyMoves(solved, randomMoves(25, rand));
+        const plan = solveCfop(state, { crossColors: ['W'], cross, oll: 'full', pll: 'full' });
+        const moves = crossOf(plan);
+        const regrips = countRegrips(moves);
+        const back = backTurns(moves);
+        if (regrips === 0) smooth++;
+        if (back === 0) noBack++;
+        expect(back).toBeLessThanOrEqual(2);
+        expect(regrips).toBeLessThanOrEqual(2);
+        // Step 0 says what the hold is good for; the cross step says where each regrip is.
+        expect(plan.steps[0].hint).toContain(`needs ${regrips ? `${regrips} regrip` : 'no regrip'}`);
+        expect(plan.steps[0].hint).toContain(back ? `${back} B turn` : 'no B turn');
+        expect(plan.steps.find((s) => s.stage === 'cross')!.hint?.split('regrip:').length).toBe(regrips ? planGrip(moves).at.length + 1 : 1);
+      }
+      // Picking by length alone leaves about 1 cross in 5 without a B turn.
+      expect(noBack / N).toBeGreaterThan(0.6);
+      expect(smooth / N).toBeGreaterThan(0.4);
+    }
+  });
   it('works through the method interface and is fast', () => {
     const state = applyMoves(solved, randomMoves(25));
     const t = performance.now();
@@ -258,5 +323,55 @@ describe('CFOP solver', () => {
     let st = solved;
     for (const s of plan.steps) st = applyMoves(st, s.alg);
     expect(plan.moves).toBe(0);
+  });
+});
+
+describe('regrips', () => {
+  const regrips = (alg: string) => countRegrips(parseAlg(alg));
+
+  it('the left hand is the mirror image of the right', () => {
+    expect(RIGHT_HAND.bottom.split(' ')).toContain('F');
+    expect(LEFT_HAND.bottom.split(' ')).toContain("F'");
+    const mirror = (alg: string) =>
+      alg.split(' ').map((m) => ({ R: 'L', L: 'R' })[m[0]] ?? m[0]).map((f, i) => f + ({ '': "'", "'": '', '2': '2' })[alg.split(' ')[i].slice(1)]).join(' ');
+    expect(mirror("R U R' F2")).toBe("L' U' L F2");
+    for (let n = 0; n < 200; n++) {
+      const alg = randomMoves(8).map((m) => m.base + ['', '', '2', "'"][m.amount]).join(' ');
+      expect(regrips(mirror(alg)), alg).toBe(regrips(alg));
+    }
+  });
+
+  it('usual finger tricks need no regrip', () => {
+    for (const alg of ["R U R' U'", "R' F R F'", "L' U' L U", "R U R' U' R' F R2 U' R' U' R U R' F'", "R B' R'", "D R' D' R", 'R2 U R2']) expect(regrips(alg), alg).toBe(0);
+  });
+
+  it('the first grip is free, the next ones are not', () => {
+    // One B or F2 alone: take the grip for it during inspection.
+    expect(planGrip(parseAlg('B'))).toEqual({ regrips: 0, start: { left: 'front', right: 'top' }, at: [] });
+    expect(regrips('F2')).toBe(0);
+    // So a B turn costs nothing as the first move, and only there.
+    expect(backTurns(parseAlg('B R U'))).toBe(0);
+    expect(backTurns(parseAlg('R B U'))).toBe(1);
+    expect(backTurns(parseAlg("B2 R B' D B"))).toBe(2);
+    // The wrist cannot keep turning the same way.
+    expect(regrips("R U R U R U R")).toBe(1);
+    // Front and back turns with both wrists already used.
+    const plan = planGrip(parseAlg("D R' L F2 B2"));
+    expect(plan.regrips).toBe(1);
+    expect(plan.at.map((a) => a.move)).toEqual([4]);
+    expect(plan.at[0].hands).toHaveLength(1);
+    expect(plan.at[0].hands[0].thumb).toBe('top');
+  });
+
+  it('counting and planning agree, and a plan is never worse than regripping at every move', () => {
+    for (let n = 0; n < 300; n++) {
+      const moves = randomMoves(10);
+      const plan = planGrip(moves);
+      expect(plan.regrips).toBe(countRegrips(moves));
+      expect(plan.at.reduce((a, r) => a + r.hands.length, 0)).toBe(plan.regrips);
+      expect(plan.regrips).toBeLessThan(moves.length);
+      // More moves never take fewer regrips.
+      expect(countRegrips(moves.slice(0, 6))).toBeLessThanOrEqual(plan.regrips);
+    }
   });
 });

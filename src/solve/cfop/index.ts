@@ -1,7 +1,8 @@
 /**
  * CFOP: cross, F2L (4 pairs), OLL, PLL, with 2-look or full last layer. With several cross
  * colours allowed, every allowed colour (in all 4 ways of holding it on the bottom) is solved
- * and the shortest solution wins.
+ * and the best one wins: the shortest, with regrips and B turns in the cross counted as extra
+ * moves (see grip.ts), so the cube is held with the side in front that makes the cross easy to do.
  */
 import { type Color, type CubeState, type Move, applyMovesToArray, countMoves, formatAlg, parseAlg, simplifyAlg, toColorArray } from '../../core/cube';
 import { validate } from '../../core/validate';
@@ -13,6 +14,7 @@ import { EO, OCLL, OLL } from './algs/oll';
 import { solveCross, solveXCross } from './cross';
 import { SLOTS, SLOT_NAMES, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { solveF2LAdvanced } from './f2lAdvanced';
+import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
 
 let tables: Record<string, LLTable> | null = null;
@@ -47,7 +49,13 @@ interface Attempt {
   steps: SolveStep[];
   moves: number;
   color: Color;
+  /** How awkward the cross (or XCross) is with the cube held this way, in extra moves: regrips and B turns. */
+  effort: number;
 }
+
+const plural = (n: number, word: string) => (n ? `${n} ${word}${n > 1 ? 's' : ''}` : `no ${word}`);
+const THUMB_WORDS: Record<Thumb, string> = { front: 'in front', top: 'on top', bottom: 'on the bottom' };
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
 
 function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Color): Attempt {
   const steps: SolveStep[] = [];
@@ -62,21 +70,38 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     st = applyMovesToArray(st, m);
   };
 
+  // Cross, or with the advanced cross an XCross (cross + at least one pair) when it is short enough.
+  const xcross = opts.cross === 'advanced' ? solveXCross(held, XCROSS_MAX) : null;
+  const crossMoves = xcross ?? solveCross(held);
+  const back = backTurns(crossMoves);
+  const grip = planGrip(crossMoves);
+  // The grip to take during inspection, when it is not the home grip (both thumbs in front).
+  const startGrip =
+    grip.start.left === grip.start.right
+      ? grip.start.left === 'front' ? '' : `both thumbs ${THUMB_WORDS[grip.start.left]}`
+      : (['left', 'right'] as const).filter((h) => grip.start[h] !== 'front').map((h) => `your ${h} thumb ${THUMB_WORDS[grip.start[h]]}`).join(' and ');
+
   // Step 0: hold the cube the right way, during the 15 s inspection (rotations only, no moves).
   const front = COLOR_WORDS[centerColor(held, 'F')];
+  const crossName = xcross ? 'XCross' : 'cross';
   push(
     {
       stage: 'inspection',
       title: `Hold ${COLOR_WORDS[cross]} on the bottom, ${front} in front`,
       caseName: holdMoves.length ? undefined : 'Already held this way: no turn needed',
-      hint: `Do this during the 15 s inspection, before the timer starts: ${top} on top, ${front} facing you.`,
+      hint:
+        `Do this during the 15 s inspection, before the timer starts: ${top} on top, ${front} facing you.` +
+        (crossMoves.length ? ` With ${front} in front the ${crossName} needs ${plural(grip.regrips, 'regrip')} and ${plural(back, 'B turn')}${crossMoves[0].base === 'B' ? ' after the first move' : ''}.` : '') +
+        (startGrip ? ` Start with ${startGrip}.` : ''),
     },
     holdMoves,
     { kind: 'cross', cross },
   );
+  // Where the regrips are, for the hint of the cross step.
+  const regripHint = grip.at
+    .map(({ move, hands }) => ` Before the ${ordinal(move + 1)} move (${formatAlg([crossMoves[move]])}) regrip: ${hands.map((h) => `${h.hand} thumb ${THUMB_WORDS[h.thumb]}`).join(', ')}.`)
+    .join('');
 
-  // Cross, or with the advanced cross an XCross (cross + at least one pair) when it is short enough.
-  const xcross = opts.cross === 'advanced' ? solveXCross(held, XCROSS_MAX) : null;
   if (xcross) {
     const after = applyMovesToArray(held, xcross);
     const done = SLOTS.filter((s) => slotSolved(after, s)).map((s) => slotColors(after, s));
@@ -84,15 +109,15 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
       {
         stage: 'cross',
         title: `XCross (${COLOR_WORDS[cross]}) + ${done.map(pairName).join(' and ')} pair${done.length > 1 ? 's' : ''}`,
-        hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom and the ${done.map(pairName).join(' and ')} pair${done.length > 1 ? 's' : ''} in one go.`,
+        hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom and the ${done.map(pairName).join(' and ')} pair${done.length > 1 ? 's' : ''} in one go.${regripHint}`,
       },
       xcross,
       { kind: 'f2l', cross, pairs: done },
     );
   } else {
     push(
-      { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom, matching the side centers.` },
-      solveCross(held),
+      { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom, matching the side centers.${regripHint}` },
+      crossMoves,
       { kind: 'cross', cross },
     );
   }
@@ -179,7 +204,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     llStep('pll', 'PLL 1/2 · corners', t.cpll, { kind: 'cpll', cross }, 'Skip: corners already in place');
     llStep('pll', 'PLL 2/2 · edges', t.epll, { kind: 'pll', cross }, 'Skip: solved');
   }
-  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross };
+  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back };
 }
 
 /** Colours of a slot: [cross colour, front-ish side, right-ish side]. */
@@ -198,13 +223,15 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
   const v = validate(state);
   if (!v.ok) throw new Error(v.errors.join('\n'));
   const start = toColorArray(state);
+  // Every way of holding an allowed colour on the bottom; an awkward cross counts as extra moves.
+  const cost = (a: Attempt) => a.moves + a.effort;
   let best: Attempt | null = null;
   for (const hold of HOLDS) {
     const st = applyMovesToArray(start, hold);
     const cross = centerColor(st, 'D');
     if (!opts.crossColors.includes(cross)) continue;
     const a = solveFrom(start, hold, opts, cross);
-    if (!best || a.moves < best.moves) best = a;
+    if (!best || cost(a) < cost(best) || (cost(a) === cost(best) && a.effort < best.effort)) best = a;
   }
   if (!best) throw new Error('Pick at least one cross colour');
   const n = opts.crossColors.length;
@@ -212,7 +239,7 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
     method: 'CFOP',
     steps: best.steps,
     moves: best.moves,
-    note: n > 1 ? `Cross on ${COLOR_WORDS[best.color]}: the shortest of your ${n} colours for this cube.` : `Cross on ${COLOR_WORDS[best.color]}.`,
+    note: n > 1 ? `Cross on ${COLOR_WORDS[best.color]}: the best of your ${n} colours for this cube.` : `Cross on ${COLOR_WORDS[best.color]}.`,
   };
 }
 
@@ -229,7 +256,7 @@ export const CFOP: MethodDef = {
     {
       key: 'crossColors',
       label: 'Cross colours',
-      help: 'Start with one. Add more as you learn to solve the cross on them; the solver picks the shortest for each cube.',
+      help: 'Start with one. Add more as you learn to solve the cross on them; the solver picks the best for each cube: the shortest solve, held so the cross needs few or no regrips and B turns.',
       kind: 'multi',
       options: COLOR_OPTIONS,
     },
