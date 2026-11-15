@@ -1,7 +1,8 @@
 /**
  * CFOP: cross, F2L (4 pairs), OLL, PLL, with 2-look or full last layer. With several cross
  * colours allowed, every allowed colour (in all 4 ways of holding it on the bottom) is solved
- * and the shortest solution wins.
+ * and the best one wins: the shortest, with B turns in the cross counted as extra moves, so the
+ * cube is held with the side in front that keeps the cross off the back face.
  */
 import { type Color, type CubeState, type Move, applyMovesToArray, countMoves, formatAlg, parseAlg, simplifyAlg, toColorArray } from '../../core/cube';
 import { validate } from '../../core/validate';
@@ -10,7 +11,7 @@ import { type Stickers, centerColor } from '../pieces';
 import type { MethodDef, SettingValues, SolvePlan, SolveStep } from '../types';
 import { CPLL, EPLL, PLL } from './algs/pll';
 import { EO, OCLL, OLL } from './algs/oll';
-import { solveCross, solveXCross } from './cross';
+import { backTurns, solveCross, solveXCross } from './cross';
 import { SLOTS, SLOT_NAMES, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { solveF2LAdvanced } from './f2lAdvanced';
 import { type LLTable, buildTable, matchLL } from './ll';
@@ -43,10 +44,18 @@ export interface CfopOptions {
 /** The advanced cross does an XCross only when it takes at most this many moves (under 11). */
 const XCROSS_MAX = 10;
 
+/**
+ * Step 0 picks how to hold the cube by the solve's length plus this many moves for each B turn in
+ * the cross (or XCross): a B turn needs a regrip, so a few more moves are better than one of them.
+ */
+export const BACK_TURN_COST = 4;
+
 interface Attempt {
   steps: SolveStep[];
   moves: number;
   color: Color;
+  /** B turns in the cross (or XCross) with the cube held this way. */
+  back: number;
 }
 
 function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Color): Attempt {
@@ -62,21 +71,27 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     st = applyMovesToArray(st, m);
   };
 
+  // Cross, or with the advanced cross an XCross (cross + at least one pair) when it is short enough.
+  const xcross = opts.cross === 'advanced' ? solveXCross(held, XCROSS_MAX) : null;
+  const crossMoves = xcross ?? solveCross(held);
+  const back = backTurns(crossMoves);
+
   // Step 0: hold the cube the right way, during the 15 s inspection (rotations only, no moves).
   const front = COLOR_WORDS[centerColor(held, 'F')];
+  const crossName = xcross ? 'XCross' : 'cross';
   push(
     {
       stage: 'inspection',
       title: `Hold ${COLOR_WORDS[cross]} on the bottom, ${front} in front`,
       caseName: holdMoves.length ? undefined : 'Already held this way: no turn needed',
-      hint: `Do this during the 15 s inspection, before the timer starts: ${top} on top, ${front} facing you.`,
+      hint:
+        `Do this during the 15 s inspection, before the timer starts: ${top} on top, ${front} facing you.` +
+        (crossMoves.length ? ` With ${front} in front the ${crossName} needs ${back ? `only ${back} B turn${back > 1 ? 's' : ''}` : 'no B turns'}.` : ''),
     },
     holdMoves,
     { kind: 'cross', cross },
   );
 
-  // Cross, or with the advanced cross an XCross (cross + at least one pair) when it is short enough.
-  const xcross = opts.cross === 'advanced' ? solveXCross(held, XCROSS_MAX) : null;
   if (xcross) {
     const after = applyMovesToArray(held, xcross);
     const done = SLOTS.filter((s) => slotSolved(after, s)).map((s) => slotColors(after, s));
@@ -92,7 +107,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
   } else {
     push(
       { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom, matching the side centers.` },
-      solveCross(held),
+      crossMoves,
       { kind: 'cross', cross },
     );
   }
@@ -179,7 +194,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     llStep('pll', 'PLL 1/2 · corners', t.cpll, { kind: 'cpll', cross }, 'Skip: corners already in place');
     llStep('pll', 'PLL 2/2 · edges', t.epll, { kind: 'pll', cross }, 'Skip: solved');
   }
-  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross };
+  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, back };
 }
 
 /** Colours of a slot: [cross colour, front-ish side, right-ish side]. */
@@ -198,13 +213,15 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
   const v = validate(state);
   if (!v.ok) throw new Error(v.errors.join('\n'));
   const start = toColorArray(state);
+  // Every way of holding an allowed colour on the bottom; B turns in the cross count as extra moves.
+  const cost = (a: Attempt) => a.moves + BACK_TURN_COST * a.back;
   let best: Attempt | null = null;
   for (const hold of HOLDS) {
     const st = applyMovesToArray(start, hold);
     const cross = centerColor(st, 'D');
     if (!opts.crossColors.includes(cross)) continue;
     const a = solveFrom(start, hold, opts, cross);
-    if (!best || a.moves < best.moves) best = a;
+    if (!best || cost(a) < cost(best) || (cost(a) === cost(best) && a.back < best.back)) best = a;
   }
   if (!best) throw new Error('Pick at least one cross colour');
   const n = opts.crossColors.length;
@@ -212,7 +229,7 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
     method: 'CFOP',
     steps: best.steps,
     moves: best.moves,
-    note: n > 1 ? `Cross on ${COLOR_WORDS[best.color]}: the shortest of your ${n} colours for this cube.` : `Cross on ${COLOR_WORDS[best.color]}.`,
+    note: n > 1 ? `Cross on ${COLOR_WORDS[best.color]}: the best of your ${n} colours for this cube.` : `Cross on ${COLOR_WORDS[best.color]}.`,
   };
 }
 
@@ -229,7 +246,7 @@ export const CFOP: MethodDef = {
     {
       key: 'crossColors',
       label: 'Cross colours',
-      help: 'Start with one. Add more as you learn to solve the cross on them; the solver picks the shortest for each cube.',
+      help: 'Start with one. Add more as you learn to solve the cross on them; the solver picks the best for each cube: the shortest solve, held so the cross needs few or no B turns.',
       kind: 'multi',
       options: COLOR_OPTIONS,
     },

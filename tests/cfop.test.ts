@@ -12,7 +12,8 @@ import {
 } from '../src/core/cube';
 import { CPLL, EPLL, PLL } from '../src/solve/cfop/algs/pll';
 import { EO, OCLL, OLL, type AlgEntry } from '../src/solve/cfop/algs/oll';
-import { CFOP, solveCfop } from '../src/solve/cfop';
+import { BACK_TURN_COST, CFOP, solveCfop } from '../src/solve/cfop';
+import { backTurns, crossDistance, solveCross, solveXCross } from '../src/solve/cfop/cross';
 import { crossSolved, f2lTable, slotSolved, SLOTS } from '../src/solve/cfop/f2l';
 import { buildTable, matchLL, stageDone } from '../src/solve/cfop/ll';
 
@@ -176,12 +177,67 @@ describe('CFOP solver', () => {
     expect(total / count).toBeLessThan(75);
   });
 
-  it('more cross colours never make the solve longer', () => {
+  /** B turns in the cross (or XCross) step of a plan. */
+  const crossBack = (plan: ReturnType<typeof solveCfop>) => backTurns(parseAlg(plan.steps.find((s) => s.stage === 'cross')!.alg));
+
+  it('more cross colours never make the solve worse (moves, plus the cost of B turns in the cross)', () => {
+    const cost = (plan: ReturnType<typeof solveCfop>) => plan.moves + BACK_TURN_COST * crossBack(plan);
     for (let n = 0; n < 20; n++) {
       const state = applyMoves(solved, randomMoves(25));
       const one = solveCfop(state, { crossColors: ['W'], oll: 'full', pll: 'full' });
       const all = solveCfop(state, { crossColors: ['W', 'Y', 'G', 'B', 'R', 'O'], oll: 'full', pll: 'full' });
-      expect(all.moves).toBeLessThanOrEqual(one.moves);
+      expect(cost(all)).toBeLessThanOrEqual(cost(one));
+    }
+  });
+
+  it('cross and XCross: of the shortest solutions, one with the fewest B turns', () => {
+    const turns = ['U', 'R', 'F', 'D', 'L', 'B'].flatMap((b) => [b, `${b}2`, `${b}'`]);
+    for (let n = 0; n < 40; n++) {
+      const st = toColorArray(applyMoves(solved, randomMoves(25)));
+      const cross = solveCross(st);
+      expect(cross.length).toBe(crossDistance(st));
+      expect(crossSolved(applyMovesToArray(st, cross))).toBe(true);
+      // Brute force: the fewest B turns over every shortest cross.
+      const fewest = (s: typeof st, back: number): number => {
+        const d = crossDistance(s);
+        if (d === 0) return back;
+        let best = Infinity;
+        for (const t of turns) {
+          const next = applyMovesToArray(s, t);
+          if (crossDistance(next) === d - 1) best = Math.min(best, fewest(next, back + (t[0] === 'B' ? 1 : 0)));
+        }
+        return best;
+      };
+      if (cross.length <= 6) expect(backTurns(cross)).toBe(fewest(st, 0));
+      // XCross: the same length whichever side is in front, and the B turns follow the best side.
+      const x = solveXCross(st, 10);
+      const sides = ['y', 'y2', "y'"].map((r) => solveXCross(applyMovesToArray(st, r), 10));
+      for (const other of sides) expect(other?.length).toBe(x?.length);
+      if (x) {
+        const after = applyMovesToArray(st, x);
+        expect(crossSolved(after) && SLOTS.some((s) => slotSolved(after, s))).toBe(true);
+      }
+    }
+  });
+
+  it('step 0 holds the cube so that the cross and the XCross need few B turns', () => {
+    let seed = 11;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (const cross of ['standard', 'advanced'] as const) {
+      const N = 60;
+      let none = 0;
+      let many = 0;
+      for (let n = 0; n < N; n++) {
+        const state = applyMoves(solved, randomMoves(25, rand));
+        const plan = solveCfop(state, { crossColors: ['W'], cross, oll: 'full', pll: 'full' });
+        const back = crossBack(plan);
+        if (back === 0) none++;
+        if (back > 1) many++;
+        expect(plan.steps[0].hint).toContain(back ? `only ${back} B turn` : 'no B turns');
+      }
+      // Without this, about 1 cross in 5 is free of B turns and 1 in 4 has two or more.
+      expect(none / N).toBeGreaterThan(0.5);
+      expect(many / N).toBeLessThan(0.1);
     }
   });
 
