@@ -123,7 +123,7 @@ function describe(st: Stickers, slot: Slot, crossWord: string): string {
   };
   const c = locate(st, cHome);
   const facing = faceOf(c[0]) === 'U' ? 'up' : faceOf(c[0]) === 'D' ? 'down' : 'to the side';
-  return `corner ${where(cHome)} (${crossWord} facing ${facing}), edge ${where(eHome)}`;
+  return `Corner ${where(cHome)} (${crossWord} facing ${facing}), edge ${where(eHome)}`;
 }
 
 /** One pair's best solution into `slot`, or null if the table has no entry. */
