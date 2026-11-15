@@ -31,7 +31,7 @@ Done so far:
   execute: few or no regrips and B turns. It also says which grip to start with, and the cross
   step says where each regrip is.
 - **Beginner method** (layer by layer), picked in the Learn page's method list, with the cross colour
-  as its setting: the cross one edge at a time, first-layer corners (corner above its slot, repeat
+  as its setting: the cross one edge at a time (its slot turned to the front, no B turns), first-layer corners (corner above its slot, repeat
   R U R' U'), middle edges (right / left algorithm), yellow cross (F R U R' U' F': dot → L → line),
   yellow edges (R U R' U R U2 R' U), corners in place (U R U' L' U R' U' L) and corner twists
   (R' D' R D at the front-right). Each step says which case it is and how many repeats it takes.
@@ -76,7 +76,7 @@ npm run build    # static site in dist/
 | `src/solve/cfop/f2lAdvanced.ts` | Advanced F2L: per-slot trigger tables for all 576 pair places (triggers from R, L, F, U and wide/slice r, l, f, S; never B), stuck pieces handled in the same search, every pair order tried, pseudo-slotting (all four pairs made with the bottom layer turned by D, D2 or D') used when it saves moves |
 | `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest, counting each regrip in the cross as 3 extra moves and each B turn after the first move as 5 |
-| `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; the cross edge by edge uses a distance table for each set of cross edges (`solveCrossEdge` in `cfop/cross.ts`) |
+| `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; never a B turn: the cube is turned instead. The cross edge by edge: the slot turned to the front, then a distance table for each set of cross edges with U, R, F, D, L only (`solveCrossEdge` in `cfop/cross.ts`) |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
 | `demo/scan.ts` | Scan panel on the front page (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |

@@ -98,7 +98,7 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   );
 
   // 1. Cross, one edge at a time (the cheapest next edge first).
-  const done: number[] = crossEdgesDone(b.st);
+  const done = crossEdgesDone(b.st);
   const shown = done.map((k) => homeColors(b.st, CROSS_HOMES[k]));
   if (done.length) {
     b.steps.push({
@@ -109,26 +109,36 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
       mask: stickeringMask(scheme, { kind: 'pieces', cross, pieces: shown }),
     });
   }
-  while (done.length < 4) {
-    let best: { k: number; moves: Move[] } | null = null;
-    for (const k of [0, 1, 2, 3].filter((k) => !done.includes(k))) {
-      const moves = solveCrossEdge(b.st, done, k);
-      if (!best || moves.length < best.moves.length) best = { k, moves };
+  // Each edge is put in with its slot turned to the front (y), using U, R, F, D, L: no B turns.
+  const FRONT: Record<string, string> = { DF: '', DR: 'y', DB: 'y2', DL: "y'" };
+  while (crossEdgesDone(b.st).length < 4) {
+    let best: { y: string; moves: Move[] } | null = null;
+    for (const k of [0, 1, 2, 3].filter((k) => !crossEdgesDone(b.st).includes(k))) {
+      const y = FRONT[CROSS_HOMES[k]];
+      const st = b.peek(y);
+      const moves = solveCrossEdge(st, crossEdgesDone(st), 0, true);
+      if (!best || moves.length < best.moves.length) best = { y, moves };
     }
-    const { k, moves } = best!;
-    const name = CROSS_HOMES[k];
-    const colors = homeColors(b.st, name);
-    done.push(k);
+    const { y, moves } = best!;
+    const colors = homeColors(b.peek(y), 'DF');
     shown.push(colors);
+    const n = shown.length;
     b.push(
       'cross',
       {
-        title: `Cross ${done.length}/4 · ${names(colors)} edge`,
-        hint: `Bring the ${names(colors)} edge to the bottom, ${word(cross)} facing down, between the ${word(cross)} and ${word(colors[1])} centers${done.length > 1 ? ', without moving the cross edges already in place' : ''}.`,
+        title: `Cross ${n}/4 · ${names(colors)} edge`,
+        hint:
+          `${y ? `Turn the cube (${y}) so the ${word(colors[1])} center is in front. ` : `The ${word(colors[1])} center is in front. `}` +
+          `Bring the ${names(colors)} edge to the bottom front, ${word(cross)} facing down${n > 1 ? ', without moving the cross edges already in place' : ''}.`,
       },
-      moves,
+      [y, formatAlg(moves)],
       [...shown],
     );
+    // An edge that went in by itself on the way.
+    for (const k of crossEdgesDone(b.st)) {
+      const c = homeColors(b.st, CROSS_HOMES[k]);
+      if (!shown.some((x) => x[1] === c[1])) shown.push(c);
+    }
   }
 
   // 2. First-layer corners.
