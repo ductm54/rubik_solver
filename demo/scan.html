@@ -15,7 +15,7 @@
         <a href="./learn.html">Learn</a>
       </nav>
       <h1>Cube Face Scanner</h1>
-      <p class="sub">Show each of the 6 faces to the camera, in any order and any rotation. Each face is read the moment it sits still.</p>
+      <p class="sub">Show each of the 6 faces to the camera, anywhere in the picture, in any order and any rotation. Each face is read the moment it sits still. Works with stickered and stickerless cubes.</p>
     </header>
 
     <main>
@@ -24,34 +24,19 @@
           <h2>Camera</h2>
           <div class="row gap wrap">
             <button id="btn-camera" class="primary">Start camera</button>
-            <button id="btn-sim" class="ghost">Simulated cube</button>
             <label class="ghost button-like" title="One video, or one or more photos">Photos / video<input id="file" type="file" accept="image/*,video/*" multiple hidden /></label>
           </div>
         </div>
-        <div class="row gap wrap scan-modes">
-          <div class="segmented" role="radiogroup" aria-label="Scan mode">
-            <label class="seg"><input type="radio" name="scan-mode" value="free" />Free-hand</label>
-            <label class="seg"><input type="radio" name="scan-mode" value="guide" />Guide frame</label>
-          </div>
-          <span class="hint" data-scan="guide">Hold one face roughly in the square; the grid snaps to it. Use this for a face that is all one colour.</span>
-          <span class="hint" data-scan="free">Show a face anywhere in the picture, facing the camera. Works with stickered and stickerless cubes.</span>
-        </div>
         <div id="stage" class="stage">
           <video id="video" playsinline muted></video>
-          <canvas id="sim" class="hidden"></canvas>
           <img id="photo" class="hidden" alt="" />
           <canvas id="overlay"></canvas>
-          <div id="placeholder" class="placeholder">Start the camera, try the simulated cube, or upload photos or a video.</div>
+          <div id="placeholder" class="placeholder">Start the camera, or upload photos or a video.</div>
         </div>
         <div class="row between stats">
           <span id="status" aria-live="polite">Idle</span>
           <span id="perf" class="muted"></span>
         </div>
-        <div class="row between wrap capture-row" data-scan="guide">
-          <label class="check"><input id="auto" type="checkbox" checked /> Capture by itself when the face is steady</label>
-          <button id="btn-capture" class="primary" disabled>Capture face</button>
-        </div>
-        <p class="hint" data-scan="guide">You can also tap the picture or press Space to capture.</p>
       </section>
 
       <section class="card">

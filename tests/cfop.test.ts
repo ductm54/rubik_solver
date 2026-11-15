@@ -165,7 +165,9 @@ describe('CFOP solver', () => {
       expect(stages.filter((s) => s === 'f2l').length).toBe(4);
       expect(stages.filter((s) => s === 'oll').length).toBe(mode.oll === 'full' ? 1 : 2);
       expect(stages.filter((s) => s === 'pll').length).toBe(mode.pll === 'full' ? 1 : 2);
-      expect(plan.steps[0].title).toContain('white');
+      expect(plan.steps[0].stage).toBe('inspection');
+      expect(plan.steps[0].moves).toBe(0);
+      expect(plan.steps[1].title).toContain('white');
       if (mode.oll === 'full') {
         total += plan.moves;
         count++;
@@ -188,7 +190,7 @@ describe('CFOP solver', () => {
     const t = performance.now();
     const plan = CFOP.solve(state, { crossColors: ['W', 'Y'], oll: 'full', pll: 'full' });
     expect(performance.now() - t).toBeLessThan(1500);
-    expect(plan.steps.length).toBe(7);
+    expect(plan.steps.length).toBe(8);
     expect(plan.steps.every((s) => s.mask?.startsWith('EDGES:'))).toBe(true);
   });
 

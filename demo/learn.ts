@@ -149,7 +149,7 @@ function solve() {
 }
 
 // --- output
-const STAGE_LABEL: Record<string, string> = { cross: 'Cross', f2l: 'F2L', oll: 'OLL', pll: 'PLL' };
+const STAGE_LABEL: Record<string, string> = { inspection: 'Step 0', cross: 'Cross', f2l: 'F2L', oll: 'OLL', pll: 'PLL' };
 
 function renderPlan() {
   stepsEl.innerHTML = '';
@@ -167,7 +167,7 @@ function renderPlan() {
   }
   summary.textContent = plan.moves ? `${plan.moves} moves. ${plan.note ?? ''}` : 'Already solved.';
   const byStage = new Map<string, number>();
-  for (const s of plan.steps) byStage.set(s.stage, (byStage.get(s.stage) ?? 0) + s.moves);
+  for (const s of plan.steps) if (s.stage !== 'inspection') byStage.set(s.stage, (byStage.get(s.stage) ?? 0) + s.moves);
   for (const [stage, n] of byStage) {
     const b = document.createElement('span');
     b.className = `stage-tag stage-${stage}`;
@@ -190,7 +190,7 @@ function stepItem(s: SolveStep, i: number): HTMLLIElement {
   head.className = 'step-head';
   const tag = Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: STAGE_LABEL[s.stage] ?? s.stage });
   const title = Object.assign(document.createElement('span'), { className: 'step-title', textContent: s.title });
-  const count = Object.assign(document.createElement('span'), { className: 'muted step-count', textContent: s.moves ? `${s.moves} moves` : 'skip' });
+  const count = Object.assign(document.createElement('span'), { className: 'muted step-count', textContent: s.moves ? `${s.moves} moves` : s.stage === 'inspection' ? 'inspection' : 'skip' });
   head.append(tag, title, count);
   btn.append(head);
   if (s.caseName) btn.append(Object.assign(document.createElement('div'), { className: 'step-case', textContent: s.caseName }));
