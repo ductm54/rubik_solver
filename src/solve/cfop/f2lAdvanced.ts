@@ -1,23 +1,56 @@
 /**
- * Advanced F2L: fewer moves. No cube rotations, a pair can go into any slot from where it is,
- * pieces stuck in another open slot are taken out as part of the same algorithm, and every pair
- * order is tried.
+ * Advanced F2L: fewer moves. No cube rotations and no B turns, a pair can go into any slot from
+ * where it is, pieces stuck in another open slot are taken out as part of the same algorithm, and
+ * every pair order is tried.
  *
  * For each target slot and each set of still-open slots there is a table of the shortest
  * trigger sequence for all 576 places of the pair (corner 8 × 3, edge 12 × 2). Triggers only
  * touch their own slot and the U layer, so solved slots and the cross are never disturbed.
  */
 import { type Move, countMoves, invertAlg, movePerm, parseAlg, simplifyAlg, type Perm, applyMovesToArray } from '../../core/cube';
-import { type Stickers, faceOf, locate } from '../pieces';
+import { CORNERS, EDGES, type Stickers, faceOf, locate } from '../pieces';
 import { SLOTS, SLOT_NAMES, SLOT_PIECES, type Slot, slotSolved } from './f2l';
 
-/** Triggers that only affect one slot (and the U layer). */
-const SLOT_TRIGGERS: Record<Slot, string[]> = {
-  FR: ["R U R'", "R U' R'", "R U2 R'", "F' U F", "F' U' F", "F' U2 F", "R' F R F'", "F R' F' R"],
-  FL: ["L' U L", "L' U' L", "L' U2 L", "F U F'", "F U' F'", "F U2 F'", "L F' L' F", "F' L F L'"],
-  BL: ["L U L'", "L U' L'", "L U2 L'", "B' U B", "B' U' B", "B' U2 B", "L' B L B'", "B L' B' L"],
-  BR: ["R' U R", "R' U' R", "R' U2 R", "B U B'", "B U' B'", "B U2 B'", "R B' R' B", "B' R B R'"],
-};
+/**
+ * Triggers per slot: short sequences that only change one slot and the U layer. They are found by
+ * trying every "A X A'" and "A X A' X'" over the finger-trick friendly turns: R, L, F, U and the
+ * wide/slice turns r, l, f, S. B turns are never used; the back slots get their edge flips from
+ * wide and slice turns instead (for example f R f' or S R S').
+ */
+const PLAIN = ['R', 'L', 'F', 'U'];
+const WIDE = ['r', 'l', 'f', 'S'];
+const U_LAYER = new Set([...CORNERS, ...EDGES].filter((c) => c.some((i) => faceOf(i) === 'U')).flat());
+
+function findTriggers(): Record<Slot, string[]> {
+  const turns = [...PLAIN, ...WIDE].flatMap((b) => [b, `${b}'`, `${b}2`]);
+  const inv = (t: string) => (t.endsWith("'") ? t[0] : t.endsWith('2') ? t : `${t}'`);
+  const cands: string[] = [];
+  for (const a of turns) {
+    if (a[0] === 'U') continue;
+    for (const x of turns) {
+      if (x[0] === a[0]) continue;
+      cands.push(`${a} ${x} ${inv(a)}`);
+      if (!a.endsWith('2') && !x.endsWith('2')) cands.push(`${a} ${x} ${inv(a)} ${inv(x)}`);
+    }
+  }
+  // Fewest wide/slice turns first, then shortest: the search keeps the first of equal options.
+  const wide = (c: string) => c.split(' ').filter((t) => WIDE.includes(t[0])).length;
+  cands.sort((p, q) => wide(p) - wide(q) || p.length - q.length);
+  const out = Object.fromEntries(SLOTS.map((s) => [s, [] as string[]])) as Record<Slot, string[]>;
+  const seen = new Set<string>();
+  for (const c of cands) {
+    const perm = applyMovesToArray(Array.from({ length: 54 }, (_, i) => i), c);
+    const moved = perm.map((v, i) => (v === i ? -1 : i)).filter((i) => i >= 0 && !U_LAYER.has(i));
+    if (!moved.length) continue;
+    const slot = SLOTS.find((s) => moved.every((i) => SLOT_PIECES[s].flat().includes(i)));
+    const key = perm.join(',');
+    if (!slot || seen.has(key)) continue;
+    seen.add(key);
+    out[slot].push(c);
+  }
+  return out;
+}
+const SLOT_TRIGGERS = findTriggers();
 const AUFS = ['U', "U'", 'U2'];
 
 interface Trig {

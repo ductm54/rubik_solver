@@ -23,7 +23,7 @@ Done so far:
   case name and a recognition hint. Each step plays in the 3D viewer from the cube as it is at that
   point, with the pieces that don't matter yet greyed out. **Solver settings**, remembered in the
   browser: cross colours (tick several and the solver picks the shortest for each cube), F2L standard
-  (turn the cube, one front-right case at a time) or advanced (no turns, any slot, best pair order), OLL 2-look
+  (turn the cube, one front-right case at a time) or advanced (no turns, no B moves, any slot, best pair order), OLL 2-look
   or full 57, PLL 2-look or full 21. The settings view is built from each method's own setting list,
   ready for more methods.
 
@@ -63,7 +63,7 @@ npm run build    # static site in dist/
 | `src/solve/mask.ts` | cubing.js stickering masks per step (any cross colour) |
 | `src/solve/cfop/cross.ts` | Optimal cross: 24⁴ distance table by BFS |
 | `src/solve/cfop/f2l.ts` | F2L pairs: y-turn to front-right, take stuck pieces out, then the shortest trigger sequence for the case (all 150 pair placements, ≤ 11 moves) |
-| `src/solve/cfop/f2lAdvanced.ts` | Advanced F2L: per-slot trigger tables for all 576 pair places, stuck pieces handled in the same search, every pair order tried |
+| `src/solve/cfop/f2lAdvanced.ts` | Advanced F2L: per-slot trigger tables for all 576 pair places (triggers from R, L, F, U and wide/slice r, l, f, S; never B), stuck pieces handled in the same search, every pair order tried |
 | `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |

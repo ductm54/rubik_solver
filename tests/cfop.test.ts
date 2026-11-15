@@ -194,7 +194,7 @@ describe('CFOP solver', () => {
     expect(plan.steps.every((s) => s.mask?.startsWith('EDGES:'))).toBe(true);
   });
 
-  it('advanced F2L: no rotations, solves the cube, fewer moves than standard', () => {
+  it('advanced F2L: no rotations or B turns, solves the cube, fewer moves than standard', () => {
     let std = 0;
     let adv = 0;
     const t = performance.now();
@@ -208,7 +208,7 @@ describe('CFOP solver', () => {
       expect([0, 1, 2, 3, 4, 5].every((f) => arr.slice(f * 9, f * 9 + 9).every((c) => c === arr[f * 9 + 4]))).toBe(true);
       const f2l = a.steps.filter((s) => s.stage === 'f2l');
       expect(f2l.length).toBe(4);
-      expect(f2l.every((s) => !/[xyz]/.test(s.alg))).toBe(true);
+      expect(f2l.every((s) => !/[xyzB]/.test(s.alg))).toBe(true);
       const sum = (p: typeof a) => p.steps.filter((s) => s.stage === 'f2l').reduce((x, s) => x + s.moves, 0);
       std += sum(b);
       adv += sum(a);
