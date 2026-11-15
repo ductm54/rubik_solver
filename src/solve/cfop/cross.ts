@@ -244,3 +244,71 @@ export function solveXCross(st: Stickers, max: number): Move[] | null {
   const options = xcrossOptions(st, max);
   return options && easiest(options);
 }
+
+/*
+ * Beginner cross: one edge at a time. For a set of cross edges (bit k = HOMES[k]), a table of
+ * exact distances to "those edges home, the others anywhere", by BFS from all such states.
+ */
+const subsetDist = new Map<number, Int8Array>();
+
+function subsetTable(set: number): Int8Array {
+  const hit = subsetDist.get(set);
+  if (hit) return hit;
+  if (!dist) build();
+  const home = HOMES.map((h) => EF_INDEX.get(h[0])!);
+  const t = new Int8Array(N).fill(-1);
+  const queue = new Int32Array(N);
+  let head = 0, tail = 0;
+  for (let code = 0; code < N; code++) {
+    if ([0, 1, 2, 3].every((k) => !(set & (1 << k)) || digit(code, k) === home[k])) {
+      t[code] = 0;
+      queue[tail++] = code;
+    }
+  }
+  while (head < tail) {
+    const c = queue[head++];
+    for (let m = 0; m < FACE_MOVES.length; m++) {
+      const n = step(c, m);
+      if (t[n] < 0) {
+        t[n] = t[c] + 1;
+        queue[tail++] = n;
+      }
+    }
+  }
+  subsetDist.set(set, t);
+  return t;
+}
+
+/** Cross edges (0 = DF, 1 = DR, 2 = DB, 3 = DL) that are in place. */
+export function crossEdgesDone(st: Stickers): number[] {
+  const code = crossCode(st);
+  return [0, 1, 2, 3].filter((k) => digit(code, k) === EF_INDEX.get(HOMES[k][0])!);
+}
+
+/**
+ * Fewest moves that put cross edge `edge` in place while the edges in `keep` stay (or end up) in
+ * place; of those, the easiest to execute.
+ */
+export function solveCrossEdge(st: Stickers, keep: number[], edge: number): Move[] {
+  const t = subsetTable([...keep, edge].reduce((a, k) => a | (1 << k), 0));
+  const path: number[] = [];
+  const out: Move[][] = [];
+  const dfs = (code: number, lastFace: number) => {
+    const d = t[code];
+    if (d === 0) {
+      out.push(path.map((m) => FACE_MOVES[m]));
+      return;
+    }
+    for (let m = 0; m < FACE_MOVES.length && out.length < MAX_OPTIONS; m++) {
+      const face = faceOfMove(m);
+      if (face === lastFace || face + 3 === lastFace) continue;
+      const n = step(code, m);
+      if (t[n] !== d - 1) continue;
+      path.push(m);
+      dfs(n, face);
+      path.pop();
+    }
+  };
+  dfs(crossCode(st), -1);
+  return easiest(out);
+}

@@ -18,7 +18,9 @@ export type MaskStage =
   | { kind: 'cross'; cross: Color }
   /** `pairs`: corner and edge of a slot by its colours. `pieces`: single pieces, by their exact colours. */
   | { kind: 'f2l'; cross: Color; pairs: Color[][]; pieces?: Color[][] }
-  | { kind: 'eo' | 'oll' | 'cpll' | 'pll'; cross: Color };
+  | { kind: 'eo' | 'oll' | 'cpll' | 'pll'; cross: Color }
+  /** Only these pieces (by their exact colours) bright, the rest dim. */
+  | { kind: 'pieces'; cross: Color; pieces: Color[][] };
 
 /** Serialised mask (cubing.js `experimental-stickering-mask-orbits`). `scheme` maps face → colour. */
 export function stickeringMask(scheme: Record<string, Color>, stage: MaskStage): string {
@@ -31,6 +33,8 @@ export function stickeringMask(scheme: Record<string, Color>, stage: MaskStage):
     colorsOf(piece).length > 1 &&
     (stage.pairs.some((p) => colorsOf(piece).every((c) => p.includes(c))) ||
       !!stage.pieces?.some((p) => p.length === piece.length && colorsOf(piece).every((c) => p.includes(c))));
+  const listed = (piece: string) =>
+    stage.kind === 'pieces' && stage.pieces.some((p) => p.length === piece.length && colorsOf(piece).every((c) => p.includes(c)));
   const isCross = (piece: string) => piece.length === 2 && colorsOf(piece).includes(stage.cross);
 
   const code = (piece: string, edge: boolean): string => {
@@ -47,6 +51,8 @@ export function stickeringMask(scheme: Record<string, Color>, stage: MaskStage):
         return !isLL(piece) ? '-' : edge ? 'I' : '-';
       case 'pll':
         return '-';
+      case 'pieces':
+        return listed(piece) ? '-' : 'D';
     }
   };
   return [

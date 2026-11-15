@@ -82,7 +82,7 @@ export function renderSettings(el: HTMLElement, m: MethodDef, values: SettingVal
         onChange(values);
       };
       label.append(input);
-      if (def.key === 'crossColors') {
+      if (def.key === 'crossColors' || def.key === 'crossColor') {
         const dot = document.createElement('span');
         dot.className = 'chip-dot';
         dot.dataset.color = o.value;
