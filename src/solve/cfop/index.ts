@@ -91,7 +91,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
       caseName: holdMoves.length ? undefined : 'Already held this way: no turn needed',
       hint:
         `Do this during the 15 s inspection, before the timer starts: ${top} on top, ${front} facing you.` +
-        (crossMoves.length ? ` With ${front} in front the ${crossName} needs ${plural(grip.regrips, 'regrip')} and ${plural(back, 'B turn')}.` : '') +
+        (crossMoves.length ? ` With ${front} in front the ${crossName} needs ${plural(grip.regrips, 'regrip')} and ${plural(back, 'B turn')}${crossMoves[0].base === 'B' ? ' after the first move' : ''}.` : '') +
         (startGrip ? ` Start with ${startGrip}.` : ''),
     },
     holdMoves,

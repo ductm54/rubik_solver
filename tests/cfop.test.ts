@@ -210,6 +210,8 @@ describe('CFOP solver', () => {
         return best;
       };
       if (cross.length <= 6) expect(effort(cross)).toBe(least(st, []));
+      // A B turn that can be the first move is the first move.
+      expect(cross[0]?.base === 'F' && cross[1]?.base === 'B').toBe(false);
       // XCross: the same length whichever side is in front.
       const x = solveXCross(st, 10);
       const sides = ['y', 'y2', "y'"].map((r) => solveXCross(applyMovesToArray(st, r), 10));
@@ -227,7 +229,7 @@ describe('CFOP solver', () => {
     for (const cross of ['standard', 'advanced'] as const) {
       const N = 60;
       let smooth = 0;
-      let manyBack = 0;
+      let noBack = 0;
       for (let n = 0; n < N; n++) {
         const state = applyMoves(solved, randomMoves(25, rand));
         const plan = solveCfop(state, { crossColors: ['W'], cross, oll: 'full', pll: 'full' });
@@ -235,15 +237,17 @@ describe('CFOP solver', () => {
         const regrips = countRegrips(moves);
         const back = backTurns(moves);
         if (regrips === 0) smooth++;
-        if (back > 1) manyBack++;
+        if (back === 0) noBack++;
+        expect(back).toBeLessThanOrEqual(2);
         expect(regrips).toBeLessThanOrEqual(2);
         // Step 0 says what the hold is good for; the cross step says where each regrip is.
         expect(plan.steps[0].hint).toContain(`needs ${regrips ? `${regrips} regrip` : 'no regrip'}`);
         expect(plan.steps[0].hint).toContain(back ? `${back} B turn` : 'no B turn');
         expect(plan.steps.find((s) => s.stage === 'cross')!.hint?.split('regrip:').length).toBe(regrips ? planGrip(moves).at.length + 1 : 1);
       }
-      expect(smooth / N).toBeGreaterThan(0.6);
-      expect(manyBack / N).toBeLessThan(0.2);
+      // Picking by length alone leaves about 1 cross in 5 without a B turn.
+      expect(noBack / N).toBeGreaterThan(0.6);
+      expect(smooth / N).toBeGreaterThan(0.4);
     }
   });
   it('works through the method interface and is fast', () => {
@@ -345,6 +349,10 @@ describe('regrips', () => {
     // One B or F2 alone: take the grip for it during inspection.
     expect(planGrip(parseAlg('B'))).toEqual({ regrips: 0, start: { left: 'front', right: 'top' }, at: [] });
     expect(regrips('F2')).toBe(0);
+    // So a B turn costs nothing as the first move, and only there.
+    expect(backTurns(parseAlg('B R U'))).toBe(0);
+    expect(backTurns(parseAlg('R B U'))).toBe(1);
+    expect(backTurns(parseAlg("B2 R B' D B"))).toBe(2);
     // The wrist cannot keep turning the same way.
     expect(regrips("R U R U R U R")).toBe(1);
     // Front and back turns with both wrists already used.

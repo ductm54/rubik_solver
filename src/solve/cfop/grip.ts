@@ -38,8 +38,12 @@ export const LEFT_HAND: Record<Thumb, string> = Object.fromEntries(
 
 /** What a regrip costs, in moves: the pause is about as long as 3 turns. */
 export const REGRIP_COST = 3;
-/** What a B turn costs on top, in moves, even within reach: it is out of sight and uses the weaker fingers. */
-export const BACK_TURN_COST = 2;
+/**
+ * What a B turn costs on top, in moves, even within reach: it is out of sight, and cubers would
+ * sooner turn the whole cube than do one. A B turn as the very first move is free: the hand is
+ * put in place for it during inspection.
+ */
+export const BACK_TURN_COST = 5;
 
 /** Wrist turns: how many places (bottom → front → top) each one moves the thumb of its hand. */
 const WRIST: Record<string, { hand: 0 | 1; by: number }> = {
@@ -86,8 +90,8 @@ const HOME = 4; // both thumbs in front
 // One regrip weighs more than any choice of first grip, which only breaks ties (home grip first).
 const REGRIP = 16;
 
-/** Turns of the B face. */
-export const backTurns = (moves: readonly Move[]) => moves.filter((m) => m.base === 'B').length;
+/** Turns of the B face that cost something: all but one that is the very first move. */
+export const backTurns = (moves: readonly Move[]) => moves.filter((m, i) => m.base === 'B' && i > 0).length;
 
 /** How awkward the moves are to execute, as a number of extra moves: regrips and B turns. */
 export const effort = (moves: readonly Move[]) => REGRIP_COST * countRegrips(moves) + BACK_TURN_COST * backTurns(moves);

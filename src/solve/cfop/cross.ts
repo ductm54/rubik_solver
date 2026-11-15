@@ -69,11 +69,14 @@ const faceOfMove = (m: number) => Math.floor(m / 3);
 /** No more solutions than this are compared (the first ones found). */
 const MAX_OPTIONS = 2000;
 
+/** F and B turn independently: when a solution opens with F then B, do the B first, where it is free. */
+const backFirst = (moves: Move[]) => (moves[0]?.base === 'F' && moves[1]?.base === 'B' ? [moves[1], moves[0], ...moves.slice(2)] : moves);
+
 /** The easiest to execute of some solutions (the first of equal ones). */
 function easiest(options: Move[][]): Move[] {
   let best = options[0];
   let bestCost = Infinity;
-  for (const o of options) {
+  for (const o of options.map(backFirst)) {
     const cost = effort(o);
     if (cost < bestCost) (best = o), (bestCost = cost);
   }
