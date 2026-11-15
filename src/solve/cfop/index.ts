@@ -94,7 +94,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
           stage: 'f2l',
           title: `F2L ${pairs.length} · ${pairName(colors)} pair`,
           caseName: `Into the ${SLOT_NAMES[p.slot]} slot`,
-          hint: `No cube turn. Now: ${p.description}.`,
+          hint: `No cube turn and no B turns (f and S are used for the back slots). Now: ${p.description}.`,
         },
         p.alg,
         { kind: 'f2l', cross, pairs: [...pairs] },
@@ -209,7 +209,7 @@ export const CFOP: MethodDef = {
     {
       key: 'f2l',
       label: 'F2L',
-      help: 'Standard: turn the cube so each pair goes in at the front-right, one case at a time. Advanced: no cube turns, any slot, best pair order: the fewest moves found.',
+      help: 'Standard: turn the cube so each pair goes in at the front-right, one case at a time. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order: the fewest moves found.',
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },
