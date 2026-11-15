@@ -16,7 +16,8 @@ const OPPOSITE: Record<string, string> = { U: 'D', D: 'U', F: 'B', B: 'F', R: 'L
 
 export type MaskStage =
   | { kind: 'cross'; cross: Color }
-  | { kind: 'f2l'; cross: Color; pairs: Color[][] }
+  /** `pairs`: corner and edge of a slot by its colours. `pieces`: single pieces, by their exact colours. */
+  | { kind: 'f2l'; cross: Color; pairs: Color[][]; pieces?: Color[][] }
   | { kind: 'eo' | 'oll' | 'cpll' | 'pll'; cross: Color };
 
 /** Serialised mask (cubing.js `experimental-stickering-mask-orbits`). `scheme` maps face → colour. */
@@ -26,7 +27,10 @@ export function stickeringMask(scheme: Record<string, Color>, stage: MaskStage):
   const ll = scheme[OPPOSITE[crossFace]];
   const isLL = (piece: string) => colorsOf(piece).includes(ll);
   const inPair = (piece: string) =>
-    stage.kind === 'f2l' && stage.pairs.some((p) => colorsOf(piece).every((c) => p.includes(c)) && colorsOf(piece).length > 1);
+    stage.kind === 'f2l' &&
+    colorsOf(piece).length > 1 &&
+    (stage.pairs.some((p) => colorsOf(piece).every((c) => p.includes(c))) ||
+      !!stage.pieces?.some((p) => p.length === piece.length && colorsOf(piece).every((c) => p.includes(c))));
   const isCross = (piece: string) => piece.length === 2 && colorsOf(piece).includes(stage.cross);
 
   const code = (piece: string, edge: boolean): string => {

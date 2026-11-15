@@ -194,7 +194,8 @@ describe('CFOP solver', () => {
     expect(plan.steps.every((s) => s.mask?.startsWith('EDGES:'))).toBe(true);
   });
 
-  it('advanced F2L: no rotations or B turns, solves the cube, fewer moves than standard', () => {
+  it('advanced F2L: no rotations or B turns, solves the cube, fewer moves than standard, uses pseudo-slotting', () => {
+    let pseudo = 0;
     let std = 0;
     let adv = 0;
     const t = performance.now();
@@ -209,11 +210,18 @@ describe('CFOP solver', () => {
       const f2l = a.steps.filter((s) => s.stage === 'f2l');
       expect(f2l.length).toBe(4);
       expect(f2l.every((s) => !/[xyzB]/.test(s.alg))).toBe(true);
+      // Pseudo-slotting: the bottom layer is turned in the first pair and turned back in the last.
+      if (f2l.some((s) => s.caseName?.startsWith('Pseudo pair'))) {
+        pseudo++;
+        expect(f2l[0].alg).toMatch(/^D/);
+        expect(f2l[3].alg).toMatch(/D[2']?$/);
+      } else expect(f2l.every((s) => !s.alg.includes('D'))).toBe(true);
       const sum = (p: typeof a) => p.steps.filter((s) => s.stage === 'f2l').reduce((x, s) => x + s.moves, 0);
       std += sum(b);
       adv += sum(a);
     }
     expect(adv).toBeLessThan(std);
+    expect(pseudo).toBeGreaterThan(0);
     expect((performance.now() - t) / 60).toBeLessThan(200);
   });
 
