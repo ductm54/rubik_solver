@@ -1,11 +1,17 @@
-import type { Color, CubeState } from '../src/core/cube';
-import { validate } from '../src/core/validate';
-import { type Capture, captureOf, readCube } from '../src/scan/readCube';
+import type { Color } from '../src/core/cube';
+import { type Capture, type ReadCubeResult, captureOf, readCube } from '../src/scan/readCube';
 import { type RGB, nameTogether } from '../src/vision/color';
 import type { FaceReading } from '../src/vision/detect';
 import { findDuplicate } from '../src/vision/duplicate';
 import { CaptureTracker, type TrackUpdate } from '../src/vision/tracker';
-import { createNet, encodeCube } from './net';
+
+export interface ScannerHandlers {
+  /** All 6 faces are in: the whole-cube reading. */
+  onCube(r: ReadCubeResult): void;
+  /** A face was removed (rescan or clear): the last reading no longer stands. */
+  onIncomplete(): void;
+}
+let handlers: ScannerHandlers = { onCube() {}, onIncomplete() {} };
 
 const COLOR_NAMES: Record<Color, string> = { W: 'white', Y: 'yellow', G: 'green', B: 'blue', R: 'red', O: 'orange' };
 const CSS: Record<Color, string> = { W: 'var(--W)', Y: 'var(--Y)', G: 'var(--G)', B: 'var(--B)', R: 'var(--R)', O: 'var(--O)' };
@@ -19,7 +25,7 @@ const photo = $<HTMLImageElement>('photo');
 const overlay = $<HTMLCanvasElement>('overlay');
 const stage = $('stage');
 const placeholder = $('placeholder');
-const statusEl = $('status');
+const statusEl = $('scan-status');
 const perf = $('perf');
 const live = $('live');
 const capturedEl = $('captured');
@@ -291,7 +297,7 @@ function renderCaptured() {
       slots[i] = null;
       tracker.reset();
       renderCaptured();
-      reviewEl.classList.add('hidden');
+      handlers.onIncomplete();
     };
     if (s?.capture.strip) slot.classList.add('has-strip');
     capturedEl.append(slot);
@@ -310,7 +316,6 @@ function onCapture() {
     } else if (mode === 'camera') stopCamera('All 6 faces are scanned. Camera stopped.');
     runReview();
   }
-  else reviewEl.classList.add('hidden');
   navigator.vibrate?.(60);
   try {
     audio ??= new AudioContext();
@@ -377,71 +382,15 @@ function drawDetected(ctx: CanvasRenderingContext2D, dpr: number) {
   ctx.restore();
 }
 
-// ---------------------------------------------------------------- review / manual fix
-
-const reviewEl = $('review');
-const reviewSummary = $('review-summary');
-const reviewStatus = $('review-status');
-const btnAlt = $<HTMLButtonElement>('btn-alt');
-const btnScramble = $<HTMLAnchorElement>('btn-scramble');
-const btnLearn = $<HTMLAnchorElement>('btn-learn');
-const net = createNet($('net'), $('palette'), (s) => renderReviewStatus(s));
-let alternatives: CubeState[] = [];
-let altIndex = 0;
+// ---------------------------------------------------------------- hand-off to the page
 
 function runReview() {
   const r = readCube(slots.map((s) => s!.capture));
   // Thumbnails now show the whole-cube reading (centers matched one-to-one, 9 of each colour).
   slots.forEach((s, i) => (s!.colors = r.faces[i]));
   renderCaptured();
-  alternatives = r.states;
-  altIndex = 0;
-  net.set(r.guess);
-  const how = r.usedStrips
-    ? `Face rotations came from neighbour strips on ${r.usedStrips} of 6 faces${r.combinationsTried > 1 ? `, plus a search of ${r.combinationsTried} combinations` : ''}.`
-    : `Each face's rotation was worked out by trying all ${r.combinationsTried.toLocaleString()} combinations.`;
-  if (r.states.length === 1) reviewSummary.textContent = `Read a valid cube. ${how}`;
-  else if (r.states.length > 1)
-    reviewSummary.textContent = `${r.states.length} valid cubes match these faces. ${how} Check each one against your cube.`;
-  else
-    reviewSummary.textContent = `No valid cube matches; a sticker was probably misread. Showing the closest guess: compare it with your cube and fix the wrong stickers.`;
-  btnAlt.classList.toggle('hidden', r.states.length < 2);
-  renderReviewStatus(net.get());
-  reviewEl.classList.remove('hidden');
-  reviewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  handlers.onCube(r);
 }
-
-function renderReviewStatus(s: CubeState) {
-  const v = validate(s);
-  reviewStatus.className = `status ${v.ok ? 'ok' : 'bad'}`;
-  reviewStatus.replaceChildren();
-  if (v.ok) reviewStatus.textContent = 'Valid cube ✓';
-  else {
-    const ul = document.createElement('ul');
-    for (const e of v.errors) {
-      const li = document.createElement('li');
-      li.textContent = e;
-      ul.append(li);
-    }
-    reviewStatus.append(ul);
-  }
-  btnScramble.href = `./index.html#cube=${encodeCube(s)}&from=scan`;
-  btnLearn.href = `./learn.html#cube=${encodeCube(s)}`;
-  for (const b of [btnScramble, btnLearn]) {
-    b.classList.toggle('disabled', !v.ok);
-    b.setAttribute('aria-disabled', String(!v.ok));
-  }
-}
-
-btnAlt.onclick = () => {
-  altIndex = (altIndex + 1) % alternatives.length;
-  net.set(alternatives[altIndex]);
-  renderReviewStatus(net.get());
-  btnAlt.textContent = `Next possibility (${altIndex + 1}/${alternatives.length})`;
-};
-btnScramble.onclick = (e) => {
-  if (btnScramble.classList.contains('disabled')) e.preventDefault();
-};
 
 // ---------------------------------------------------------------- wiring
 
@@ -463,7 +412,7 @@ $('btn-clear').onclick = () => {
   tracker.reset();
   slots.fill(null);
   renderCaptured();
-  reviewEl.classList.add('hidden');
+  handlers.onIncomplete();
 };
 video.addEventListener('loadedmetadata', () => {
   setMode(video.srcObject ? 'camera' : 'video');
@@ -478,8 +427,19 @@ if (!navigator.mediaDevices?.getUserMedia) {
   btnCamera.title = 'Camera needs HTTPS and a browser that supports getUserMedia';
 }
 
-resetView();
-renderCaptured();
-requestAnimationFrame(tick);
-// For automated tests / debugging.
-Object.assign(window, { scanner: { tracker, slots, get mode() { return mode; }, getNet: () => encodeCube(net.get()) } });
+/** Wire the scanner to the page. Call once; the camera only starts when the user asks. */
+export function initScanner(h: ScannerHandlers) {
+  handlers = h;
+  resetView();
+  renderCaptured();
+  requestAnimationFrame(tick);
+  // For automated tests / debugging.
+  Object.assign(window, { scanner: { tracker, slots, get mode() { return mode; } } });
+}
+
+/** Turn the camera / video off (the panel was closed); captured faces are kept. */
+export function pauseScanner() {
+  if (mode === 'camera') stopCamera();
+  else if (mode === 'video') video.pause();
+}
+

@@ -289,3 +289,10 @@ details:not([open]) summary::after { transform: rotate(-90deg); }
 .now + twisty-player { margin-top: 8px; }
 #btn-whole.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .step.playing .step-btn { border-color: var(--accent); border-style: dashed; }
+
+/* --- scan panel on the front page */
+.scan-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 4px; }
+@media (min-width: 900px) { .scan-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.review { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.review .hint { margin: 0 0 6px; }
+.review .hint:last-child { margin: 0; }

@@ -6,7 +6,7 @@ faces, works out a scramble that reproduces that exact state, and times your sol
 Done so far:
 - **Phase 0**: core cube logic. Type in 54 colours, get a valid scramble ([demo](https://ductm54.github.io/rubik_solver/)).
 - **Phase 1**: live face detection in the camera and colour reading of one face, with
-  auto-capture ([demo](https://ductm54.github.io/rubik_solver/scan.html)).
+  auto-capture ([demo](https://ductm54.github.io/rubik_solver/#scan)).
 - **Phase 2**: free-hand 6-face scan: faces in any order and rotation, neighbour-strip
   orientation, whole-cube colour reading, a review / manual fix screen, and hand-off to the
   scramble page.
@@ -28,7 +28,7 @@ Done so far:
   or full 57, PLL 2-look or full 21. The settings view is built from each method's own setting list,
   ready for more methods.
 
-**Live demo:** https://ductm54.github.io/rubik_solver/ · scanner: https://ductm54.github.io/rubik_solver/scan.html · timer: https://ductm54.github.io/rubik_solver/timer.html · learn: https://ductm54.github.io/rubik_solver/learn.html
+**Live demo:** https://ductm54.github.io/rubik_solver/ · timer: https://ductm54.github.io/rubik_solver/timer.html · learn: https://ductm54.github.io/rubik_solver/learn.html
 
 ## Develop
 
@@ -69,8 +69,8 @@ npm run build    # static site in dist/
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
-| `demo/scan.*` | Camera page: free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
-| `demo/` | 2D net editor, Generate button, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
+| `demo/scan.ts` | Scan panel on the front page (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
+| `demo/index.html`, `demo/main.ts` | Front page: scan, edit (2D net, Solved / Random) or review a scanned cube, then Generate, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
 | `tests/` | Cube, solver and timer tests; `scan-real.test.ts` runs the scanner on the real photos in `tests/fixtures` |
 
 ## Notes

@@ -2,81 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cube Face Scanner</title>
-    <link rel="stylesheet" href="./style.css" />
+    <title>Cube Scramble Finder</title>
+    <meta http-equiv="refresh" content="0; url=./index.html#scan" />
+    <script>location.replace('./index.html#scan');</script>
   </head>
-  <body>
-    <header>
-      <nav class="tabs">
-        <a href="./index.html">Scramble</a>
-        <a href="./scan.html" aria-current="page">Scan</a>
-        <a href="./timer.html">Timer</a>
-        <a href="./learn.html">Learn</a>
-      </nav>
-      <h1>Cube Face Scanner</h1>
-      <p class="sub">Show each of the 6 faces to the camera, anywhere in the picture, in any order and any rotation. Each face is read the moment it sits still. Works with stickered and stickerless cubes.</p>
-    </header>
-
-    <main>
-      <section class="card">
-        <div class="row between">
-          <h2>Camera</h2>
-          <div class="row gap wrap">
-            <button id="btn-camera" class="primary">Start camera</button>
-            <button id="btn-stop" class="ghost hidden">Stop camera</button>
-            <label class="ghost button-like" title="One video, or one or more photos">Photos / video<input id="file" type="file" accept="image/*,video/*" multiple hidden /></label>
-          </div>
-        </div>
-        <div id="stage" class="stage">
-          <video id="video" playsinline muted></video>
-          <img id="photo" class="hidden" alt="" />
-          <canvas id="overlay"></canvas>
-          <div id="placeholder" class="placeholder">Start the camera, or upload photos or a video.</div>
-        </div>
-        <div class="row between stats">
-          <span id="status" aria-live="polite">Idle</span>
-          <span id="perf" class="muted"></span>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Live reading</h2>
-        <div id="live" class="mini big"></div>
-        <p id="live-note" class="hint">Stickers with a dashed outline are uncertain.</p>
-
-        <div class="row between" style="margin-top: 18px">
-          <h2>Captured faces <span id="count" class="muted"></span></h2>
-          <button id="btn-clear" class="ghost small">Clear</button>
-        </div>
-        <div id="captured" class="captured"></div>
-        <p class="hint">Tap a captured face to scan it again. A logo on a center sticker is ignored: centers are read around their edge.</p>
-      </section>
-
-      <section id="review" class="card span-all hidden">
-        <div class="row between">
-          <h2>Review cube</h2>
-          <div class="row gap wrap">
-            <button id="btn-alt" class="ghost hidden">Next possibility</button>
-            <a id="btn-learn" class="button-like" href="./learn.html">How to solve it</a>
-            <a id="btn-scramble" class="primary button-like" href="./index.html">Find scramble →</a>
-          </div>
-        </div>
-        <p id="review-summary" class="hint"></p>
-        <div class="review-grid">
-          <div>
-            <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour"></div>
-            <div id="net" class="net" aria-label="Cube net"></div>
-          </div>
-          <div>
-            <div id="review-status" class="status" aria-live="polite"></div>
-            <p class="hint">If a sticker was misread, tap a colour and then the sticker to fix it. Centers are fixed: white top (U), green front (F).</p>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer>Everything runs on-device; no frames leave your browser.</footer>
-    <script type="module" src="./scan.ts"></script>
-  </body>
+  <body><a href="./index.html#scan">The scanner has moved to the front page.</a></body>
 </html>
