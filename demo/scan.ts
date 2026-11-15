@@ -25,6 +25,7 @@ const live = $('live');
 const capturedEl = $('captured');
 const countEl = $('count');
 const btnCamera = $<HTMLButtonElement>('btn-camera');
+const btnStop = $<HTMLButtonElement>('btn-stop');
 
 type Mode = 'idle' | 'camera' | 'photo' | 'video';
 let mode: Mode = 'idle';
@@ -142,6 +143,14 @@ function nextPhoto() {
   photo.src = fileSrc(photos[photoIdx]);
 }
 
+/** Turn the camera off and go back to the start screen; captured faces are kept. */
+function stopCamera(message?: string) {
+  if (mode !== 'camera' && !stream) return;
+  stopAll();
+  setMode('idle');
+  statusEl.textContent = message ?? `Camera stopped. ${filled()} of 6 faces scanned.`;
+}
+
 function loadVideo(file: File) {
   stopAll();
   video.loop = false;
@@ -169,6 +178,7 @@ function setMode(m: Mode) {
   photo.classList.toggle('hidden', m !== 'photo');
   placeholder.classList.toggle('hidden', m !== 'idle');
   btnCamera.textContent = m === 'camera' ? 'Restart camera' : 'Start camera';
+  btnStop.classList.toggle('hidden', m !== 'camera');
   const { w, h } = sourceSize();
   if (w && h) stage.style.aspectRatio = `${w} / ${h}`;
   resetView();
@@ -297,7 +307,7 @@ function onCapture() {
     if (mode === 'video') {
       video.pause();
       statusEl.textContent = 'All 6 faces are scanned.';
-    }
+    } else if (mode === 'camera') stopCamera('All 6 faces are scanned. Camera stopped.');
     runReview();
   }
   else reviewEl.classList.add('hidden');
@@ -436,6 +446,7 @@ btnScramble.onclick = (e) => {
 // ---------------------------------------------------------------- wiring
 
 btnCamera.onclick = () => void startCamera();
+btnStop.onclick = () => stopCamera();
 $<HTMLInputElement>('file').onchange = (e) => {
   const input = e.target as HTMLInputElement;
   const files = [...(input.files ?? [])];
