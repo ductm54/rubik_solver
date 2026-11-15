@@ -4,8 +4,12 @@
  * so pieces are picked by colour through the cube's colour scheme.
  */
 import type { Color } from '../core/cube';
+import { t } from '../i18n';
 
-export const COLOR_WORDS: Record<Color, string> = { W: 'white', Y: 'yellow', G: 'green', B: 'blue', R: 'red', O: 'orange' };
+/** A colour's name in the current language, e.g. "white". */
+export const colorWord = (c: Color) => t(`color.${c}`);
+/** Colour names of one piece, e.g. "white-green". */
+export const colorNames = (cs: Color[]) => cs.map(colorWord).join(t('color.sep'));
 
 // cubing.js 3x3x3 orbit order.
 const EDGES = ['UF', 'UR', 'UB', 'UL', 'DF', 'DR', 'DB', 'DL', 'FR', 'FL', 'BR', 'BL'];

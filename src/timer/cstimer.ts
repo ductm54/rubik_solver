@@ -4,6 +4,7 @@
  *     "properties": { "sessionData": "<JSON string>" , ... } }
  * penaltyMs is 0, 2000 (+2) or -1 (DNF).
  */
+import { t } from '../i18n';
 import type { Penalty, Solve } from './stats';
 
 type CsSolve = [[number, number], string, string, number];
@@ -29,12 +30,12 @@ export function fromCsTimer(json: string): Solve[] {
   try {
     data = JSON.parse(json);
   } catch {
-    throw new Error('Not a csTimer export: the file is not valid JSON');
+    throw new Error(t('cstimer.notJson'));
   }
-  if (!data || typeof data !== 'object') throw new Error('Not a csTimer export');
+  if (!data || typeof data !== 'object') throw new Error(t('cstimer.notExport'));
   const out: Solve[] = [];
   const sessions = Object.keys(data).filter((k) => /^session\d+$/.test(k));
-  if (!sessions.length) throw new Error('Not a csTimer export: no sessions found');
+  if (!sessions.length) throw new Error(t('cstimer.noSessions'));
   for (const key of sessions) {
     const list = (data as Record<string, unknown>)[key];
     if (!Array.isArray(list)) continue;

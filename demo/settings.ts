@@ -2,7 +2,10 @@
  * Solver settings view, built from a method's setting definitions so new methods get it for
  * free. Values are remembered per method in localStorage (when available).
  */
+import { cap, hasKey, t } from '../src/i18n';
 import type { MethodDef, SettingValues } from '../src/solve/types';
+
+const tr = (key: string, fallback: string) => (hasKey(key) ? t(key) : fallback);
 
 const KEY = 'learn.settings.v1';
 
@@ -56,7 +59,7 @@ export function renderSettings(el: HTMLElement, m: MethodDef, values: SettingVal
     const field = document.createElement('fieldset');
     field.className = 'setting';
     const legend = document.createElement('legend');
-    legend.textContent = def.label;
+    legend.textContent = tr(`set.${m.id}.${def.key}.label`, def.label);
     field.append(legend);
     const opts = document.createElement('div');
     opts.className = def.kind === 'multi' ? 'chips' : 'segmented';
@@ -88,14 +91,15 @@ export function renderSettings(el: HTMLElement, m: MethodDef, values: SettingVal
         dot.dataset.color = o.value;
         label.append(dot);
       }
-      label.append(document.createTextNode(o.label));
+      const colorOpt = def.key === 'crossColors' || def.key === 'crossColor';
+      label.append(document.createTextNode(colorOpt ? cap(t(`color.${o.value}`)) : tr(`set.${m.id}.${def.key}.${o.value}`, o.label)));
       opts.append(label);
     }
     field.append(opts);
     if (def.help) {
       const p = document.createElement('p');
       p.className = 'hint';
-      p.textContent = def.help;
+      p.textContent = tr(`set.${m.id}.${def.key}.help`, def.help);
       field.append(p);
     }
     el.append(field);

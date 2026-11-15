@@ -2,6 +2,7 @@
  * Solve history chart (SVG): singles as a muted line with dots, ao5 and ao12 as coloured lines.
  * One y-axis (seconds), hairline grid, legend + end labels, crosshair tooltip on hover.
  */
+import { t } from '../src/i18n';
 import { type Solve, effective, formatTime, rollingAverage } from '../src/timer/stats';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -23,7 +24,7 @@ function niceTicks(lo: number, hi: number, count = 4): number[] {
 
 export function renderChart(container: HTMLElement, legend: HTMLElement, tooltip: HTMLElement, solves: Solve[]) {
   const series = [
-    { key: 'single', label: 'Single', cls: 'mark-single' },
+    { key: 'single', label: t('chart.single'), cls: 'mark-single' },
     { key: 'ao5', label: 'ao5', cls: 'mark-s1' },
     { key: 'ao12', label: 'ao12', cls: 'mark-s2' },
   ] as const;
@@ -42,7 +43,7 @@ export function renderChart(container: HTMLElement, legend: HTMLElement, tooltip
   if (solves.length < 2) {
     const p = document.createElement('p');
     p.className = 'hint empty';
-    p.textContent = 'Your solves will be charted here once you have two.';
+    p.textContent = t('chart.empty');
     container.append(p);
     return;
   }
@@ -64,7 +65,7 @@ export function renderChart(container: HTMLElement, legend: HTMLElement, tooltip
   const x = (i: number) => m.l + (n === 1 ? 0 : (i / (n - 1)) * (W - m.l - m.r));
   const y = (v: number) => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
 
-  const svg = el('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Solve times with ao5 and ao12' });
+  const svg = el('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': t('chart.label') });
   // grid + y labels
   for (const v of niceTicks(lo, hi)) {
     svg.append(el('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: 'grid' }));
@@ -143,7 +144,7 @@ export function renderChart(container: HTMLElement, legend: HTMLElement, tooltip
     tooltip.innerHTML = '';
     const title = document.createElement('div');
     title.className = 'tt-title';
-    title.textContent = `Solve #${i + 1}`;
+    title.textContent = t('chart.solve', { n: i + 1 });
     tooltip.append(title);
     for (const [k, s] of series.entries()) {
       const row = document.createElement('div');

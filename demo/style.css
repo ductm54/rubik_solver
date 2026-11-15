@@ -102,6 +102,8 @@ footer a { color: inherit; }
 .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
 .tabs a { padding: 6px 12px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; }
 .tabs a[aria-current='page'] { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+.tabs { align-items: center; flex-wrap: wrap; }
+.lang-picker { margin-left: auto; font: inherit; font-size: 13px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 4px 8px; max-width: 42vw; }
 .wrap { flex-wrap: wrap; }
 .muted { color: var(--muted); font-weight: 400; }
 .hidden { display: none !important; }

@@ -1,4 +1,6 @@
+import { lang } from './i18n';
 import 'cubing/twisty';
+import { t } from '../src/i18n';
 import { type CubeState, applyMoves, formatAlg, parseAlg, randomMoves, solvedState } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import { METHODS, getMethod } from '../src/solve/methods';
@@ -49,8 +51,8 @@ const net = createNet($('net'), $('palette'), () => {
 });
 
 // --- method + settings
-for (const m of METHODS) methodSel.add(new Option(m.name, m.id, false, m.id === method.id));
-methodSel.add(new Option('More coming…', '', false, false));
+for (const m of METHODS) methodSel.add(new Option(t(`method.${m.id}.name`), m.id, false, m.id === method.id));
+methodSel.add(new Option(t('learn.moreComing'), '', false, false));
 methodSel.options[methodSel.options.length - 1].disabled = true;
 methodSel.onchange = () => {
   method = getMethod(methodSel.value);
@@ -102,7 +104,7 @@ function checkCube(): boolean {
   status.innerHTML = '';
   if (v.ok) {
     status.className = 'status ok';
-    status.textContent = 'Valid cube ✓';
+    status.textContent = t('common.validCube');
     return true;
   }
   status.className = 'status bad';
@@ -138,18 +140,18 @@ worker.onmessage = (e) => {
 function solve() {
   if (!checkCube()) {
     plan = null;
-    summary.textContent = 'Fix the cube to see a solution.';
+    summary.textContent = t('learn.fixCube');
     renderPlan();
     return;
   }
   if (!ready) return;
   requestId++;
-  summary.textContent = 'Solving…';
-  worker.postMessage({ id: requestId, kind: 'learn', state: net.get() as CubeState, method: method.id, settings, scramble });
+  summary.textContent = t('common.solving');
+  worker.postMessage({ id: requestId, kind: 'learn', state: net.get() as CubeState, method: method.id, settings, scramble, lang });
 }
 
 // --- output
-const STAGE_LABEL: Record<string, string> = { inspection: 'Step 0', cross: 'Cross', f2l: 'F2L', oll: 'OLL', pll: 'PLL', corners: '1st layer', middle: '2nd layer', top: 'Last layer' };
+const stageLabel = (stage: string) => t(`stage.${stage}`);
 
 function renderPlan() {
   stepsEl.innerHTML = '';
@@ -165,13 +167,13 @@ function renderPlan() {
     offsets.push(total);
     total += tokens(s.alg).length;
   }
-  summary.textContent = plan.moves ? `${plan.moves} moves. ${plan.note ?? ''}` : 'Already solved.';
+  summary.textContent = plan.moves ? t('learn.summary', { moves: plan.moves, note: plan.note ?? '' }) : t('learn.alreadySolved');
   const byStage = new Map<string, number>();
   for (const s of plan.steps) if (s.stage !== 'inspection') byStage.set(s.stage, (byStage.get(s.stage) ?? 0) + s.moves);
   for (const [stage, n] of byStage) {
     const b = document.createElement('span');
     b.className = `stage-tag stage-${stage}`;
-    b.textContent = `${STAGE_LABEL[stage] ?? stage} ${n}`;
+    b.textContent = `${stageLabel(stage)} ${n}`;
     breakdown.append(b);
   }
   plan.steps.forEach((s, i) => stepsEl.append(stepItem(s, i)));
@@ -188,9 +190,9 @@ function stepItem(s: SolveStep, i: number): HTMLLIElement {
   btn.onclick = () => void load(i, stepAt(pos) === i ? pos : offsets[i]);
   const head = document.createElement('div');
   head.className = 'step-head';
-  const tag = Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: STAGE_LABEL[s.stage] ?? s.stage });
+  const tag = Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: stageLabel(s.stage) });
   const title = Object.assign(document.createElement('span'), { className: 'step-title', textContent: s.title });
-  const count = Object.assign(document.createElement('span'), { className: 'muted step-count', textContent: s.moves ? `${s.moves} move${s.moves > 1 ? 's' : ''}` : s.stage === 'inspection' ? 'inspection' : 'skip' });
+  const count = Object.assign(document.createElement('span'), { className: 'muted step-count', textContent: s.moves ? t('learn.moves', { count: s.moves }) : t(s.stage === 'inspection' ? 'learn.inspection' : 'learn.skip') });
   head.append(tag, title, count);
   btn.append(head);
   if (s.caseName) btn.append(Object.assign(document.createElement('div'), { className: 'step-case', textContent: s.caseName }));
@@ -320,21 +322,21 @@ function renderNow() {
   if (view === 'whole') keepVisible(cur);
   renderNav();
   if (!plan || cur < 0) {
-    now.textContent = plan ? 'Nothing to do: the cube is solved.' : '';
+    now.textContent = plan ? t('common.cubeSolved') : '';
     return;
   }
   const s = plan.steps[cur];
   const head = document.createElement('div');
   head.className = 'now-head';
   head.append(
-    Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: STAGE_LABEL[s.stage] ?? s.stage }),
+    Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: stageLabel(s.stage) }),
     Object.assign(document.createElement('span'), { className: 'now-title', textContent: s.title }),
   );
   const done = Math.min(Math.max(pos - offsets[cur], 0), len(cur));
   head.append(
     Object.assign(document.createElement('span'), {
       className: 'muted now-count',
-      textContent: `${view === 'whole' ? 'Whole solve · ' : ''}step ${cur + 1}/${plan.steps.length} · move ${done}/${len(cur)}`,
+      textContent: (view === 'whole' ? t('learn.wholePrefix') : '') + t('learn.position', { step: cur + 1, steps: plan.steps.length, move: done, moves: len(cur) }),
     }),
   );
   now.append(head);
@@ -378,9 +380,9 @@ $('btn-next').onclick = () => {
 btnCopy.onclick = async () => {
   if (!plan) return;
   const text = plan.steps.filter((s) => s.alg).map((s) => `${s.alg} // ${s.title}${s.caseName ? ` (${s.caseName})` : ''}`).join('\n');
-  await navigator.clipboard.writeText(`Scramble: ${planScramble}\n${text}`);
-  btnCopy.textContent = 'Copied';
-  setTimeout(() => (btnCopy.textContent = 'Copy'), 1200);
+  await navigator.clipboard.writeText(`${t('common.scramble')}: ${planScramble}\n${text}`);
+  btnCopy.textContent = t('common.copied');
+  setTimeout(() => (btnCopy.textContent = t('common.copy')), 1200);
 };
 
 // Cube from the URL: #cube=<54 letters> (scanner, scramble page) or #scramble=<moves> (timer).

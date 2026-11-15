@@ -1,7 +1,8 @@
 /** Clickable 2D cube net with a colour palette: shared by the scramble and scan pages. */
 import { COLORS, type Color, type CubeState, FACES, type FaceName, cloneState, solvedState } from '../src/core/cube';
+import { cap, t } from '../src/i18n';
 
-export const COLOR_NAMES: Record<Color, string> = { W: 'White', Y: 'Yellow', G: 'Green', B: 'Blue', R: 'Red', O: 'Orange' };
+const colorName = (c: Color) => cap(t(`color.${c}`));
 
 // Net layout in a 12 × 9 grid: [row, col] of each face's top-left sticker.
 const NET_POS: Record<FaceName, [number, number]> = { U: [0, 3], L: [3, 0], F: [3, 3], R: [3, 6], B: [3, 9], D: [6, 3] };
@@ -21,8 +22,8 @@ export function createNet(netEl: HTMLElement, paletteEl: HTMLElement, onChange: 
     b.className = 'swatch';
     b.dataset.color = c;
     b.setAttribute('role', 'radio');
-    b.setAttribute('aria-label', COLOR_NAMES[c]);
-    b.title = COLOR_NAMES[c];
+    b.setAttribute('aria-label', colorName(c));
+    b.title = colorName(c);
     b.onclick = () => {
       paint = c;
       renderPalette();
