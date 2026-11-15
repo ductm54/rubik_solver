@@ -94,7 +94,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
           stage: 'f2l',
           title: `F2L ${pairs.length} · ${pairName(colors)} pair`,
           caseName: `Into the ${SLOT_NAMES[p.slot]} slot`,
-          hint: `No cube turn and no B turns (f and S are used for the back slots). Now: ${p.description}.`,
+          hint: `${p.description}.`,
         },
         p.alg,
         { kind: 'f2l', cross, pairs: [...pairs] },
