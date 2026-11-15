@@ -1,4 +1,6 @@
+import { lang } from './i18n';
 import { FACES, applyMoves, solvedState, type CubeState } from '../src/core/cube';
+import { t } from '../src/i18n';
 import { fromCsTimer, toCsTimer } from '../src/timer/cstimer';
 import { TimerMachine, INSPECTION_MS, DNF_AFTER_MS } from '../src/timer/machine';
 import { AVERAGES, type Penalty, type Solve, computeStats, formatSolve, formatTime, rollingAverage } from '../src/timer/stats';
@@ -80,7 +82,7 @@ function newScramble() {
     nextScramble = null;
     requestRandom(false);
   } else if (solverReady) {
-    scrambleEl.textContent = 'Generating…';
+    scrambleEl.textContent = t('timer.generating');
     requestRandom(true);
   }
 }
@@ -88,9 +90,9 @@ function newScramble() {
 function setScramble(s: string, src: Solve['source']) {
   scramble = s;
   source = src;
-  scrambleEl.textContent = s || '(solved cube)';
+  scrambleEl.textContent = s || t('timer.solvedCube');
   ($('btn-learn') as HTMLAnchorElement).href = `./learn.html#scramble=${encodeURIComponent(s)}`;
-  sourceEl.textContent = src === 'scan' ? 'From your scan' : src === 'manual' ? 'From the scramble page' : '';
+  sourceEl.textContent = src === 'scan' ? t('timer.fromScan') : src === 'manual' ? t('timer.fromManual') : '';
   sourceEl.classList.toggle('hidden', src === 'random');
   renderPreview(applyMoves(solvedState(), s));
 }
@@ -120,33 +122,29 @@ function frame() {
   renderClock(t);
 }
 
-function renderClock(t: number) {
+function renderClock(now: number) {
   const st = machine.state;
   pad.dataset.state = st;
   document.body.classList.toggle('focus', st === 'running' || st === 'inspecting' || st === 'holding' || st === 'ready');
   if (st === 'inspecting' || ((st === 'holding' || st === 'ready') && machine.opts.inspection && inspectingHold)) {
-    const used = machine.inspectionElapsed(t);
+    const used = machine.inspectionElapsed(now);
     const left = Math.ceil((INSPECTION_MS - used) / 1000);
     clock.textContent = used > DNF_AFTER_MS ? 'DNF' : used > INSPECTION_MS ? '+2' : String(left);
     pad.dataset.warn = used > 12000 ? 'yes' : 'no';
-    hint.textContent = st === 'inspecting' ? 'Inspecting: hold to get ready, release to start' : st === 'ready' ? 'Release to start' : 'Keep holding…';
+    hint.textContent = t(st === 'inspecting' ? 'timer.inspecting' : st === 'ready' ? 'timer.release' : 'timer.keepHolding');
     return;
   }
   pad.dataset.warn = 'no';
   if (st === 'running') {
-    clock.textContent = formatTime(machine.elapsed(t)).replace(/\d$/, '');
-    hint.textContent = 'Tap or press any key to stop';
+    clock.textContent = formatTime(machine.elapsed(now)).replace(/\d$/, '');
+    hint.textContent = t('timer.tapToStop');
   } else if (st === 'holding' || st === 'ready') {
     clock.textContent = '0.00';
-    hint.textContent = st === 'ready' ? 'Release to start' : 'Keep holding…';
+    hint.textContent = t(st === 'ready' ? 'timer.release' : 'timer.keepHolding');
   } else {
     const r = machine.lastResult;
     clock.textContent = r ? formatSolve(r) : '0.00';
-    hint.textContent = !scramble && source === 'random'
-      ? 'Waiting for a scramble…'
-      : machine.opts.inspection
-      ? 'Hold space or touch here and release to start inspection'
-      : 'Hold space or touch here, release to start';
+    hint.textContent = t(!scramble && source === 'random' ? 'timer.waiting' : machine.opts.inspection ? 'timer.hintInspect' : 'timer.hintStart');
   }
 }
 let inspectingHold = false;
@@ -243,7 +241,7 @@ function renderLast() {
   const s = solves[solves.length - 1];
   lastEl.classList.toggle('hidden', !s);
   if (!s) return;
-  lastTime.textContent = `Last: ${formatSolve(s)}`;
+  lastTime.textContent = t('timer.last', { time: formatSolve(s) });
   lastNote.value = s.note ?? '';
   for (const b of lastEl.querySelectorAll<HTMLButtonElement>('[data-pen]')) b.classList.toggle('active', b.dataset.pen === s.penalty);
 }
@@ -271,9 +269,9 @@ function renderStats() {
   const st = computeStats(solves);
   const f = (v: number | null) => (v === null ? '—' : formatTime(v));
   const tiles = [
-    statTile('Best single', f(st.best)),
-    statTile('Mean', f(st.mean), `${st.completed}/${st.count} solved`),
-    ...AVERAGES.map((n) => statTile(`ao${n}`, f(st.current[n]), `best ${f(st.bestAvg[n])}`)),
+    statTile(t('timer.best'), f(st.best)),
+    statTile(t('timer.mean'), f(st.mean), t('timer.solvedOf', { done: st.completed, count: st.count })),
+    ...AVERAGES.map((n) => statTile(`ao${n}`, f(st.current[n]), t('timer.bestOf', { time: f(st.bestAvg[n]) }))),
   ];
   $('stats').replaceChildren(...tiles);
 }
@@ -300,16 +298,16 @@ function renderTable() {
     td(ao5[i] === null ? '—' : formatTime(ao5[i]!), 'num');
     td(ao12[i] === null ? '—' : formatTime(ao12[i]!), 'num');
     const sc = td(s.scramble, 'hide-sm scr');
-    sc.title = s.scramble + (s.note ? `\nNote: ${s.note}` : '');
-    td(new Date(s.date).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }), 'hide-sm muted');
+    sc.title = s.scramble + (s.note ? `\n${t('timer.noteLine', { note: s.note })}` : '');
+    td(new Date(s.date).toLocaleString(lang, { dateStyle: 'short', timeStyle: 'short' }), 'hide-sm muted');
     const act = document.createElement('td');
     act.className = 'actions';
     const sel = document.createElement('select');
-    sel.setAttribute('aria-label', `Penalty for solve ${i + 1}`);
+    sel.setAttribute('aria-label', t('timer.penaltyFor', { i: i + 1 }));
     for (const p of ['none', '+2', 'DNF'] as Penalty[]) {
       const o = document.createElement('option');
       o.value = p;
-      o.textContent = p === 'none' ? 'OK' : p;
+      o.textContent = p === 'none' ? t('timer.ok') : p;
       o.selected = s.penalty === p;
       sel.append(o);
     }
@@ -317,7 +315,7 @@ function renderTable() {
     const del = document.createElement('button');
     del.className = 'ghost small danger';
     del.textContent = '✕';
-    del.setAttribute('aria-label', `Delete solve ${i + 1}`);
+    del.setAttribute('aria-label', t('timer.deleteSolve', { i: i + 1 }));
     del.onclick = () => void deleteSolve(s);
     act.append(sel, del);
     tr.append(act);
@@ -374,7 +372,7 @@ $('btn-export').onclick = () => {
   a.download = `cstimer-${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  ioStatus.textContent = `Exported ${solves.length} solves. csTimer can import this file (Export → Import from file).`;
+  ioStatus.textContent = t('timer.exported', { count: solves.length });
 };
 $<HTMLInputElement>('file-import').onchange = async (e) => {
   const input = e.target as HTMLInputElement;
@@ -388,13 +386,14 @@ $<HTMLInputElement>('file-import').onchange = async (e) => {
     await store.putMany(fresh);
     solves = (await store.list()).slice();
     renderAll();
-    ioStatus.textContent = `Imported ${fresh.length} solves${imported.length > fresh.length ? ` (${imported.length - fresh.length} already here)` : ''}.`;
+    const dup = imported.length - fresh.length;
+    ioStatus.textContent = t(dup ? 'timer.importedDup' : 'timer.imported', { count: fresh.length, dup });
   } catch (err) {
     ioStatus.textContent = (err as Error).message;
   }
 };
 $('btn-clear-all').onclick = async () => {
-  if (!solves.length || !confirm(`Delete all ${solves.length} solves? Export first if you want to keep them.`)) return;
+  if (!solves.length || !confirm(t('timer.confirmClear', { count: solves.length }))) return;
   await store.clear();
   solves = [];
   machine.lastResult = null;
@@ -408,8 +407,8 @@ new ResizeObserver(() => renderChart($('chart'), $('legend'), $('tooltip'), solv
   store = await openStore();
   solves = await store.list();
   $('storage-note').textContent = store.persistent
-    ? 'Solves are saved in this browser only. Export to keep a copy or move them to another device.'
-    : 'This browser is not letting the page save data (private mode?): solves will be lost when you close it. Export to keep them.';
+    ? t('timer.storageOk')
+    : t('timer.storageNo');
   // A scramble handed over from the scramble page: #scramble=<alg>&source=scan|manual
   const params = new URLSearchParams(location.hash.slice(1));
   const handed = params.get('scramble');

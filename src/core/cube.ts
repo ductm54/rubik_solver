@@ -5,6 +5,7 @@
  * row by row. U is viewed from above with B at the top, D from below with F at the top,
  * and the four side faces with U at the top. Index 4 of each face is its center.
  */
+import { t } from '../i18n';
 
 export type Color = 'W' | 'Y' | 'G' | 'B' | 'R' | 'O';
 export const COLORS: readonly Color[] = ['W', 'Y', 'G', 'B', 'R', 'O'];
@@ -80,7 +81,7 @@ export function toFacelets(s: CubeState): string {
   return toColorArray(s)
     .map((c) => {
       const f = colorToFace.get(c);
-      if (!f) throw new Error(`Colour ${c} does not match any center`);
+      if (!f) throw new Error(t('val.noCenter', { c }));
       return f;
     })
     .join('');
@@ -96,7 +97,7 @@ export function centerMap(s: CubeState): Map<Color, FaceName> {
   const m = new Map<Color, FaceName>();
   for (const f of FACES) {
     const c = s[f][4];
-    if (m.has(c)) throw new Error(`Two centers share colour ${c} (${m.get(c)} and ${f})`);
+    if (m.has(c)) throw new Error(t('val.sharedCenter', { c, a: m.get(c)!, b: f }));
     m.set(c, f);
   }
   return m;
@@ -217,7 +218,7 @@ export function parseAlg(alg: string): Move[] {
     .filter(Boolean)
     .map((tok) => {
       const m = /^(?:([URFDLB])w|([URFDLBurfdlbMESxyz]))(2|'|2'|’)?$/.exec(tok);
-      if (!m) throw new Error(`Unsupported move "${tok}"`);
+      if (!m) throw new Error(t('val.badMove', { move: tok }));
       const base = m[1] ? m[1].toLowerCase() : m[2];
       const amount = m[3] === "'" || m[3] === '’' ? 3 : m[3]?.startsWith('2') ? 2 : 1;
       return { base, amount } as Move;

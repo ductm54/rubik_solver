@@ -6,13 +6,14 @@
  */
 import { type Color, type CubeState, type Move, applyMovesToArray, countMoves, formatAlg, parseAlg, simplifyAlg, toColorArray } from '../../core/cube';
 import { validate } from '../../core/validate';
-import { COLOR_WORDS, type MaskStage, stickeringMask } from '../mask';
+import { andList, getLocale, hasKey, t } from '../../i18n';
+import { type MaskStage, colorNames, colorWord, stickeringMask } from '../mask';
 import { type Stickers, centerColor } from '../pieces';
 import type { MethodDef, SettingValues, SolvePlan, SolveStep } from '../types';
 import { CPLL, EPLL, PLL } from './algs/pll';
-import { EO, OCLL, OLL } from './algs/oll';
+import { type AlgEntry, EO, OCLL, OLL } from './algs/oll';
 import { solveCross, solveXCross } from './cross';
-import { SLOTS, SLOT_NAMES, type Slot, crossSolved, planPair, slotSolved } from './f2l';
+import { SLOTS, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { solveF2LAdvanced } from './f2lAdvanced';
 import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
@@ -53,8 +54,8 @@ interface Attempt {
   effort: number;
 }
 
-const plural = (n: number, word: string) => (n ? `${n} ${word}${n > 1 ? 's' : ''}` : `no ${word}`);
-const THUMB_WORDS: Record<Thumb, string> = { front: 'in front', top: 'on top', bottom: 'on the bottom' };
+const thumb = (th: Thumb) => t(`thumb.${th}`);
+const hand = (h: 'left' | 'right') => t(`hand.${h}`);
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
 
 function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Color): Attempt {
@@ -63,7 +64,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
   let st = start;
   const scheme = schemeOf(start);
   const held = applyMovesToArray(start, holdMoves);
-  const top = COLOR_WORDS[centerColor(held, 'U')];
+  const top = colorWord(centerColor(held, 'U'));
   const push = (s: Omit<SolveStep, 'moves' | 'alg' | 'mask'>, moves: Move[], mask: MaskStage) => {
     const m = simplifyAlg(moves);
     steps.push({ ...s, alg: formatAlg(m), moves: countMoves(m), mask: stickeringMask(scheme, mask) });
@@ -78,28 +79,42 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
   // The grip to take during inspection, when it is not the home grip (both thumbs in front).
   const startGrip =
     grip.start.left === grip.start.right
-      ? grip.start.left === 'front' ? '' : `both thumbs ${THUMB_WORDS[grip.start.left]}`
-      : (['left', 'right'] as const).filter((h) => grip.start[h] !== 'front').map((h) => `your ${h} thumb ${THUMB_WORDS[grip.start[h]]}`).join(' and ');
+      ? grip.start.left === 'front' ? '' : t('cfop.bothThumbs', { where: thumb(grip.start.left) })
+      : andList((['left', 'right'] as const).filter((h) => grip.start[h] !== 'front').map((h) => t('cfop.yourThumb', { hand: hand(h), where: thumb(grip.start[h]) })));
 
   // Step 0: hold the cube the right way, during the 15 s inspection (rotations only, no moves).
-  const front = COLOR_WORDS[centerColor(held, 'F')];
-  const crossName = xcross ? 'XCross' : 'cross';
+  const front = colorWord(centerColor(held, 'F'));
+  const crossName = t(xcross ? 'cfop.xcrossWord' : 'cfop.crossWord');
   push(
     {
       stage: 'inspection',
-      title: `Hold ${COLOR_WORDS[cross]} on the bottom, ${front} in front`,
-      caseName: holdMoves.length ? undefined : 'Already held this way: no turn needed',
+      title: t('solve.holdTitle', { cross: colorWord(cross), front }),
+      caseName: holdMoves.length ? undefined : t('solve.alreadyHeld'),
       hint:
-        `Do this during the 15 s inspection, before the timer starts: ${top} on top, ${front} facing you.` +
-        (crossMoves.length ? ` With ${front} in front the ${crossName} needs ${plural(grip.regrips, 'regrip')} and ${plural(back, 'B turn')}${crossMoves[0].base === 'B' ? ' after the first move' : ''}.` : '') +
-        (startGrip ? ` Start with ${startGrip}.` : ''),
+        t('cfop.holdHint', { top, front }) +
+        (crossMoves.length
+          ? t(crossMoves[0].base === 'B' ? 'cfop.holdHintCrossFirst' : 'cfop.holdHintCross', {
+              front,
+              crossName,
+              regrips: t('cfop.regrips', { count: grip.regrips }),
+              backTurns: t('cfop.backTurns', { count: back }),
+            })
+          : '') +
+        (startGrip ? t('cfop.holdHintGrip', { grip: startGrip }) : ''),
     },
     holdMoves,
     { kind: 'cross', cross },
   );
   // Where the regrips are, for the hint of the cross step.
   const regripHint = grip.at
-    .map(({ move, hands }) => ` Before the ${ordinal(move + 1)} move (${formatAlg([crossMoves[move]])}) regrip: ${hands.map((h) => `${h.hand} thumb ${THUMB_WORDS[h.thumb]}`).join(', ')}.`)
+    .map(({ move, hands }) =>
+      t('cfop.regripAt', {
+        n: move + 1,
+        nth: ordinal(move + 1),
+        move: formatAlg([crossMoves[move]]),
+        hands: new Intl.ListFormat(getLocale(), { type: 'unit', style: 'short' }).format(hands.map((h) => t('cfop.handThumb', { hand: hand(h.hand), where: thumb(h.thumb) }))),
+      }),
+    )
     .join('');
 
   if (xcross) {
@@ -108,15 +123,15 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     push(
       {
         stage: 'cross',
-        title: `XCross (${COLOR_WORDS[cross]}) + ${done.map(pairName).join(' and ')} pair${done.length > 1 ? 's' : ''}`,
-        hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom and the ${done.map(pairName).join(' and ')} pair${done.length > 1 ? 's' : ''} in one go.${regripHint}`,
+        title: t('cfop.xcrossTitle', { count: done.length, cross: colorWord(cross), pairs: andList(done.map(pairName)) }),
+        hint: t('cfop.xcrossHint', { count: done.length, cross: colorWord(cross), pairs: andList(done.map(pairName)) }) + regripHint,
       },
       xcross,
       { kind: 'f2l', cross, pairs: done },
     );
   } else {
     push(
-      { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom, matching the side centers.${regripHint}` },
+      { stage: 'cross', title: t('cfop.crossTitle', { cross: colorWord(cross) }), hint: t('cfop.crossHint', { cross: colorWord(cross) }) + regripHint },
       crossMoves,
       { kind: 'cross', cross },
     );
@@ -127,26 +142,29 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
   for (const s of SLOTS.filter((s) => slotSolved(st, s))) {
     const colors = slotColors(st, s);
     pairs.push(colors);
-    steps.push({ stage: 'f2l', title: `F2L ${pairs.length} · ${pairName(colors)} pair`, caseName: xcross ? 'Solved together with the cross (XCross)' : 'Already solved after the cross', alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
+    steps.push({ stage: 'f2l', title: t('cfop.pairTitle', { n: pairs.length, pair: pairName(colors) }), caseName: t(xcross ? 'cfop.withXcross' : 'cfop.afterCross'), alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
   }
   if (opts.f2l === 'advanced') {
-    const plan = solveF2LAdvanced(st, COLOR_WORDS[cross]);
+    const plan = solveF2LAdvanced(st, colorWord(cross));
     const pieces: Color[][] = [];
-    const sides = (c: Color[]) => c.filter((x) => x !== cross).map((x) => COLOR_WORDS[x]).join('-');
+    const sides = (c: Color[]) => colorNames(c.filter((x) => x !== cross));
     plan.forEach((p, k) => {
       pieces.push(p.corner, p.edge);
       const turns = [
-        k === 0 ? `the bottom layer is turned first (${p.alg[0].base === 'D' ? formatAlg([p.alg[0]]) : 'D'}), so each corner goes in with the edge of another slot` : '',
-        k === plan.length - 1 ? 'the last turn lines the bottom layer up again' : '',
+        k === 0 ? t('cfop.pseudoFirst', { move: p.alg[0].base === 'D' ? formatAlg([p.alg[0]]) : 'D' }) : '',
+        k === plan.length - 1 ? t('cfop.pseudoLast') : '',
       ].filter(Boolean);
       push(
         {
           stage: 'f2l',
           title: p.pseudo
-            ? `F2L ${pairs.length + k + 1} · ${sides(p.corner)} corner + ${sides(p.edge)} edge`
-            : `F2L ${pairs.length + k + 1} · ${sides(p.corner)} pair`,
-          caseName: `${p.pseudo ? 'Pseudo pair into' : 'Into'} the ${SLOT_NAMES[p.slot]} slot`,
-          hint: `${p.description}.${p.pseudo && turns.length ? ` Pseudo-slotting: ${turns.join('; ')}.` : ''}`,
+            ? t('cfop.pseudoTitle', { n: pairs.length + k + 1, corner: sides(p.corner), edge: sides(p.edge) })
+            : t('cfop.pairTitle', { n: pairs.length + k + 1, pair: sides(p.corner) }),
+          caseName: t(p.pseudo ? 'cfop.pseudoInto' : 'cfop.into', { slot: slotName(p.slot) }),
+          hint:
+            p.pseudo && turns.length
+              ? t('cfop.advHintPseudo', { desc: p.description, turns: turns.join(t('cfop.turnsSep')) })
+              : t('cfop.advHint', { desc: p.description }),
         },
         p.alg,
         { kind: 'f2l', cross, pairs: [...pairs], pieces: [...pieces] },
@@ -157,7 +175,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     const done = SLOTS.filter((s) => slotSolved(st, s));
     let best: ReturnType<typeof planPair> = null;
     for (const s of SLOTS.filter((s) => !done.includes(s))) {
-      const p = planPair(st, s, COLOR_WORDS[cross]);
+      const p = planPair(st, s, colorWord(cross));
       if (p && (!best || p.moves < best.moves)) best = p;
     }
     if (!best) throw new Error('F2L: no case matched (internal error)');
@@ -166,11 +184,13 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     push(
       {
         stage: 'f2l',
-        title: `F2L ${pairs.length} · ${pairName(colors)} pair`,
+        title: t('cfop.pairTitle', { n: pairs.length, pair: pairName(colors) }),
         caseName: best.extractedFrom
-          ? `A piece is stuck in the ${SLOT_NAMES[best.extractedFrom]} slot${best.rotation.length ? ' (after the turn)' : ''}: take it out first`
+          ? t(best.rotation.length ? 'cfop.stuckAfterTurn' : 'cfop.stuck', { slot: slotName(best.extractedFrom) })
           : undefined,
-        hint: `${best.rotation.length ? `Turn the cube (${formatAlg(best.rotation)}) so this slot is at the front-right. ` : 'The slot is at the front-right. '}Now: ${best.description}.`,
+        hint: best.rotation.length
+          ? t('cfop.turnToSlot', { rotation: formatAlg(best.rotation), desc: best.description })
+          : t('cfop.slotAtFR', { desc: best.description }),
       },
       [...best.rotation, ...best.extraction, ...best.alg],
       { kind: 'f2l', cross, pairs: [...pairs] },
@@ -180,8 +200,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
   if (!crossSolved(st) || !SLOTS.every((s) => slotSolved(st, s))) throw new Error('F2L did not finish (internal error)');
 
   // Last layer
-  const t = llTables();
-  const llStep = (stage: string, title: string, table: LLTable, mask: MaskStage, skipText: string) => {
+  const llStep = (stage: string, title: string, table: LLTable, mask: MaskStage, skipText: string, kind: string) => {
     const m = matchLL(st, table);
     if (!m) throw new Error(`${title}: no case matched (internal error)`);
     if (!m.entry && !m.count) {
@@ -189,20 +208,21 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
       return;
     }
     push(
-      { stage, title, caseName: m.entry?.name ?? 'Only an AUF (U turn)', hint: m.entry?.hint?.replaceAll('{top}', top) },
+      { stage, title, caseName: m.entry ? caseName(kind, m.entry) : t('cfop.aufOnly'), hint: m.entry ? caseHint(kind, m.entry, top) : undefined },
       m.moves,
       mask,
     );
   };
-  if (opts.oll === 'full') llStep('oll', 'OLL', t.oll, { kind: 'oll', cross }, 'OLL skip: top already done');
+  const tb = llTables();
+  if (opts.oll === 'full') llStep('oll', t('cfop.oll'), tb.oll, { kind: 'oll', cross }, t('cfop.ollSkip'), 'oll');
   else {
-    llStep('oll', 'OLL 1/2 · edges', t.eo, { kind: 'eo', cross }, `Skip: ${top} cross already there`);
-    llStep('oll', 'OLL 2/2 · corners', t.ocll, { kind: 'oll', cross }, `Skip: ${top} corners already oriented`);
+    llStep('oll', t('cfop.ollEdges'), tb.eo, { kind: 'eo', cross }, t('cfop.eoSkip', { top }), 'eo');
+    llStep('oll', t('cfop.ollCorners'), tb.ocll, { kind: 'oll', cross }, t('cfop.ocllSkip', { top }), 'ocll');
   }
-  if (opts.pll === 'full') llStep('pll', 'PLL', t.pll, { kind: 'pll', cross }, 'PLL skip: solved');
+  if (opts.pll === 'full') llStep('pll', t('cfop.pll'), tb.pll, { kind: 'pll', cross }, t('cfop.pllSkip'), 'pll');
   else {
-    llStep('pll', 'PLL 1/2 · corners', t.cpll, { kind: 'cpll', cross }, 'Skip: corners already in place');
-    llStep('pll', 'PLL 2/2 · edges', t.epll, { kind: 'pll', cross }, 'Skip: solved');
+    llStep('pll', t('cfop.pllCorners'), tb.cpll, { kind: 'cpll', cross }, t('cfop.cpllSkip'), 'cpll');
+    llStep('pll', t('cfop.pllEdges'), tb.epll, { kind: 'pll', cross }, t('cfop.epllSkip'), 'epll');
   }
   return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back };
 }
@@ -213,7 +233,24 @@ function slotColors(st: Stickers, s: Slot): Color[] {
   return [centerColor(st, 'D'), ...sides.map((f) => centerColor(st, f))];
 }
 
-const pairName = (c: Color[]) => c.slice(1).map((x) => COLOR_WORDS[x]).join('-');
+const pairName = (c: Color[]) => colorNames(c.slice(1));
+const slotName = (s: Slot) => t(`slot.${s}`);
+
+/** A last-layer case's name in the current language ("OLL 27 · Sune", "Line", "T-perm"). */
+function caseName(kind: string, e: AlgEntry): string {
+  if (kind === 'oll') {
+    const fam = e.name.replace(/^OLL \S+ · /, '');
+    return `OLL ${e.id} · ${hasKey(`oll.fam.${fam}`) ? t(`oll.fam.${fam}`) : fam}`;
+  }
+  return hasKey(`${kind}.${e.id}.name`) ? t(`${kind}.${e.id}.name`) : e.name;
+}
+
+/** How to recognise a case; `{top}` is the top colour. G-perms share one hint. */
+function caseHint(kind: string, e: AlgEntry, top: string): string | undefined {
+  if (!e.hint) return undefined;
+  const key = kind === 'pll' && e.id.startsWith('G') ? 'pll.G.hint' : `${kind}.${e.id}.hint`;
+  return (hasKey(key) ? t(key, { top }) : e.hint).replaceAll('{top}', top);
+}
 
 function schemeOf(st: Stickers): Record<string, Color> {
   return Object.fromEntries([...'URFDLB'].map((f, i) => [f, st[i * 9 + 4]]));
@@ -233,19 +270,19 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
     const a = solveFrom(start, hold, opts, cross);
     if (!best || cost(a) < cost(best) || (cost(a) === cost(best) && a.effort < best.effort)) best = a;
   }
-  if (!best) throw new Error('Pick at least one cross colour');
+  if (!best) throw new Error(t('cfop.pickColour'));
   const n = opts.crossColors.length;
   return {
     method: 'CFOP',
     steps: best.steps,
     moves: best.moves,
-    note: n > 1 ? `Cross on ${COLOR_WORDS[best.color]}: the best of your ${n} colours for this cube.` : `Cross on ${COLOR_WORDS[best.color]}.`,
+    note: n > 1 ? t('cfop.noteBest', { color: colorWord(best.color), n }) : t('cfop.noteOne', { color: colorWord(best.color) }),
   };
 }
 
 const COLOR_OPTIONS: { value: Color; label: string }[] = (['W', 'Y', 'G', 'B', 'R', 'O'] as Color[]).map((c) => ({
   value: c,
-  label: COLOR_WORDS[c][0].toUpperCase() + COLOR_WORDS[c].slice(1),
+  label: { W: 'White', Y: 'Yellow', G: 'Green', B: 'Blue', R: 'Red', O: 'Orange' }[c],
 }));
 
 export const CFOP: MethodDef = {

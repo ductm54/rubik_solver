@@ -1,4 +1,5 @@
 import type { Color } from '../src/core/cube';
+import { t } from '../src/i18n';
 import { type Capture, type ReadCubeResult, captureOf, readCube } from '../src/scan/readCube';
 import { type RGB, nameTogether } from '../src/vision/color';
 import type { FaceReading } from '../src/vision/detect';
@@ -13,7 +14,7 @@ export interface ScannerHandlers {
 }
 let handlers: ScannerHandlers = { onCube() {}, onIncomplete() {} };
 
-const COLOR_NAMES: Record<Color, string> = { W: 'white', Y: 'yellow', G: 'green', B: 'blue', R: 'red', O: 'orange' };
+const colorName = (c: Color) => t(`color.${c}`);
 const CSS: Record<Color, string> = { W: 'var(--W)', Y: 'var(--Y)', G: 'var(--G)', B: 'var(--B)', R: 'var(--R)', O: 'var(--O)' };
 const CSS_HEX: Record<Color, string> = { W: '#ffffff', Y: '#ffd500', G: '#009b48', B: '#0046ad', R: '#b71234', O: '#ff5800' };
 const PROC_MAX = 480; // longest side of the frame given to the free-hand detector
@@ -82,7 +83,7 @@ async function startCamera() {
       audio: false,
     });
   } catch (err) {
-    statusEl.textContent = `Camera unavailable: ${(err as Error).message}`;
+    statusEl.textContent = t('scan.cameraUnavailable', { error: (err as Error).message });
     return;
   }
   video.srcObject = stream;
@@ -109,7 +110,7 @@ function loadFiles(files: File[]) {
   if (clip) return loadVideo(clip);
   const imgs = files.filter((f) => f.type.startsWith('image/'));
   if (!imgs.length) {
-    statusEl.textContent = 'Choose one or more photos, or a video.';
+    statusEl.textContent = t('scan.chooseFiles');
     return;
   }
   stopAll();
@@ -126,7 +127,7 @@ function newPicture() {
   last = null;
 }
 
-const photoPrefix = () => (mode === 'photo' && photos.length > 1 ? `Photo ${photoIdx + 1} of ${photos.length}: ` : '');
+const photoPrefix = () => (mode === 'photo' && photos.length > 1 ? t('scan.photoPrefix', { i: photoIdx + 1, n: photos.length }) : '');
 
 function nextPhoto() {
   if (mode !== 'photo' && photoIdx >= 0) return; // left photo mode meanwhile
@@ -134,9 +135,8 @@ function nextPhoto() {
   if (photoIdx >= photos.length || filled() === 6) {
     photoDone = true;
     const n = filled();
-    const seen = photos.length > 1 ? `Looked at ${photos.length} photos. ` : '';
-    statusEl.textContent =
-      n === 6 ? `${seen}All 6 faces are scanned.` : `${seen}Found ${n} of 6 faces. Upload more photos, or use the camera for the rest.`;
+    const seen = photos.length > 1 ? t('scan.lookedAt', { n: photos.length }) : '';
+    statusEl.textContent = seen + (n === 6 ? t('scan.allDone') : t('scan.foundSome', { n }));
     return;
   }
   photoDone = false;
@@ -144,7 +144,7 @@ function nextPhoto() {
     setMode('photo');
     newPicture();
     photoStart = performance.now();
-    statusEl.textContent = `${photoPrefix()}Looking for a face…`;
+    statusEl.textContent = photoPrefix() + t('scan.looking');
   };
   photo.src = fileSrc(photos[photoIdx]);
 }
@@ -154,14 +154,14 @@ function stopCamera(message?: string) {
   if (mode !== 'camera' && !stream) return;
   stopAll();
   setMode('idle');
-  statusEl.textContent = message ?? `Camera stopped. ${filled()} of 6 faces scanned.`;
+  statusEl.textContent = message ?? t('scan.stopped', { n: filled() });
 }
 
 function loadVideo(file: File) {
   stopAll();
   video.loop = false;
   video.src = fileSrc(file); // 'loadedmetadata' switches to video mode
-  void video.play().catch(() => (statusEl.textContent = 'This video cannot be played in this browser.'));
+  void video.play().catch(() => (statusEl.textContent = t('scan.videoUnplayable')));
 }
 
 function stopAll() {
@@ -183,7 +183,7 @@ function setMode(m: Mode) {
   video.classList.toggle('hidden', m !== 'camera' && m !== 'video');
   photo.classList.toggle('hidden', m !== 'photo');
   placeholder.classList.toggle('hidden', m !== 'idle');
-  btnCamera.textContent = m === 'camera' ? 'Restart camera' : 'Start camera';
+  btnCamera.textContent = t(m === 'camera' ? 'scan.restart' : 'scan.start');
   btnStop.classList.toggle('hidden', m !== 'camera');
   const { w, h } = sourceSize();
   if (w && h) stage.style.aspectRatio = `${w} / ${h}`;
@@ -194,7 +194,7 @@ function resetView() {
   last = null;
   perf.textContent = '';
   renderLive(null);
-  if (mode !== 'idle') statusEl.textContent = 'Looking for a face…';
+  if (mode !== 'idle') statusEl.textContent = t('scan.looking');
 }
 
 function sourceSize(): { w: number; h: number; el: CanvasImageSource | null } {
@@ -243,7 +243,7 @@ worker.onmessage = (e) => {
     const dup = findDuplicate(capture.labs, slots.map((s) => s?.capture.labs));
     const idx = slots.indexOf(null);
     if (dup >= 0)
-      statusEl.textContent = mode === 'photo' ? `${photoPrefix()}This face is already scanned.` : 'This face is already scanned. Turn to another face.';
+      statusEl.textContent = mode === 'photo' ? photoPrefix() + t('scan.duplicate') : t('scan.duplicateTurn');
     else if (idx >= 0) {
       slots[idx] = { capture, colors: update.capture.colors };
       onCapture();
@@ -251,7 +251,7 @@ worker.onmessage = (e) => {
   }
   if (mode === 'photo' && (update.capture || now - photoStart > PHOTO_TIMEOUT)) {
     photoDone = true;
-    if (!update.capture) statusEl.textContent = `${photoPrefix()}No face found in this photo.`;
+    if (!update.capture) statusEl.textContent = photoPrefix() + t('scan.noFace');
     setTimeout(nextPhoto, photos.length > 1 ? 800 : 0);
   }
 };
@@ -260,10 +260,10 @@ worker.onmessage = (e) => {
 
 function renderStatus(face: FaceReading | null, colors: Color[], u: TrackUpdate) {
   const pre = photoPrefix();
-  if (!face) statusEl.textContent = `${pre}Looking for a face…`;
-  else if (u.status === 'steadying') statusEl.textContent = `${pre}Reading the ${COLOR_NAMES[colors[4]]} face…`;
+  if (!face) statusEl.textContent = pre + t('scan.looking');
+  else if (u.status === 'steadying') statusEl.textContent = pre + t('scan.reading', { color: colorName(colors[4]) });
   else if (u.status === 'captured')
-    statusEl.textContent = `${pre}Captured the ${COLOR_NAMES[colors[4]]} face ✓${mode === 'photo' ? '' : ' Turn to the next one.'}`;
+    statusEl.textContent = pre + t(mode === 'photo' ? 'scan.captured' : 'scan.capturedNext', { color: colorName(colors[4]) });
 }
 
 function miniFace(colors: Color[] | null, unsure: boolean[] = []): HTMLElement {
@@ -290,7 +290,7 @@ function renderCaptured() {
     const slot = document.createElement('button');
     slot.className = 'slot';
     slot.append(miniFace(s?.colors ?? null));
-    slot.title = s ? `Scan face ${i + 1} again` : `Face ${i + 1} not scanned yet`;
+    slot.title = t(s ? 'scan.rescan' : 'scan.notYet', { i: i + 1 });
     slot.classList.toggle('filled', !!s);
     slot.disabled = !s;
     slot.onclick = () => {
@@ -302,7 +302,7 @@ function renderCaptured() {
     if (s?.capture.strip) slot.classList.add('has-strip');
     capturedEl.append(slot);
   });
-  countEl.textContent = `${filled()} / 6 faces`;
+  countEl.textContent = t('scan.count', { n: filled() });
 }
 
 let audio: AudioContext | null = null;
@@ -312,8 +312,8 @@ function onCapture() {
   if (filled() === 6) {
     if (mode === 'video') {
       video.pause();
-      statusEl.textContent = 'All 6 faces are scanned.';
-    } else if (mode === 'camera') stopCamera('All 6 faces are scanned. Camera stopped.');
+      statusEl.textContent = t('scan.allDone');
+    } else if (mode === 'camera') stopCamera(t('scan.allDoneStopped'));
     runReview();
   }
   navigator.vibrate?.(60);
@@ -420,11 +420,11 @@ video.addEventListener('loadedmetadata', () => {
 });
 video.addEventListener('ended', () => {
   if (mode !== 'video' || filled() === 6) return;
-  statusEl.textContent = `Video ended: found ${filled()} of 6 faces. Tap the picture to play it again, or upload another.`;
+  statusEl.textContent = t('scan.videoEnded', { n: filled() });
 });
 if (!navigator.mediaDevices?.getUserMedia) {
   btnCamera.disabled = true;
-  btnCamera.title = 'Camera needs HTTPS and a browser that supports getUserMedia';
+  btnCamera.title = t('scan.needsHttps');
 }
 
 /** Wire the scanner to the page. Call once; the camera only starts when the user asks. */

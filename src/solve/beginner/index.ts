@@ -12,7 +12,8 @@
 import { type Color, type CubeState, type Move, applyMovesToArray, countMoves, formatAlg, parseAlg, simplifyAlg, toColorArray } from '../../core/cube';
 import { validate } from '../../core/validate';
 import { crossEdgesDone, solveCrossEdge } from '../cfop/cross';
-import { COLOR_WORDS, type MaskStage, stickeringMask } from '../mask';
+import { cap, getLocale, t } from '../../i18n';
+import { type MaskStage, colorNames, colorWord, stickeringMask } from '../mask';
 import { type Stickers, centerColor, cubie, locate, pieceSolved, positionName } from '../pieces';
 import type { MethodDef, SettingValues, SolvePlan, SolveStep } from '../types';
 
@@ -33,10 +34,9 @@ const SLOTS = ['FR', 'FL', 'BL', 'BR'];
 const U_EDGES = ['UF', 'UR', 'UB', 'UL'];
 const U_CORNERS = ['UFR', 'URB', 'UBL', 'ULF'];
 
-const word = (c: Color) => COLOR_WORDS[c];
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-const names = (cs: Color[]) => cs.map(word).join('-');
-const times = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
+const word = colorWord;
+const names = colorNames;
+const times = (n: number) => t('solve.times', { count: n });
 const repeat = (alg: string, n: number) => Array(n).fill(alg).join(' ');
 
 /** Colours of the piece that belongs at a named position (by the current centers). */
@@ -89,9 +89,9 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   b.push(
     'inspection',
     {
-      title: `Hold ${word(cross)} on the bottom, ${word(centerColor(held, 'F'))} in front`,
-      caseName: hold ? undefined : 'Already held this way: no turn needed',
-      hint: `${cap(word(top))} is on top. Keep the cube held this way: the steps say when to turn it.`,
+      title: t('solve.holdTitle', { cross: word(cross), front: word(centerColor(held, 'F')) }),
+      caseName: hold ? undefined : t('solve.alreadyHeld'),
+      hint: t('beg.holdHint', { top: cap(word(top)) }),
     },
     hold,
     crossEdges,
@@ -103,7 +103,7 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   if (done.length) {
     b.steps.push({
       stage: 'cross',
-      title: `Cross · ${done.map((k) => names(homeColors(b.st, CROSS_HOMES[k]))).join(', ')} already in place`,
+      title: t('beg.crossDone', { edges: new Intl.ListFormat(getLocale(), { type: 'unit', style: 'short' }).format(done.map((k) => names(homeColors(b.st, CROSS_HOMES[k])))) }),
       alg: '',
       moves: 0,
       mask: stickeringMask(scheme, { kind: 'pieces', cross, pieces: shown }),
@@ -126,10 +126,10 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     b.push(
       'cross',
       {
-        title: `Cross ${n}/4 · ${names(colors)} edge`,
+        title: t('beg.crossTitle', { n, edge: names(colors) }),
         hint:
-          `${y ? `Turn the cube (${y}) so the ${word(colors[1])} center is in front. ` : `The ${word(colors[1])} center is in front. `}` +
-          `Bring the ${names(colors)} edge to the bottom front, ${word(cross)} facing down${n > 1 ? ', without moving the cross edges already in place' : ''}.`,
+          (y ? t('beg.turnToCenter', { rotation: y, color: word(colors[1]) }) : t('beg.centerInFront', { color: word(colors[1]) })) +
+          t(n > 1 ? 'beg.bringKeep' : 'beg.bring', { edge: names(colors), cross: word(cross) }),
       },
       [y, formatAlg(moves)],
       [...shown],
@@ -147,8 +147,8 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   for (let k = 0; k < shownCorners.length; k++)
     b.steps.push({
       stage: 'corners',
-      title: `Corner ${k + 1}/4 · ${names(shownCorners[k])}`,
-      caseName: 'Already solved',
+      title: t('beg.cornerTitle', { n: k + 1, colors: names(shownCorners[k]) }),
+      caseName: t('solve.alreadySolved'),
       alg: '',
       moves: 0,
       mask: stickeringMask(scheme, { kind: 'pieces', cross, pieces: [...crossEdges, ...shownCorners.slice(0, k + 1)] }),
@@ -167,14 +167,14 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
         // Stuck in another bottom slot: turn that slot to the front-right, take it out, turn back.
         const [there, back] = ({ DFL: ["y'", 'y'], DBL: ['y2', 'y2'], DBR: ['y', "y'"] } as Record<string, string[]>)[at];
         alg += ` ${there} R U R' ${back}`;
-        caseName = 'The corner is in another bottom slot: take it out first (R U R\')';
+        caseName = t('beg.cornerElsewhere');
         st = applyMovesToArray(b.st, alg);
       }
       if (whereIs(st, 'DFR') !== 'DFR') {
         const u = U_TURNS.find((t) => whereIs(applyMovesToArray(st, t), 'DFR') === 'UFR')!;
         alg += ` ${u}`;
         st = applyMovesToArray(st, u);
-      } else caseName ??= 'The corner is in its slot but twisted';
+      } else caseName ??= t('beg.cornerTwisted');
       let reps = 0;
       while (!solvedAt(st, 'DFR')) {
         st = applyMovesToArray(st, SEXY);
@@ -189,9 +189,9 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     b.push(
       'corners',
       {
-        title: `Corner ${shownCorners.length}/4 · ${names(colors)}`,
+        title: t('beg.cornerTitle', { n: shownCorners.length, colors: names(colors) }),
         caseName,
-        hint: `Turn the cube so the ${names(colors.slice(1))} slot is at the front-right, bottom. Turn U until the corner is right above it (top front-right), then repeat R U R' U' until it is solved: here ${times(reps)}.`,
+        hint: t('beg.cornerHint', { slot: names(colors.slice(1)), times: times(reps) }),
       },
       alg,
       [...crossEdges, ...shownCorners],
@@ -218,9 +218,9 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
       b.push(
         'middle',
         {
-          title: `Middle edge · ${names(colors)}`,
-          caseName: right ? 'Goes to the right' : 'Goes to the left',
-          hint: `Find a top edge with no ${word(top)}. Turn U and the cube so its front sticker matches the front center (${word(colors[0])}): it makes an upside-down T. Its top sticker (${word(colors[1])}) matches the ${right ? 'right' : 'left'} center, so do the ${right ? 'right' : 'left'} algorithm.`,
+          title: t('beg.middleTitle', { colors: names(colors) }),
+          caseName: t(right ? 'beg.goesRight' : 'beg.goesLeft'),
+          hint: t(right ? 'beg.middleHintRight' : 'beg.middleHintLeft', { top: word(top), front: word(colors[0]), side: word(colors[1]) }),
         },
         [`${y} ${u}`, right ? MIDDLE_RIGHT : MIDDLE_LEFT],
         [...firstLayer, ...middleIn(b.peek(`${y} ${u} ${right ? MIDDLE_RIGHT : MIDDLE_LEFT}`))],
@@ -231,9 +231,9 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
       b.push(
         'middle',
         {
-          title: 'Middle edge · take a stuck edge out',
-          caseName: 'No top edge without the top colour',
-          hint: `An edge is in the wrong middle slot or flipped. Turn the cube so that slot is at the front-right and do the right algorithm: it puts a top edge in and brings the stuck edge up.`,
+          title: t('beg.stuckTitle'),
+          caseName: t('beg.stuckCase'),
+          hint: t('beg.stuckHint'),
         },
         [y, MIDDLE_RIGHT],
         [...firstLayer, ...middleIn(b.peek(`${y} ${MIDDLE_RIGHT}`))],
@@ -249,21 +249,21 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     const o = oriented(b.st);
     const n = o.filter(Boolean).length;
     let u = '';
-    let caseName = 'Dot: no top edge done';
-    let hint = `Only the center shows ${word(top)} among the edges. Do ${YELLOW_CROSS} from any side: it makes an L.`;
+    let caseName = t('beg.dot');
+    let hint = t('beg.dotHint', { top: word(top), alg: YELLOW_CROSS });
     if (n === 2 && o[0] === o[2]) {
       u = o[0] ? 'U' : '';
-      caseName = 'Line';
-      hint = `A ${word(top)} line: turn U so it goes left to right, then ${YELLOW_CROSS} makes the cross.`;
+      caseName = t('beg.line');
+      hint = t('beg.lineHint', { top: word(top), alg: YELLOW_CROSS });
     } else if (n === 2) {
       u = U_TURNS.find((t) => {
         const p = oriented(b.peek(t));
         return p[2] && p[3]; // back and left
       })!;
-      caseName = 'L shape';
-      hint = `A ${word(top)} L: turn U so its two arms point to the back and the left, then ${YELLOW_CROSS} makes a line.`;
+      caseName = t('beg.L');
+      hint = t('beg.LHint', { top: word(top), alg: YELLOW_CROSS });
     }
-    b.push('top', { title: `${cap(word(top))} cross`, caseName, hint }, [u, YELLOW_CROSS], 'eo');
+    b.push('top', { title: t('beg.topCross', { top: cap(word(top)) }), caseName, hint }, [u, YELLOW_CROSS], 'eo');
   }
 
   // 5. Top edges in place (matching the side centers).
@@ -275,7 +275,7 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     const u = bestU(b.st);
     const m = matched(b.peek(u));
     if (m.every(Boolean)) {
-      if (u) b.push('top', { title: 'Top edges in place', caseName: 'Line them up', hint: `Turn U so all four top edges match their side centers.` }, u, topEdgesShown);
+      if (u) b.push('top', { title: t('beg.topEdges'), caseName: t('beg.lineUp'), hint: t('beg.lineUpHint') }, u, topEdgesShown);
       break;
     }
     // Hold so the alg fixes it in one go when it can.
@@ -284,12 +284,9 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     b.push(
       'top',
       {
-        title: 'Top edges in place',
-        caseName: y !== undefined ? (adjacent ? 'Two next to each other match' : 'Two opposite edges match') : 'Two opposite edges match: first make them neighbours',
-        hint:
-          y !== undefined
-            ? `Turn U so two top edges match their side centers, then turn the cube so they are at the back and the right, and do ${YELLOW_EDGES}. It swaps the front and left edges.`
-            : `Turn U so two opposite top edges match their side centers, do ${YELLOW_EDGES} from any side: then two neighbouring edges match.`,
+        title: t('beg.topEdges'),
+        caseName: t(y !== undefined ? (adjacent ? 'beg.adjacent' : 'beg.opposite') : 'beg.oppositeFirst'),
+        hint: t(y !== undefined ? 'beg.edgesHint' : 'beg.edgesHintOpposite', { alg: YELLOW_EDGES }),
       },
       [`${u} ${y ?? ''}`, YELLOW_EDGES],
       topEdgesShown,
@@ -306,11 +303,9 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     b.push(
       'top',
       {
-        title: 'Top corners in place',
-        caseName: one ? 'One corner in place' : 'No corner in place',
-        hint: one
-          ? `A corner is in place when it has the colours of its three centers (twisted is fine). Turn the cube so it is at the front-right, then ${CORNER_CYCLE} cycles the other three.`
-          : `No corner has the colours of its three centers yet: do ${CORNER_CYCLE} once from any side, then one will.`,
+        title: t('beg.cornersPlace'),
+        caseName: t(one ? 'beg.oneCorner' : 'beg.noCorner'),
+        hint: t(one ? 'beg.oneCornerHint' : 'beg.noCornerHint', { alg: CORNER_CYCLE }),
       },
       [one ? y! : '', CORNER_CYCLE],
       'all',
@@ -333,16 +328,16 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     b.push(
       'top',
       {
-        title: `Twist corner ${corner}`,
-        caseName: `${CORNER_TWIST} ${times(reps)}`,
-        hint: `${u ? 'Turn only U (not the cube) so a twisted corner is at the top front-right. ' : 'A twisted corner is at the top front-right. '}Repeat ${CORNER_TWIST} until ${word(top)} is on top: here ${times(reps)}. The bottom looks scrambled for a while: it comes back when the last corner is done.`,
+        title: t('beg.twistTitle', { n: corner }),
+        caseName: t('beg.twistCase', { alg: CORNER_TWIST, times: times(reps) }),
+        hint: t(u ? 'beg.twistHint' : 'beg.twistHintHere', { alg: CORNER_TWIST, top: word(top), times: times(reps) }),
       },
       [u, repeat(CORNER_TWIST, reps)],
       'all',
     );
   }
   const auf = U_TURNS.find((t) => U_EDGES.every((e) => solvedAt(b.peek(t), e)))!;
-  if (auf) b.push('top', { title: 'Line up the top layer', hint: 'Turn U so the top layer matches the rest: solved.' }, auf, 'all');
+  if (auf) b.push('top', { title: t('beg.aufTitle'), hint: t('beg.aufHint') }, auf, 'all');
   if (!U_CORNERS.every((c) => solvedAt(b.st, c)) || !U_EDGES.every((e) => solvedAt(b.st, e)) || !SLOTS.every((s) => solvedAt(b.st, s) && solvedAt(b.st, `D${s}`)))
     throw new Error('Beginner solve did not finish (internal error)');
   return b.steps;
@@ -359,7 +354,7 @@ export function solveBeginner(state: CubeState, cross: Color): SolvePlan {
     const steps = solveFrom(start, hold, cross);
     if (!best || total(steps) < total(best)) best = steps;
   }
-  return { method: 'Beginner', steps: best!, moves: total(best!), note: `Layer by layer, ${word(cross)} cross on the bottom.` };
+  return { method: 'Beginner', steps: best!, moves: total(best!), note: t('beg.note', { cross: word(cross) }) };
 }
 
 export const BEGINNER: MethodDef = {
@@ -372,7 +367,7 @@ export const BEGINNER: MethodDef = {
       label: 'Cross colour',
       help: 'The colour you start with, on the bottom. Most guides use white.',
       kind: 'choice',
-      options: (['W', 'Y', 'G', 'B', 'R', 'O'] as Color[]).map((c) => ({ value: c, label: word(c)[0].toUpperCase() + word(c).slice(1) })),
+      options: (['W', 'Y', 'G', 'B', 'R', 'O'] as Color[]).map((c) => ({ value: c, label: { W: 'White', Y: 'Yellow', G: 'Green', B: 'Blue', R: 'Red', O: 'Orange' }[c] })),
     },
   ],
   defaults: { crossColor: 'W' },

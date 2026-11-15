@@ -1,4 +1,6 @@
+import { lang } from './i18n';
 import 'cubing/twisty';
+import { t } from '../src/i18n';
 import { type CubeState, applyMoves, randomMoves, solvedState } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import type { ReadCubeResult } from '../src/scan/readCube';
@@ -27,7 +29,7 @@ function renderStatus() {
   const v = validate(state());
   if (v.ok) {
     status.className = 'status ok';
-    status.textContent = 'Valid cube ✓';
+    status.textContent = t('common.validCube');
   } else {
     status.className = 'status bad';
     status.innerHTML = '';
@@ -116,15 +118,14 @@ function hideReview() {
 function onScanned(r: ReadCubeResult) {
   alternatives = r.states;
   altIndex = 0;
+  const count = r.combinationsTried.toLocaleString(lang);
   const how = r.usedStrips
-    ? `Face rotations came from neighbour strips on ${r.usedStrips} of 6 faces${r.combinationsTried > 1 ? `, plus a search of ${r.combinationsTried} combinations` : ''}.`
-    : `Each face's rotation was worked out by trying all ${r.combinationsTried.toLocaleString()} combinations.`;
-  if (r.states.length === 1) reviewSummary.textContent = `Scanned a valid cube. ${how}`;
-  else if (r.states.length > 1)
-    reviewSummary.textContent = `${r.states.length} valid cubes match these faces. ${how} Check each one against your cube.`;
-  else
-    reviewSummary.textContent = `No valid cube matches the scan; a sticker was probably misread. Showing the closest guess: compare it with your cube and fix the wrong stickers.`;
-  btnAlt.textContent = 'Next possibility';
+    ? t(r.combinationsTried > 1 ? 'review.stripsSearch' : 'review.strips', { n: r.usedStrips, count })
+    : t('review.search', { count });
+  if (r.states.length === 1) reviewSummary.textContent = t('review.one', { how });
+  else if (r.states.length > 1) reviewSummary.textContent = t('review.many', { n: r.states.length, how });
+  else reviewSummary.textContent = t('review.none');
+  btnAlt.textContent = t('edit.nextPossibility');
   btnAlt.classList.toggle('hidden', r.states.length < 2);
   reviewEl.classList.remove('hidden');
   setCube(r.guess, 'scan', true);
@@ -134,7 +135,7 @@ function onScanned(r: ReadCubeResult) {
 btnAlt.onclick = () => {
   if (!alternatives.length) return;
   altIndex = (altIndex + 1) % alternatives.length;
-  btnAlt.textContent = `Next possibility (${altIndex + 1}/${alternatives.length})`;
+  btnAlt.textContent = t('edit.nextPossibilityN', { i: altIndex + 1, n: alternatives.length });
   setCube(alternatives[altIndex], 'scan', true);
 };
 
@@ -144,23 +145,23 @@ worker.onmessage = (e) => {
   const d = e.data;
   if (d.type === 'ready') {
     solverReady = true;
-    btnGenerate.textContent = 'Generate scramble';
+    btnGenerate.textContent = t('cube.generate');
     // A cube handed over in the URL: generate straight away.
     if (renderStatus() && (fromHash || tab === 'random')) btnGenerate.click();
     return;
   }
   if (d.id !== requestId) return; // stale
-  btnGenerate.textContent = 'Generate scramble';
+  btnGenerate.textContent = t('cube.generate');
   renderStatus();
   if (d.type === 'error') {
     scrambleEl.textContent = '—';
     meta.textContent = d.message;
     return;
   }
-  scrambleEl.textContent = d.scramble || '(already solved)';
+  scrambleEl.textContent = d.scramble || t('cube.alreadySolved');
   meta.textContent = d.moveCount
-    ? `${d.moveCount} moves · found in ${d.ms.toFixed(0)} ms · solution: ${d.solution}`
-    : 'Nothing to do: the cube is solved.';
+    ? t('cube.meta', { moves: d.moveCount, ms: d.ms.toFixed(0), solution: d.solution })
+    : t('common.cubeSolved');
   btnCopy.disabled = !d.scramble;
   player.alg = d.scramble;
   const btnTime = $<HTMLAnchorElement>('btn-time');
@@ -175,14 +176,14 @@ btnGenerate.onclick = () => {
   if (!renderStatus()) return;
   requestId++;
   btnGenerate.disabled = true;
-  btnGenerate.textContent = 'Solving…';
-  worker.postMessage({ id: requestId, state: state() });
+  btnGenerate.textContent = t('common.solving');
+  worker.postMessage({ id: requestId, state: state(), lang });
 };
 
 btnCopy.onclick = async () => {
   await navigator.clipboard.writeText(scrambleEl.textContent ?? '');
-  btnCopy.textContent = 'Copied';
-  setTimeout(() => (btnCopy.textContent = 'Copy'), 1200);
+  btnCopy.textContent = t('common.copied');
+  setTimeout(() => (btnCopy.textContent = t('common.copy')), 1200);
 };
 
 // Cube passed in the URL (a shared link): #cube=<54 letters URFDLB>. #scan opens the scanner.

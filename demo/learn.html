@@ -3,46 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Solve Helper</title>
+    <title data-i18n="learn.docTitle">Solve Helper</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <header>
       <nav class="tabs">
-        <a href="./index.html">Cube</a>
-        <a href="./timer.html">Timer</a>
-        <a href="./learn.html" aria-current="page">Learn</a>
+        <a href="./index.html" data-i18n="nav.cube">Cube</a>
+        <a href="./timer.html" data-i18n="nav.timer">Timer</a>
+        <a href="./learn.html" aria-current="page" data-i18n="nav.learn">Learn</a>
       </nav>
-      <h1>Solve Helper</h1>
-      <p class="sub">Enter a cube and see how to solve it step by step, with the case names and algorithms to learn.</p>
+      <h1 data-i18n="learn.title">Solve Helper</h1>
+      <p class="sub" data-i18n="learn.sub">Enter a cube and see how to solve it step by step, with the case names and algorithms to learn.</p>
     </header>
 
     <main class="learn-main">
         <section class="card area-cube">
           <div class="row between">
-            <h2>Your cube</h2>
+            <h2 data-i18n="learn.yourCube">Your cube</h2>
             <div class="row gap">
-              <button id="btn-solved" class="ghost">Solved</button>
-              <button id="btn-random" class="ghost">Random cube</button>
+              <button id="btn-solved" class="ghost" data-i18n="learn.solved">Solved</button>
+              <button id="btn-random" class="ghost" data-i18n="learn.random">Random cube</button>
             </div>
           </div>
           <form id="scramble-form" class="scramble-input">
-            <input id="scramble-in" type="text" placeholder="Or type a scramble, e.g. R U R' F2 D…" autocomplete="off" spellcheck="false" aria-label="Scramble" />
-            <button class="ghost" type="submit">Apply</button>
+            <input id="scramble-in" type="text" placeholder="Or type a scramble, e.g. R U R' F2 D…" data-i18n-placeholder="learn.scramblePlaceholder" autocomplete="off" spellcheck="false" aria-label="Scramble" data-i18n-aria-label="common.scramble" />
+            <button class="ghost" type="submit" data-i18n="learn.apply">Apply</button>
           </form>
-          <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour"></div>
-          <div id="net" class="net" aria-label="Cube net"></div>
-          <p class="hint">Paint stickers to match your cube (white top, green front), scan it on the Cube tab, or apply a scramble.</p>
+          <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour" data-i18n-aria-label="common.paintColour"></div>
+          <div id="net" class="net" aria-label="Cube net" data-i18n-aria-label="common.cubeNet"></div>
+          <p class="hint" data-i18n="learn.cubeHint">Paint stickers to match your cube (white top, green front), scan it on the Cube tab, or apply a scramble.</p>
           <div id="status" class="status" aria-live="polite"></div>
         </section>
 
         <section class="card area-settings">
           <details id="settings-box" open>
-            <summary><h2>Solver settings</h2></summary>
+            <summary><h2 data-i18n="learn.settings">Solver settings</h2></summary>
             <fieldset class="setting">
-              <legend>Method</legend>
+              <legend data-i18n="learn.method">Method</legend>
               <select id="method"></select>
-              <p class="hint">More methods (beginner, Roux, ZZ) will use the same settings view.</p>
+              <p class="hint" data-i18n="learn.methodHint">More methods (Roux, ZZ) will use the same settings view.</p>
             </fieldset>
             <div id="settings"></div>
           </details>
@@ -50,10 +50,10 @@
 
       <section class="card area-solution">
         <div class="row between">
-          <h2>Solution</h2>
-          <button id="btn-copy" class="ghost small" disabled>Copy</button>
+          <h2 data-i18n="learn.solution">Solution</h2>
+          <button id="btn-copy" class="ghost small" disabled data-i18n="common.copy">Copy</button>
         </div>
-        <p id="summary" class="summary">Loading solver…</p>
+        <p id="summary" class="summary" data-i18n="common.loadingSolver">Loading solver…</p>
         <div id="breakdown" class="breakdown"></div>
         <div id="now" class="now" aria-live="polite"></div>
         <twisty-player
@@ -65,21 +65,21 @@
           hint-facelets="floating"
         ></twisty-player>
         <div class="row between step-nav">
-          <button id="btn-prev" class="ghost small">← Prev step</button>
-          <button id="btn-whole" class="ghost small" aria-pressed="true">Whole solve</button>
-          <button id="btn-next" class="ghost small">Next step →</button>
+          <button id="btn-prev" class="ghost small" data-i18n="learn.prev">← Prev step</button>
+          <button id="btn-whole" class="ghost small" aria-pressed="true" data-i18n="learn.whole">Whole solve</button>
+          <button id="btn-next" class="ghost small" data-i18n="learn.next">Next step →</button>
         </div>
         <label class="check">
           <input id="opt-highlight" type="checkbox" checked />
-          Highlight the pieces each step works on (grey out the rest)
+          <span data-i18n="learn.highlight">Highlight the pieces each step works on (grey out the rest)</span>
         </label>
         <ol id="steps" class="steps"></ol>
       </section>
     </main>
 
     <footer>
-      Cross: optimal search · F2L: shortest trigger sequences for every case · OLL / PLL: standard algorithms ·
-      Viewer: <a href="https://js.cubing.net/cubing/">cubing.js</a>
+      <span data-i18n="learn.footer">Cross: optimal search · F2L: shortest trigger sequences for every case · OLL / PLL: standard algorithms ·</span>
+      <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
     </footer>
     <script type="module" src="./learn.ts"></script>
   </body>

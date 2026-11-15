@@ -9,11 +9,11 @@
  * shortest trigger sequence for every case.
  */
 import { type Move, applyMovesToArray, countMoves, formatAlg, invertAlg, parseAlg, simplifyAlg, solvedState, toColorArray } from '../../core/cube';
+import { t } from '../../i18n';
 import { type Stickers, cubie, faceOf, locate, pieceSolved } from '../pieces';
 
 export const SLOTS = ['FR', 'FL', 'BL', 'BR'] as const;
 export type Slot = (typeof SLOTS)[number];
-export const SLOT_NAMES: Record<Slot, string> = { FR: 'front-right', FL: 'front-left', BL: 'back-left', BR: 'back-right' };
 
 /** y-rotation that brings each slot to the front-right position. */
 const SLOT_ROTATION: Record<Slot, string> = { FR: '', FL: "y'", BL: 'y2', BR: 'y' };
@@ -87,10 +87,10 @@ export function describePair(st: Stickers, crossWord = 'cross colour'): string {
   const cornerInSlot = faceOf(c[0]) !== 'U' && c.every((i) => faceOf(i) !== 'U');
   const edgeInSlot = e.every((i) => faceOf(i) !== 'U');
   const cross = faceOf(c[0]); // where the cross-colour sticker of the corner faces
-  const facing = cross === 'U' ? 'up' : cross === 'D' ? 'down' : 'to the side';
-  const cornerText = cornerInSlot ? `corner in the slot (${crossWord} ${facing === 'down' ? 'facing down' : facing})` : `corner on top (${crossWord} facing ${facing})`;
-  const edgeText = edgeInSlot ? (pieceSolved(st, EDGE_HOME) ? 'edge in the slot, correct' : 'edge in the slot, flipped') : 'edge on top';
-  return `${cornerText}, ${edgeText}`;
+  const facing = cross === 'U' ? 'Up' : cross === 'D' ? 'Down' : 'Side';
+  const cornerText = t(`f2l.corner${cornerInSlot ? 'Slot' : 'Top'}${facing}`, { cross: crossWord });
+  const edgeText = t(edgeInSlot ? (pieceSolved(st, EDGE_HOME) ? 'f2l.edgeSlotOk' : 'f2l.edgeSlotFlipped') : 'f2l.edgeTop');
+  return t('f2l.pair', { corner: cornerText, edge: edgeText });
 }
 
 /** Pair pieces of FR are only in the U layer or in the FR slot itself. */

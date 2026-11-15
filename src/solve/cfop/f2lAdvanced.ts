@@ -10,7 +10,8 @@
  */
 import { type Color, type Move, countMoves, formatAlg, invertAlg, movePerm, parseAlg, simplifyAlg, type Perm, applyMovesToArray } from '../../core/cube';
 import { CORNERS, EDGES, type Stickers, faceOf, homeColor, locate, pieceSolved } from '../pieces';
-import { SLOTS, SLOT_NAMES, SLOT_PIECES, type Slot, slotSolved } from './f2l';
+import { t } from '../../i18n';
+import { SLOTS, SLOT_PIECES, type Slot, slotSolved } from './f2l';
 
 /**
  * Triggers per slot: short sequences that only change one slot and the U layer. They are found by
@@ -137,13 +138,13 @@ function describe(st: Stickers, slot: Slot, offset: number, crossWord: string): 
   const cHome = cornerHome(slot, offset);
   const where = (home: number[]) => {
     const l = locate(st, home);
-    if (l.some((i) => faceOf(i) === 'U')) return 'on top';
+    if (l.some((i) => faceOf(i) === 'U')) return t('f2l.advOnTop');
     const s = SLOTS.find((x) => l.every((i) => SLOT_PIECES[x].flat().includes(i)))!;
-    return s === slot ? 'in its slot' : `in the ${SLOT_NAMES[s]} slot`;
+    return s === slot ? t('f2l.advInItsSlot') : t('f2l.advInSlot', { slot: t(`slot.${s}`) });
   };
   const c = locate(st, cHome);
-  const facing = faceOf(c[0]) === 'U' ? 'up' : faceOf(c[0]) === 'D' ? 'down' : 'to the side';
-  return `Corner ${where(cHome)} (${crossWord} facing ${facing}), edge ${where(SLOT_PIECES[slot][1])}`;
+  const facing = t(faceOf(c[0]) === 'U' ? 'f2l.facingUp' : faceOf(c[0]) === 'D' ? 'f2l.facingDown' : 'f2l.facingSide');
+  return t('f2l.adv', { corner: where(cHome), cross: crossWord, facing, edge: where(SLOT_PIECES[slot][1]) });
 }
 
 /** One pair's best solution into `slot`, or null if the table has no entry. */
@@ -205,7 +206,7 @@ export function solveF2LAdvanced(st: Stickers, crossWord: string): AdvancedPair[
     if (!plan) continue;
     // Pseudo pairs that are in place as soon as the bottom layer is turned come first.
     const ready = SLOTS.filter((s) => placed(turned, s, offset)).map((s) =>
-      makePair(turned, s, offset, [], 'Corner and edge are already together in the slot once the bottom layer is turned'),
+      makePair(turned, s, offset, [], t('f2l.advReady')),
     );
     const pairs = [...ready, ...plan.pairs.map((p) => ({ ...p }))];
     const first = pairs[0];

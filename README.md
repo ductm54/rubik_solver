@@ -35,6 +35,10 @@ Done so far:
   R U R' U'), middle edges (right / left algorithm), yellow cross (F R U R' U' F': dot → L → line),
   yellow edges (R U R' U R U2 R' U), corners in place (U R U' L' U R' U' L) and corner twists
   (R' D' R D at the front-right). Each step says which case it is and how many repeats it takes.
+- **Languages**: English, Español, Français, Deutsch, Português, Русский, 中文（简体）, 日本語 and
+  Tiếng Việt, picked from the nav (or `?lang=fr`), remembered in the browser, and matched to the browser's
+  language on a first visit. Everything is translated: pages, scanner messages, cube errors, timer, and
+  the solver's step titles, case names and hints.
 
 **Live demo:** https://ductm54.github.io/rubik_solver/ · timer: https://ductm54.github.io/rubik_solver/timer.html · learn: https://ductm54.github.io/rubik_solver/learn.html
 
@@ -77,6 +81,8 @@ npm run build    # static site in dist/
 | `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest, counting each regrip in the cross as 3 extra moves and each B turn after the first move as 5 |
 | `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; never a B turn: the cube is turned instead. The cross edge by edge: the slot turned to the front, then a distance table for each set of cross edges with U, R, F, D, L only (`solveCrossEdge` in `cfop/cross.ts`) |
+| `src/i18n/` | `t(key, params)` with plural forms; `locales/en.ts` holds every key, the other languages load on demand (one chunk each). Solver texts are made in the page's language: the worker gets it with each request |
+| `demo/i18n.ts` | Page language (`?lang=`, saved choice, browser), `data-i18n` attributes in the HTML, the language picker |
 | `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
 | `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
 | `demo/scan.ts` | Scan panel on the front page (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |

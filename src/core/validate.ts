@@ -1,6 +1,7 @@
 /**
  * Cube validity: colour counts, real pieces, each piece once, twist, flip and parity.
  */
+import { type MessageKey, type Params, t } from '../i18n';
 import { COLORS, type CubeState, type FaceName, centerMap, toColorArray } from './cube';
 
 const F = (face: FaceName, n: number) => 'URFDLB'.indexOf(face) * 9 + n - 1;
@@ -55,24 +56,35 @@ function parity(p: number[]): number {
 }
 
 export function validate(state: CubeState): ValidationResult {
+  return check(state, true);
+}
+
+/** With `describe` off only `ok` matters: no messages are built (fast, for searches). */
+function check(state: CubeState, describe: boolean): ValidationResult {
   const errors: string[] = [];
+  let failed = false;
+  const fail = (key: MessageKey, params?: Params) => {
+    failed = true;
+    if (describe) errors.push(t(key, params));
+  };
   const colors = toColorArray(state);
 
   for (const c of COLORS) {
     const n = colors.filter((x) => x === c).length;
-    if (n !== 9) errors.push(`Colour ${c} appears ${n} times (expected 9)`);
+    if (n !== 9) fail('val.count', { c, name: t(`color.${c}`), n });
   }
   const unknown = new Set(colors.filter((c) => !COLORS.includes(c)));
-  for (const c of unknown) errors.push(`Unknown colour "${c}"`);
+  for (const c of unknown) fail('val.unknown', { c });
 
   let toFace: Map<string, FaceName>;
   try {
     toFace = centerMap(state);
   } catch (e) {
     errors.push((e as Error).message);
+    failed = true;
     return { ok: false, errors };
   }
-  if (errors.length) return { ok: false, errors };
+  if (failed) return { ok: false, errors };
 
   const f = colors.map((c) => toFace.get(c)!).join('');
 
@@ -90,7 +102,7 @@ export function validate(state: CubeState): ValidationResult {
       found = cornerSets.indexOf(r);
     }
     if (found < 0) {
-      errors.push(`Corner at ${CORNER_NAMES[pos]} has colours ${idx.map((i) => colors[i]).join('/')}, which is not a real corner piece`);
+      fail('val.badCorner', { pos: CORNER_NAMES[pos], colors: idx.map((i) => colors[i]).join('/') });
     }
     cp.push(found);
     co.push(ori);
@@ -109,35 +121,35 @@ export function validate(state: CubeState): ValidationResult {
       ori = 1;
     }
     if (found < 0) {
-      errors.push(`Edge at ${EDGE_NAMES[pos]} has colours ${idx.map((i) => colors[i]).join('/')}, which is not a real edge piece`);
+      fail('val.badEdge', { pos: EDGE_NAMES[pos], colors: idx.map((i) => colors[i]).join('/') });
     }
     ep.push(found);
     eo.push(ori);
   });
 
-  if (errors.length) return { ok: false, errors };
+  if (failed) return { ok: false, errors };
 
-  const dupCheck = (perm: number[], names: string[], kind: string) => {
+  const dupCheck = (perm: number[], names: string[], kind: 'Corner' | 'Edge') => {
     const seen = new Map<number, number>();
     perm.forEach((p, pos) => {
-      if (seen.has(p)) errors.push(`${kind} piece ${names[p]} appears twice (at ${names[seen.get(p)!]} and ${names[pos]})`);
+      if (seen.has(p)) fail(`val.dup${kind}` as const, { piece: names[p], a: names[seen.get(p)!], b: names[pos] });
       else seen.set(p, pos);
     });
-    names.forEach((n, i) => !perm.includes(i) && errors.push(`${kind} piece ${n} is missing`));
+    names.forEach((n, i) => !perm.includes(i) && fail(`val.missing${kind}` as const, { piece: n }));
   };
   dupCheck(cp, CORNER_NAMES, 'Corner');
   dupCheck(ep, EDGE_NAMES, 'Edge');
-  if (errors.length) return { ok: false, errors };
+  if (failed) return { ok: false, errors };
 
   const twist = co.reduce((a, b) => a + b, 0) % 3;
-  if (twist !== 0) errors.push(`Corner twist is off by ${twist === 1 ? 'one clockwise' : 'one anticlockwise'} turn: a corner is twisted in place`);
+  if (twist !== 0) fail(twist === 1 ? 'val.twistCw' : 'val.twistCcw');
   const flip = eo.reduce((a, b) => a + b, 0) % 2;
-  if (flip !== 0) errors.push('Edge flip is odd: an edge is flipped in place');
-  if (parity(cp) !== parity(ep)) errors.push('Permutation parity mismatch: two pieces are swapped');
+  if (flip !== 0) fail('val.flip');
+  if (parity(cp) !== parity(ep)) fail('val.parity');
 
-  return errors.length ? { ok: false, errors } : { ok: true, errors, cubies: { cp, co, ep, eo } };
+  return failed ? { ok: false, errors } : { ok: true, errors, cubies: { cp, co, ep, eo } };
 }
 
 export function isValid(state: CubeState): boolean {
-  return validate(state).ok;
+  return check(state, false).ok;
 }
