@@ -149,7 +149,7 @@ function solve() {
 }
 
 // --- output
-const STAGE_LABEL: Record<string, string> = { inspection: 'Step 0', cross: 'Cross', f2l: 'F2L', oll: 'OLL', pll: 'PLL' };
+const STAGE_LABEL: Record<string, string> = { inspection: 'Step 0', cross: 'Cross', f2l: 'F2L', oll: 'OLL', pll: 'PLL', corners: '1st layer', middle: '2nd layer', top: 'Last layer' };
 
 function renderPlan() {
   stepsEl.innerHTML = '';
@@ -190,7 +190,7 @@ function stepItem(s: SolveStep, i: number): HTMLLIElement {
   head.className = 'step-head';
   const tag = Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: STAGE_LABEL[s.stage] ?? s.stage });
   const title = Object.assign(document.createElement('span'), { className: 'step-title', textContent: s.title });
-  const count = Object.assign(document.createElement('span'), { className: 'muted step-count', textContent: s.moves ? `${s.moves} moves` : s.stage === 'inspection' ? 'inspection' : 'skip' });
+  const count = Object.assign(document.createElement('span'), { className: 'muted step-count', textContent: s.moves ? `${s.moves} move${s.moves > 1 ? 's' : ''}` : s.stage === 'inspection' ? 'inspection' : 'skip' });
   head.append(tag, title, count);
   btn.append(head);
   if (s.caseName) btn.append(Object.assign(document.createElement('div'), { className: 'step-case', textContent: s.caseName }));
