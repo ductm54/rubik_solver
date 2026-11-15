@@ -57,11 +57,24 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     st = applyMovesToArray(st, m);
   };
 
+  // Step 0: hold the cube the right way, during the 15 s inspection (rotations only, no moves).
+  const front = COLOR_WORDS[centerColor(held, 'F')];
+  push(
+    {
+      stage: 'inspection',
+      title: `Hold ${COLOR_WORDS[cross]} on the bottom, ${front} in front`,
+      caseName: holdMoves.length ? undefined : 'Already held this way: no turn needed',
+      hint: `Do this during the 15 s inspection, before the timer starts: ${top} on top, ${front} facing you.`,
+    },
+    holdMoves,
+    { kind: 'cross', cross },
+  );
+
   // Cross
   const crossMoves = solveCross(held);
   push(
-    { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Hold ${COLOR_WORDS[cross]} on the bottom and solve the 4 ${COLOR_WORDS[cross]} edges, matching the side centers.` },
-    [...holdMoves, ...crossMoves],
+    { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom, matching the side centers.` },
+    crossMoves,
     { kind: 'cross', cross },
   );
 
@@ -200,7 +213,7 @@ export const CFOP: MethodDef = {
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },
-        { value: 'advanced', label: 'Advanced (fewest moves)' },
+        { value: 'advanced', label: 'Advanced' },
       ],
     },
     {
