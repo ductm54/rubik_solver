@@ -10,7 +10,7 @@ import { type Stickers, centerColor } from '../pieces';
 import type { MethodDef, SettingValues, SolvePlan, SolveStep } from '../types';
 import { CPLL, EPLL, PLL } from './algs/pll';
 import { EO, OCLL, OLL } from './algs/oll';
-import { solveCross } from './cross';
+import { solveCross, solveXCross } from './cross';
 import { SLOTS, SLOT_NAMES, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { solveF2LAdvanced } from './f2lAdvanced';
 import { type LLTable, buildTable, matchLL } from './ll';
@@ -33,10 +33,15 @@ const HOLDS = ['', 'x', 'x2', "x'", 'z', "z'"].flatMap((a) => ['', 'y', 'y2', "y
 
 export interface CfopOptions {
   crossColors: Color[];
+  /** Advanced: the cross and at least one F2L pair together (XCross) when that takes under 11 moves. */
+  cross?: 'standard' | 'advanced';
   f2l?: 'standard' | 'advanced';
   oll: 'full' | '2look';
   pll: 'full' | '2look';
 }
+
+/** The advanced cross does an XCross only when it takes at most this many moves (under 11). */
+const XCROSS_MAX = 10;
 
 interface Attempt {
   steps: SolveStep[];
@@ -70,20 +75,34 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     { kind: 'cross', cross },
   );
 
-  // Cross
-  const crossMoves = solveCross(held);
-  push(
-    { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom, matching the side centers.` },
-    crossMoves,
-    { kind: 'cross', cross },
-  );
+  // Cross, or with the advanced cross an XCross (cross + at least one pair) when it is short enough.
+  const xcross = opts.cross === 'advanced' ? solveXCross(held, XCROSS_MAX) : null;
+  if (xcross) {
+    const after = applyMovesToArray(held, xcross);
+    const done = SLOTS.filter((s) => slotSolved(after, s)).map((s) => slotColors(after, s));
+    push(
+      {
+        stage: 'cross',
+        title: `XCross (${COLOR_WORDS[cross]}) + ${done.map(pairName).join(' and ')} pair${done.length > 1 ? 's' : ''}`,
+        hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom and the ${done.map(pairName).join(' and ')} pair${done.length > 1 ? 's' : ''} in one go.`,
+      },
+      xcross,
+      { kind: 'f2l', cross, pairs: done },
+    );
+  } else {
+    push(
+      { stage: 'cross', title: `Cross (${COLOR_WORDS[cross]})`, hint: `Solve the 4 ${COLOR_WORDS[cross]} edges on the bottom, matching the side centers.` },
+      solveCross(held),
+      { kind: 'cross', cross },
+    );
+  }
 
   // F2L: greedy, cheapest pair first. Slot names are relative to the current way of holding it.
   const pairs: Color[][] = [];
   for (const s of SLOTS.filter((s) => slotSolved(st, s))) {
     const colors = slotColors(st, s);
     pairs.push(colors);
-    steps.push({ stage: 'f2l', title: `F2L ${pairs.length} · ${pairName(colors)} pair`, caseName: 'Already solved after the cross', alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
+    steps.push({ stage: 'f2l', title: `F2L ${pairs.length} · ${pairName(colors)} pair`, caseName: xcross ? 'Solved together with the cross (XCross)' : 'Already solved after the cross', alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
   }
   if (opts.f2l === 'advanced') {
     const plan = solveF2LAdvanced(st, COLOR_WORDS[cross]);
@@ -215,6 +234,16 @@ export const CFOP: MethodDef = {
       options: COLOR_OPTIONS,
     },
     {
+      key: 'cross',
+      label: 'Cross',
+      help: 'Standard: the shortest cross. Advanced: an XCross, the cross and at least one F2L pair solved together, whenever that takes under 11 moves (otherwise the normal cross).',
+      kind: 'choice',
+      options: [
+        { value: 'standard', label: 'Standard' },
+        { value: 'advanced', label: 'Advanced (XCross)' },
+      ],
+    },
+    {
       key: 'f2l',
       label: 'F2L',
       help: 'Standard: turn the cube so each pair goes in at the front-right, one case at a time. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) when it is shorter: the fewest moves found.',
@@ -245,11 +274,12 @@ export const CFOP: MethodDef = {
       ],
     },
   ],
-  defaults: { crossColors: ['W'], f2l: 'standard', oll: '2look', pll: '2look' },
+  defaults: { crossColors: ['W'], cross: 'standard', f2l: 'standard', oll: '2look', pll: '2look' },
   solve(state: CubeState, s: SettingValues) {
     const colors = (Array.isArray(s.crossColors) ? s.crossColors : [s.crossColors]) as Color[];
     return solveCfop(state, {
       crossColors: colors.length ? colors : ['W'],
+      cross: s.cross === 'advanced' ? 'advanced' : 'standard',
       f2l: s.f2l === 'advanced' ? 'advanced' : 'standard',
       oll: s.oll === 'full' ? 'full' : '2look',
       pll: s.pll === 'full' ? 'full' : '2look',

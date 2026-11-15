@@ -225,6 +225,34 @@ describe('CFOP solver', () => {
     expect((performance.now() - t) / 60).toBeLessThan(200);
   });
 
+  it('advanced cross: cross and at least one pair together in under 11 moves, never longer overall', () => {
+    let xcross = 0;
+    let adv = 0;
+    let std = 0;
+    for (let n = 0; n < 40; n++) {
+      const state = applyMoves(solved, randomMoves(25));
+      const a = solveCfop(state, { crossColors: ['W'], cross: 'advanced', oll: 'full', pll: 'full' });
+      const b = solveCfop(state, { crossColors: ['W'], oll: 'full', pll: 'full' });
+      let st = state;
+      const cross = a.steps.find((s) => s.stage === 'cross')!;
+      for (const step of a.steps) {
+        st = applyMoves(st, step.alg);
+        if (step === cross && cross.title.startsWith('XCross')) {
+          xcross++;
+          expect(cross.moves).toBeLessThan(11);
+          const arr = toColorArray(st);
+          expect(crossSolved(arr) && SLOTS.some((s) => slotSolved(arr, s))).toBe(true);
+        }
+      }
+      expect(f2lDone(toColorArray(st))).toBe(true);
+      expect(a.steps.filter((s) => s.stage === 'f2l').length).toBe(4);
+      adv += a.moves;
+      std += b.moves;
+    }
+    expect(xcross).toBeGreaterThan(20);
+    expect(adv).toBeLessThan(std);
+  });
+
   it('handles a solved cube', () => {
     const plan = solveCfop(solved, { crossColors: ['W'], oll: '2look', pll: '2look' });
     let st = solved;
