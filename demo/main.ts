@@ -2,7 +2,7 @@ import 'cubing/twisty';
 import { type CubeState, applyMoves, randomMoves, solvedState } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import type { ReadCubeResult } from '../src/scan/readCube';
-import { createNet, decodeCube, encodeCube } from './net';
+import { createNet, decodeCube, encodeCube, renderNetView } from './net';
 
 let solverReady = false;
 let requestId = 0;
@@ -66,30 +66,41 @@ function setCube(s: CubeState, from: 'scan' | 'manual', generate = false) {
   if (generate && solverReady && renderStatus()) btnGenerate.click();
 }
 
+function newRandom() {
+  setCube(applyMoves(solvedState(), randomMoves(30)), 'manual', true);
+  renderNetView($('preview'), state());
+}
 $('btn-solved').onclick = () => setCube(solvedState(), 'manual');
-$('btn-random').onclick = () => setCube(applyMoves(solvedState(), randomMoves(30)), 'manual', true);
+$('btn-random').onclick = newRandom;
 
-// --- scanning: the scanner code (and its vision worker) loads the first time the panel opens
-const scanCard = $('scan-card');
-const btnScan = $<HTMLButtonElement>('btn-scan');
+// --- tabs: Scan / Edit / Random. The scanner code (and its vision worker) loads on first use.
+type Tab = 'scan' | 'edit' | 'random';
+let tab: Tab | null = null;
 let scanner: Promise<typeof import('./scan')> | null = null;
 
-function openScan() {
-  scanCard.classList.remove('hidden');
-  btnScan.classList.add('hidden');
-  scanner ??= import('./scan').then((m) => {
-    m.initScanner({ onCube: onScanned, onIncomplete: hideReview });
-    return m;
-  });
-  scanCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function showTab(t: Tab) {
+  if (t === tab) return;
+  if (tab === 'scan') void scanner?.then((m) => m.pauseScanner());
+  tab = t;
+  for (const name of ['scan', 'edit', 'random'] as Tab[]) {
+    const on = name === t;
+    const b = $(`tab-${name}`);
+    b.setAttribute('aria-selected', String(on));
+    $(b.dataset.panel!).classList.toggle('hidden', !on);
+  }
+  $('count').classList.toggle('hidden', t !== 'scan');
+  status.classList.toggle('hidden', t === 'scan');
+  if (t === 'scan')
+    scanner ??= import('./scan').then((m) => {
+      m.initScanner({ onCube: onScanned, onIncomplete: hideReview });
+      return m;
+    });
+  // Random: a fresh cube each time the tab is opened.
+  if (t === 'random') newRandom();
 }
-function closeScan() {
-  scanCard.classList.add('hidden');
-  btnScan.classList.remove('hidden');
-  void scanner?.then((m) => m.pauseScanner());
-}
-btnScan.onclick = openScan;
-$('btn-scan-close').onclick = closeScan;
+$('tab-scan').onclick = () => showTab('scan');
+$('tab-edit').onclick = () => showTab('edit');
+$('tab-random').onclick = () => showTab('random');
 
 const reviewEl = $('review');
 const reviewSummary = $('review-summary');
@@ -117,8 +128,7 @@ function onScanned(r: ReadCubeResult) {
   btnAlt.classList.toggle('hidden', r.states.length < 2);
   reviewEl.classList.remove('hidden');
   setCube(r.guess, 'scan', true);
-  closeScan();
-  $('net').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showTab('edit');
 }
 
 btnAlt.onclick = () => {
@@ -136,7 +146,7 @@ worker.onmessage = (e) => {
     solverReady = true;
     btnGenerate.textContent = 'Generate scramble';
     // A cube handed over in the URL: generate straight away.
-    if (renderStatus() && fromHash) btnGenerate.click();
+    if (renderStatus() && (fromHash || tab === 'random')) btnGenerate.click();
     return;
   }
   if (d.id !== requestId) return; // stale
@@ -181,5 +191,5 @@ if (fromHash) net.set(fromHash);
 if (location.hash.includes('from=scan')) source = 'scan';
 renderStatus();
 clearOutput();
-if (/(^#|&)scan\b/.test(location.hash)) openScan();
+showTab(/(^#|&)scan\b/.test(location.hash) ? 'scan' : 'edit');
 Object.assign(window, { cubePage: { getNet: () => encodeCube(net.get()) } });

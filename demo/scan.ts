@@ -302,7 +302,7 @@ function renderCaptured() {
     if (s?.capture.strip) slot.classList.add('has-strip');
     capturedEl.append(slot);
   });
-  countEl.textContent = `${filled()} / 6`;
+  countEl.textContent = `${filled()} / 6 faces`;
 }
 
 let audio: AudioContext | null = null;

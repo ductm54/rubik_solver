@@ -77,6 +77,22 @@ export function createNet(netEl: HTMLElement, paletteEl: HTMLElement, onChange: 
   };
 }
 
+/** Read-only net: draw a cube state into `el` (a `.net` grid). */
+export function renderNetView(el: HTMLElement, s: CubeState) {
+  el.replaceChildren();
+  for (const f of FACES) {
+    const [r0, c0] = NET_POS[f];
+    for (let i = 0; i < 9; i++) {
+      const d = document.createElement('span');
+      d.className = i === 4 ? 'sticker center' : 'sticker';
+      d.dataset.color = s[f][i];
+      d.style.gridRow = String(r0 + Math.floor(i / 3) + 1);
+      d.style.gridColumn = String(c0 + (i % 3) + 1);
+      el.append(d);
+    }
+  }
+}
+
 /** Cube as 54 colour letters in URFDLB order, for passing in a URL. */
 export function encodeCube(s: CubeState): string {
   return FACES.map((f) => s[f].join('')).join('');
