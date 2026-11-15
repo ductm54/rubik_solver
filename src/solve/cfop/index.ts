@@ -86,21 +86,29 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     steps.push({ stage: 'f2l', title: `F2L ${pairs.length} · ${pairName(colors)} pair`, caseName: 'Already solved after the cross', alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
   }
   if (opts.f2l === 'advanced') {
-    for (const p of solveF2LAdvanced(st, COLOR_WORDS[cross])) {
-      const colors = slotColors(st, p.slot);
-      pairs.push(colors);
+    const plan = solveF2LAdvanced(st, COLOR_WORDS[cross]);
+    const pieces: Color[][] = [];
+    const sides = (c: Color[]) => c.filter((x) => x !== cross).map((x) => COLOR_WORDS[x]).join('-');
+    plan.forEach((p, k) => {
+      pieces.push(p.corner, p.edge);
+      const turns = [
+        k === 0 ? `the bottom layer is turned first (${p.alg[0].base === 'D' ? formatAlg([p.alg[0]]) : 'D'}), so each corner goes in with the edge of another slot` : '',
+        k === plan.length - 1 ? 'the last turn lines the bottom layer up again' : '',
+      ].filter(Boolean);
       push(
         {
           stage: 'f2l',
-          title: `F2L ${pairs.length} · ${pairName(colors)} pair`,
-          caseName: `Into the ${SLOT_NAMES[p.slot]} slot`,
-          hint: `${p.description}.`,
+          title: p.pseudo
+            ? `F2L ${pairs.length + k + 1} · ${sides(p.corner)} corner + ${sides(p.edge)} edge`
+            : `F2L ${pairs.length + k + 1} · ${sides(p.corner)} pair`,
+          caseName: `${p.pseudo ? 'Pseudo pair into' : 'Into'} the ${SLOT_NAMES[p.slot]} slot`,
+          hint: `${p.description}.${p.pseudo && turns.length ? ` Pseudo-slotting: ${turns.join('; ')}.` : ''}`,
         },
         p.alg,
-        { kind: 'f2l', cross, pairs: [...pairs] },
+        { kind: 'f2l', cross, pairs: [...pairs], pieces: [...pieces] },
       );
-    }
-  }
+    });
+  } else
   while (pairs.length < 4) {
     const done = SLOTS.filter((s) => slotSolved(st, s));
     let best: ReturnType<typeof planPair> = null;
@@ -209,7 +217,7 @@ export const CFOP: MethodDef = {
     {
       key: 'f2l',
       label: 'F2L',
-      help: 'Standard: turn the cube so each pair goes in at the front-right, one case at a time. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order: the fewest moves found.',
+      help: 'Standard: turn the cube so each pair goes in at the front-right, one case at a time. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) when it is shorter: the fewest moves found.',
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },
