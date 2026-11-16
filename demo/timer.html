@@ -2,92 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title data-i18n="timer.docTitle">Cube Timer</title>
-    <link rel="stylesheet" href="./style.css" />
+    <title>Rubik Solver</title>
+    <script>
+      // This page is now a tab of the front page; keep old links (and what they carry in the hash) working.
+      location.replace('./index.html#timer' + (location.hash.length > 1 ? '&' + location.hash.slice(1) : ''));
+    </script>
   </head>
-  <body class="timer-page">
-    <header>
-      <nav class="tabs">
-        <a href="./index.html" data-i18n="nav.cube">Cube</a>
-        <a href="./timer.html" aria-current="page" data-i18n="nav.timer">Timer</a>
-        <a href="./learn.html" data-i18n="nav.learn">Learn</a>
-      </nav>
-    </header>
-
-    <main class="timer-main">
-      <section class="card span-all scramble-card dimmable">
-        <div class="row between">
-          <div class="row gap wrap">
-            <h2 data-i18n="common.scramble">Scramble</h2>
-            <span id="source" class="tag hidden"></span>
-          </div>
-          <div class="row gap">
-            <a id="btn-learn" class="button-like small" href="./learn.html" data-i18n="timer.howTo">How to solve</a>
-            <button id="btn-copy-scramble" class="ghost small" data-i18n="common.copy">Copy</button>
-            <button id="btn-new" class="ghost small" disabled data-i18n="timer.new">New scramble</button>
-          </div>
-        </div>
-        <div class="scramble-row">
-          <code id="scramble" class="scramble-text" data-i18n="common.loadingSolver">Loading solver…</code>
-          <div id="preview" class="preview" aria-label="Scrambled cube preview" data-i18n-aria-label="random.preview"></div>
-        </div>
-      </section>
-
-      <section class="card span-all pad-card">
-        <div id="pad" class="pad" tabindex="0" role="button" aria-label="Timer: hold and release to start, tap to stop" data-i18n-aria-label="timer.padLabel">
-          <div id="clock" class="clock">0.00</div>
-          <div id="hint" class="pad-hint" data-i18n="timer.hintInspect">Hold space or touch here and release to start inspection</div>
-        </div>
-        <div id="last" class="last dimmable hidden">
-          <span id="last-time" class="last-time"></span>
-          <div class="row gap wrap">
-            <button class="ghost small" data-pen="none" data-i18n="timer.ok">OK</button>
-            <button class="ghost small" data-pen="+2">+2</button>
-            <button class="ghost small" data-pen="DNF">DNF</button>
-            <input id="last-note" class="note" placeholder="Note" data-i18n-placeholder="timer.note" maxlength="200" />
-            <button id="btn-delete-last" class="ghost small danger" data-i18n="common.delete">Delete</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="card dimmable">
-        <h2 data-i18n="timer.stats">Statistics</h2>
-        <div id="stats" class="stats-grid"></div>
-      </section>
-
-      <section class="card dimmable">
-        <div class="row between">
-          <h2 data-i18n="timer.history">History</h2>
-          <div class="legend" id="legend"></div>
-        </div>
-        <div id="chart" class="chart"></div>
-      </section>
-
-      <section class="card span-all dimmable">
-        <div class="row between">
-          <h2><span data-i18n="timer.solves">Solves</span> <span id="count" class="muted"></span></h2>
-          <div class="row gap wrap">
-            <label class="check"><input id="opt-inspection" type="checkbox" checked /> <span data-i18n="timer.inspection">15 s inspection</span></label>
-            <button id="btn-export" class="ghost small" data-i18n="timer.export">Export (csTimer)</button>
-            <label class="ghost small button-like"><span data-i18n="timer.import">Import</span><input id="file-import" type="file" accept=".txt,.json,application/json" hidden /></label>
-            <button id="btn-clear-all" class="ghost small danger" data-i18n="timer.clearAll">Clear all</button>
-          </div>
-        </div>
-        <p id="io-status" class="hint" aria-live="polite"></p>
-        <div class="table-wrap">
-          <table class="solves">
-            <thead>
-              <tr><th>#</th><th data-i18n="timer.colTime">Time</th><th>ao5</th><th>ao12</th><th class="hide-sm" data-i18n="common.scramble">Scramble</th><th class="hide-sm" data-i18n="timer.colDate">Date</th><th></th></tr>
-            </thead>
-            <tbody id="solves"></tbody>
-          </table>
-        </div>
-        <button id="btn-more" class="ghost small hidden" style="margin-top: 10px" data-i18n="timer.showAll">Show all</button>
-        <p id="storage-note" class="hint"></p>
-      </section>
-    </main>
-    <div id="tooltip" class="tooltip hidden" role="tooltip"></div>
-    <script type="module" src="./timer.ts"></script>
-  </body>
+  <body><a href="./index.html#timer">The timer has moved to the front page.</a></body>
 </html>

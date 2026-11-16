@@ -165,10 +165,10 @@ worker.onmessage = (e) => {
   btnCopy.disabled = !d.scramble;
   player.alg = d.scramble;
   const btnTime = $<HTMLAnchorElement>('btn-time');
-  btnTime.href = `./timer.html#${new URLSearchParams({ scramble: d.scramble, source })}`;
+  btnTime.href = `#timer&${new URLSearchParams({ scramble: d.scramble, source })}`;
   btnTime.classList.toggle('hidden', !d.scramble);
   const btnLearn = $<HTMLAnchorElement>('btn-learn');
-  btnLearn.href = `./learn.html#cube=${encodeCube(state())}`;
+  btnLearn.href = `#learn&scramble=${encodeURIComponent(d.scramble)}`;
   btnLearn.classList.toggle('hidden', !d.scramble);
 };
 
@@ -187,10 +187,25 @@ btnCopy.onclick = async () => {
 };
 
 // Cube passed in the URL (a shared link): #cube=<54 letters URFDLB>. #scan opens the scanner.
-const fromHash = decodeCube(/cube=([A-Z]{54})/.exec(location.hash)?.[1] ?? '');
+const cubeInHash = () => decodeCube(/cube=([A-Z]{54})/.exec(location.hash)?.[1] ?? '');
+const scanInHash = () => /(^#|&)scan\b/.test(location.hash);
+const fromHash = cubeInHash();
 if (fromHash) net.set(fromHash);
 if (location.hash.includes('from=scan')) source = 'scan';
 renderStatus();
 clearOutput();
-showTab(/(^#|&)scan\b/.test(location.hash) ? 'scan' : 'edit');
+showTab(scanInHash() ? 'scan' : 'edit');
+
+/** The Cube tab was opened again (the page stays loaded): follow what the link asked for. */
+export function show() {
+  const cube = cubeInHash();
+  if (scanInHash()) showTab('scan');
+  else if (cube && encodeCube(cube) !== encodeCube(state())) setCube(cube, 'manual', true);
+  history.replaceState(null, '', `#cube=${encodeCube(state())}`);
+}
+
+/** Another tab was opened: the camera must not keep running behind it. */
+export function hide() {
+  void scanner?.then((m) => m.pauseScanner());
+}
 Object.assign(window, { cubePage: { getNet: () => encodeCube(net.get()) } });

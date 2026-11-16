@@ -3,114 +3,358 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title data-i18n="cube.docTitle">Cube Scramble Finder</title>
+    <title>Rubik Solver</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <header>
-      <nav class="tabs">
-        <a href="./index.html" aria-current="page" data-i18n="nav.cube">Cube</a>
-        <a href="./timer.html" data-i18n="nav.timer">Timer</a>
-        <a href="./learn.html" data-i18n="nav.learn">Learn</a>
-      </nav>
-      <h1 data-i18n="cube.title">Cube Scramble Finder</h1>
-      <p class="sub" data-i18n="cube.sub">Scan your cube, paint its stickers, or pick a random one, and get a scramble that reproduces that exact cube.</p>
-    </header>
+    <div class="lp">
+      <header class="lp-header">
+        <a class="lp-brand" href="#cube">
+          <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="5" fill="#1b1b1f"></rect><rect x="4" y="4" width="5" height="5" rx="1" fill="#ffd500"></rect><rect x="10.5" y="4" width="5" height="5" rx="1" fill="#ffffff"></rect><rect x="17" y="4" width="5" height="5" rx="1" fill="#ff5800"></rect><rect x="4" y="10.5" width="5" height="5" rx="1" fill="#009b48"></rect><rect x="10.5" y="10.5" width="5" height="5" rx="1" fill="#ffd500"></rect><rect x="17" y="10.5" width="5" height="5" rx="1" fill="#2a78d6"></rect><rect x="4" y="17" width="5" height="5" rx="1" fill="#ffffff"></rect><rect x="10.5" y="17" width="5" height="5" rx="1" fill="#b71234"></rect><rect x="17" y="17" width="5" height="5" rx="1" fill="#ffd500"></rect></svg>
+          Rubik Solver
+        </a>
+        <nav class="tabs" aria-label="Sections">
+          <a href="#cube" data-route="cube" data-i18n="nav.cube">Cube</a>
+          <a href="#timer" data-route="timer" data-i18n="nav.timer">Timer</a>
+          <a href="#learn" data-route="learn" data-i18n="nav.learn">Learn</a>
+        </nav>
+        <div class="lang-slot"></div>
+      </header>
 
-    <main>
-      <section class="card">
-        <div class="row between">
-          <div class="seg" role="tablist" aria-label="How to set up the cube" data-i18n-aria-label="cube.setupLabel">
-            <button id="tab-scan" role="tab" data-panel="panel-scan">📷 <span data-i18n="cube.tabScan">Scan</span></button>
-            <button id="tab-edit" role="tab" data-panel="panel-edit">✏️ <span data-i18n="cube.tabEdit">Edit</span></button>
-            <button id="tab-random" role="tab" data-panel="panel-random">🎲 <span data-i18n="cube.tabRandom">Random</span></button>
-          </div>
-          <span id="count" class="muted"></span>
-        </div>
+      <!-- One page, three views: #cube, #timer, #learn. Each view's code loads the first time it is opened (app.ts). -->
+      <div id="page-cube" class="page" hidden>
+        <section class="lp-intro">
+          <h1 data-i18n="cube.title">Cube Scramble Finder</h1>
+          <p class="sub" data-i18n="cube.sub">Scan your cube, paint its stickers, or pick a random one, and get a scramble that reproduces that exact cube.</p>
+        </section>
 
-        <div id="panel-scan" class="tab-panel hidden" role="tabpanel">
+      <main>
+        <section class="card">
           <div class="row between">
+            <div class="seg" role="tablist" aria-label="How to set up the cube" data-i18n-aria-label="cube.setupLabel">
+              <button id="tab-scan" role="tab" data-panel="panel-scan"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M21 16v3a2 2 0 0 1-2 2h-3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg> <span data-i18n="cube.tabScan">Scan</span></button>
+              <button id="tab-edit" role="tab" data-panel="panel-edit"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg> <span data-i18n="cube.tabEdit">Edit</span></button>
+              <button id="tab-random" role="tab" data-panel="panel-random"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="m4 4 5 5"></path></svg> <span data-i18n="cube.tabRandom">Random</span></button>
+            </div>
+            <span id="count" class="muted"></span>
+          </div>
+
+          <div id="panel-scan" class="tab-panel hidden" role="tabpanel">
+            <div class="row between">
+              <div class="row gap wrap">
+                <button id="btn-camera" class="primary" data-i18n="scan.start">Start camera</button>
+                <button id="btn-stop" class="ghost hidden" data-i18n="scan.stop">Stop camera</button>
+                <label class="ghost button-like" title="One video, or one or more photos" data-i18n-title="scan.filesTitle"><span data-i18n="scan.files">Photos / video</span><input id="file" type="file" accept="image/*,video/*" multiple hidden /></label>
+              </div>
+              <button id="btn-clear" class="ghost small" title="Forget the captured faces" data-i18n-title="scan.clearTitle" data-i18n="scan.clear">Clear faces</button>
+            </div>
+            <div id="stage" class="stage">
+              <video id="video" playsinline muted></video>
+              <img id="photo" class="hidden" alt="" />
+              <canvas id="overlay"></canvas>
+              <div id="placeholder" class="placeholder" data-i18n="scan.placeholder">Show each of the 6 faces, in any order and rotation. Each face is read the moment it sits still.</div>
+            </div>
+            <div class="row between stats">
+              <span id="scan-status" aria-live="polite" data-i18n="scan.idle">Idle</span>
+              <span id="perf" class="muted"></span>
+            </div>
+            <div class="faces-row">
+              <div class="live-tile" title="Live reading: dashed stickers are uncertain" data-i18n-title="scan.liveTitle">
+                <div id="live" class="mini"></div>
+                <span class="muted" data-i18n="scan.live">Live</span>
+              </div>
+              <div id="captured" class="captured"></div>
+            </div>
+            <p class="hint" data-i18n="scan.hint">Tap a captured face to scan it again. After 6 faces the Edit tab opens so you can check the cube. Frames never leave your browser.</p>
+          </div>
+
+          <div id="panel-edit" class="tab-panel hidden" role="tabpanel">
+            <div id="review" class="review hidden">
+              <p id="review-summary" class="hint"></p>
+              <button id="btn-alt" class="ghost small hidden" data-i18n="edit.nextPossibility">Next possibility</button>
+            </div>
+            <div class="row between">
+              <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour" data-i18n-aria-label="common.paintColour"></div>
+              <button id="btn-solved" class="ghost small" data-i18n="edit.resetSolved">Reset to solved</button>
+            </div>
+            <div id="net" class="net" aria-label="Cube net" data-i18n-aria-label="common.cubeNet"></div>
+            <p class="hint" data-i18n="edit.hint">Tap a colour, then tap stickers to paint them. Centers are fixed: white top (U), green front (F).</p>
+          </div>
+
+          <div id="panel-random" class="tab-panel hidden" role="tabpanel">
             <div class="row gap wrap">
-              <button id="btn-camera" class="primary" data-i18n="scan.start">Start camera</button>
-              <button id="btn-stop" class="ghost hidden" data-i18n="scan.stop">Stop camera</button>
-              <label class="ghost button-like" title="One video, or one or more photos" data-i18n-title="scan.filesTitle"><span data-i18n="scan.files">Photos / video</span><input id="file" type="file" accept="image/*,video/*" multiple hidden /></label>
+              <button id="btn-random" class="primary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="m4 4 5 5"></path></svg> <span data-i18n="random.new">New random cube</span></button>
+              <span class="hint" style="margin: 0" data-i18n="random.sub">A random state, scrambled for you straight away.</span>
             </div>
-            <button id="btn-clear" class="ghost small" title="Forget the captured faces" data-i18n-title="scan.clearTitle" data-i18n="scan.clear">Clear faces</button>
+            <div id="preview" class="net preview-net" aria-label="Cube preview" data-i18n-aria-label="random.preview"></div>
+            <p class="hint" data-i18n="random.hint">Switch to Edit to change any sticker.</p>
           </div>
-          <div id="stage" class="stage">
-            <video id="video" playsinline muted></video>
-            <img id="photo" class="hidden" alt="" />
-            <canvas id="overlay"></canvas>
-            <div id="placeholder" class="placeholder" data-i18n="scan.placeholder">Show each of the 6 faces, in any order and rotation. Each face is read the moment it sits still.</div>
-          </div>
-          <div class="row between stats">
-            <span id="scan-status" aria-live="polite" data-i18n="scan.idle">Idle</span>
-            <span id="perf" class="muted"></span>
-          </div>
-          <div class="faces-row">
-            <div class="live-tile" title="Live reading: dashed stickers are uncertain" data-i18n-title="scan.liveTitle">
-              <div id="live" class="mini"></div>
-              <span class="muted" data-i18n="scan.live">Live</span>
-            </div>
-            <div id="captured" class="captured"></div>
-          </div>
-          <p class="hint" data-i18n="scan.hint">Tap a captured face to scan it again. After 6 faces the Edit tab opens so you can check the cube. Frames never leave your browser.</p>
-        </div>
 
-        <div id="panel-edit" class="tab-panel hidden" role="tabpanel">
-          <div id="review" class="review hidden">
-            <p id="review-summary" class="hint"></p>
-            <button id="btn-alt" class="ghost small hidden" data-i18n="edit.nextPossibility">Next possibility</button>
-          </div>
+          <div id="status" class="status" aria-live="polite"></div>
+        </section>
+
+        <section class="card">
           <div class="row between">
-            <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour" data-i18n-aria-label="common.paintColour"></div>
-            <button id="btn-solved" class="ghost small" data-i18n="edit.resetSolved">Reset to solved</button>
+            <h2 data-i18n="common.scramble">Scramble</h2>
+            <button id="btn-generate" class="primary" disabled data-i18n="common.loadingSolver">Loading solver…</button>
           </div>
-          <div id="net" class="net" aria-label="Cube net" data-i18n-aria-label="common.cubeNet"></div>
-          <p class="hint" data-i18n="edit.hint">Tap a colour, then tap stickers to paint them. Centers are fixed: white top (U), green front (F).</p>
-        </div>
-
-        <div id="panel-random" class="tab-panel hidden" role="tabpanel">
-          <div class="row gap wrap">
-            <button id="btn-random" class="primary">🎲 <span data-i18n="random.new">New random cube</span></button>
-            <span class="hint" style="margin: 0" data-i18n="random.sub">A random state, scrambled for you straight away.</span>
+          <div class="scramble-box">
+            <code id="scramble">—</code>
+            <button id="btn-copy" class="ghost small" disabled data-i18n="common.copy">Copy</button>
           </div>
-          <div id="preview" class="net preview-net" aria-label="Cube preview" data-i18n-aria-label="random.preview"></div>
-          <p class="hint" data-i18n="random.hint">Switch to Edit to change any sticker.</p>
-        </div>
+          <div class="row gap wrap" style="margin-top: 12px">
+            <a id="btn-time" class="primary button-like hidden" href="#timer" data-i18n="cube.timeIt">Time this solve →</a>
+            <a id="btn-learn" class="button-like hidden" href="#learn" data-i18n="cube.howTo">How to solve it</a>
+          </div>
+          <p id="meta" class="hint"></p>
+          <twisty-player
+            id="player"
+            puzzle="3x3x3"
+            alg=""
+            background="none"
+            control-panel="bottom-row"
+            hint-facelets="floating"
+          ></twisty-player>
+        </section>
+      </main>
 
-        <div id="status" class="status" aria-live="polite"></div>
-      </section>
+      <footer class="lp-footer">
+        <span data-i18n="cube.footerSolver">Solver: Kociemba two-phase</span> (<a href="https://github.com/ldez/cubejs">cubejs</a>) ·
+        <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
+      </footer>
+      </div>
 
-      <section class="card">
-        <div class="row between">
-          <h2 data-i18n="common.scramble">Scramble</h2>
-          <button id="btn-generate" class="primary" disabled data-i18n="common.loadingSolver">Loading solver…</button>
-        </div>
-        <div class="scramble-box">
-          <code id="scramble">—</code>
-          <button id="btn-copy" class="ghost small" disabled data-i18n="common.copy">Copy</button>
-        </div>
-        <div class="row gap wrap" style="margin-top: 12px">
-          <a id="btn-time" class="primary button-like hidden" href="./timer.html" data-i18n="cube.timeIt">Time this solve →</a>
-          <a id="btn-learn" class="button-like hidden" href="./learn.html" data-i18n="cube.howTo">How to solve it</a>
-        </div>
-        <p id="meta" class="hint"></p>
-        <twisty-player
-          id="player"
-          puzzle="3x3x3"
-          alg=""
-          background="none"
-          control-panel="bottom-row"
-          hint-facelets="floating"
-        ></twisty-player>
-      </section>
-    </main>
+      <div id="page-timer" class="page" hidden>
+        <main class="timer-main">
+          <section class="card span-all scramble-card dimmable">
+            <div class="row between">
+              <div class="row gap wrap">
+                <h2 data-i18n="common.scramble">Scramble</h2>
+                <span id="timer-source" class="tag hidden"></span>
+              </div>
+              <div class="row gap">
+                <a id="timer-btn-learn" class="button-like small" href="#learn" data-i18n="timer.howTo">How to solve</a>
+                <button id="timer-btn-copy-scramble" class="ghost small" data-i18n="common.copy">Copy</button>
+                <button id="timer-btn-new" class="ghost small" disabled data-i18n="timer.new">New scramble</button>
+              </div>
+            </div>
+            <div class="scramble-row">
+              <code id="timer-scramble" class="scramble-text" data-i18n="common.loadingSolver">Loading solver…</code>
+              <div id="timer-preview" class="preview" aria-label="Scrambled cube preview" data-i18n-aria-label="random.preview"></div>
+            </div>
+          </section>
 
-    <footer>
-      <span data-i18n="cube.footerSolver">Solver: Kociemba two-phase</span> (<a href="https://github.com/ldez/cubejs">cubejs</a>) ·
-      <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
-    </footer>
-    <script type="module" src="./main.ts"></script>
+          <section class="card span-all pad-card">
+            <div id="timer-pad" class="pad" tabindex="0" role="button" aria-label="Timer: hold and release to start, tap to stop" data-i18n-aria-label="timer.padLabel">
+              <div id="timer-clock" class="clock">0.00</div>
+              <div id="timer-hint" class="pad-hint" data-i18n="timer.hintInspect">Hold space or touch here and release to start inspection</div>
+            </div>
+            <div id="timer-last" class="last dimmable hidden">
+              <span id="timer-last-time" class="last-time"></span>
+              <div class="row gap wrap">
+                <button class="ghost small" data-pen="none" data-i18n="timer.ok">OK</button>
+                <button class="ghost small" data-pen="+2">+2</button>
+                <button class="ghost small" data-pen="DNF">DNF</button>
+                <input id="timer-last-note" class="note" placeholder="Note" data-i18n-placeholder="timer.note" maxlength="200" />
+                <button id="timer-btn-delete-last" class="ghost small danger" data-i18n="common.delete">Delete</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="card dimmable">
+            <h2 data-i18n="timer.stats">Statistics</h2>
+            <div id="timer-stats" class="stats-grid"></div>
+          </section>
+
+          <section class="card dimmable">
+            <div class="row between">
+              <h2 data-i18n="timer.history">History</h2>
+              <div class="legend" id="timer-legend"></div>
+            </div>
+            <div id="timer-chart" class="chart"></div>
+          </section>
+
+          <section class="card span-all dimmable">
+            <div class="row between">
+              <h2><span data-i18n="timer.solves">Solves</span> <span id="timer-count" class="muted"></span></h2>
+              <div class="row gap wrap">
+                <label class="check"><input id="timer-opt-inspection" type="checkbox" checked /> <span data-i18n="timer.inspection">15 s inspection</span></label>
+                <button id="timer-btn-export" class="ghost small" data-i18n="timer.export">Export (csTimer)</button>
+                <label class="ghost small button-like"><span data-i18n="timer.import">Import</span><input id="timer-file-import" type="file" accept=".txt,.json,application/json" hidden /></label>
+                <button id="timer-btn-clear-all" class="ghost small danger" data-i18n="timer.clearAll">Clear all</button>
+              </div>
+            </div>
+            <p id="timer-io-status" class="hint" aria-live="polite"></p>
+            <div class="table-wrap">
+              <table class="solves">
+                <thead>
+                  <tr><th>#</th><th data-i18n="timer.colTime">Time</th><th>ao5</th><th>ao12</th><th class="hide-sm" data-i18n="common.scramble">Scramble</th><th class="hide-sm" data-i18n="timer.colDate">Date</th><th></th></tr>
+                </thead>
+                <tbody id="timer-solves"></tbody>
+              </table>
+            </div>
+            <button id="timer-btn-more" class="ghost small hidden" style="margin-top: 10px" data-i18n="timer.showAll">Show all</button>
+            <p id="timer-storage-note" class="hint"></p>
+          </section>
+        </main>
+        <div id="timer-tooltip" class="tooltip hidden" role="tooltip"></div>
+      </div>
+
+      <div id="page-learn" class="page" hidden>
+        <section class="card lp-setup" aria-label="Your cube and solver settings" data-i18n-aria-label="learn.setupLabel">
+          <div class="lp-setup-bar">
+            <div id="learn-mini-net" class="net mini-net" aria-hidden="true"></div>
+            <form id="learn-scramble-form" class="lp-scramble">
+              <label class="lp-field">
+                <span data-i18n="common.scramble">Scramble</span>
+                <input id="learn-scramble-in" type="text" placeholder="Or type a scramble, e.g. R U R' F2 D…" data-i18n-placeholder="learn.scramblePlaceholder" autocomplete="off" spellcheck="false" />
+              </label>
+              <button class="lp-btn" type="submit" data-i18n="learn.apply">Apply</button>
+            </form>
+            <div class="lp-actions">
+              <button id="learn-btn-random" class="lp-btn" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="m4 4 5 5"></path></svg>
+                <span data-i18n="learn.random">Random cube</span>
+              </button>
+              <a class="lp-btn" href="#scan">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M21 16v3a2 2 0 0 1-2 2h-3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg>
+                <span data-i18n="learn.scan">Scan</span>
+              </a>
+              <button id="learn-btn-cube" class="lp-btn lp-btn-accent" type="button" aria-expanded="false" aria-controls="learn-cube-panel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
+                <span data-i18n="learn.editCube">Edit cube</span>
+              </button>
+            </div>
+            <div class="lp-chips-row">
+              <div id="learn-chips" class="lp-chips"></div>
+              <button id="learn-btn-settings" class="lp-btn lp-btn-accent" type="button" aria-expanded="false" aria-controls="learn-settings-panel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10"></path><path d="M18 6h2"></path><circle cx="16" cy="6" r="2"></circle><path d="M4 12h2"></path><path d="M10 12h10"></path><circle cx="8" cy="12" r="2"></circle><path d="M4 18h10"></path><path d="M18 18h2"></path><circle cx="16" cy="18" r="2"></circle></svg>
+                <span data-i18n="learn.editSettings">Edit solver settings</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="learn-setup-panel" class="lp-setup-panel" hidden>
+            <div id="learn-cube-panel" class="lp-paint" hidden>
+              <div class="row between">
+                <h2 data-i18n="learn.paint">Paint your cube</h2>
+                <button id="learn-btn-solved" class="lp-btn" type="button" data-i18n="learn.solved">Solved</button>
+              </div>
+              <div id="learn-palette" class="palette" role="radiogroup" aria-label="Paint colour" data-i18n-aria-label="common.paintColour"></div>
+              <div id="learn-net" class="net" aria-label="Cube net" data-i18n-aria-label="common.cubeNet"></div>
+              <p class="hint" data-i18n="learn.cubeHint">Paint stickers to match your cube (white top, green front), scan it on the Cube tab, or apply a scramble.</p>
+              <div id="learn-status" class="status" aria-live="polite"></div>
+            </div>
+            <div id="learn-settings-panel" class="lp-settings" hidden>
+              <h2 data-i18n="learn.settings">Solver settings</h2>
+              <label class="setting lp-method">
+                <span data-i18n="learn.method">Method</span>
+                <select id="learn-method"></select>
+              </label>
+              <div id="learn-settings"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lp-overview" aria-label="Solve overview" data-i18n-aria-label="learn.overviewLabel">
+          <div class="lp-overview-head">
+            <h1 id="learn-summary" data-i18n="common.loadingSolver">Loading solver…</h1>
+            <p id="learn-note" class="muted"></p>
+          </div>
+          <div id="learn-segs" class="lp-segs"></div>
+          <div id="learn-groups" class="lp-groups" aria-hidden="true"></div>
+        </section>
+
+        <main class="lp-main">
+          <section class="card lp-now" aria-label="Current step" data-i18n-aria-label="learn.currentLabel">
+            <div class="lp-now-head">
+              <span id="learn-now-tag" class="stage-tag"></span>
+              <h2 id="learn-now-title"></h2>
+              <span id="learn-now-pos" class="muted lp-now-pos"></span>
+              <div class="lp-mode" role="group" aria-label="View" data-i18n-aria-label="learn.viewLabel">
+                <button id="learn-mode-whole" type="button" aria-pressed="true" data-i18n="learn.whole">Whole solve</button>
+                <button id="learn-mode-step" type="button" aria-pressed="false" data-i18n="learn.oneStep">Step by step</button>
+              </div>
+            </div>
+            <div class="lp-now-body">
+              <div class="lp-viewer">
+                <twisty-player
+                  id="learn-player"
+                  puzzle="3x3x3"
+                  alg=""
+                  background="none"
+                  control-panel="none"
+                  hint-facelets="floating"
+                ></twisty-player>
+              </div>
+              <div class="lp-now-info">
+                <div id="learn-now-case-box" class="lp-info" hidden>
+                  <span class="lp-label" data-i18n="learn.case">Case</span>
+                  <span id="learn-now-case" class="lp-case"></span>
+                </div>
+                <div id="learn-now-hint-box" class="lp-info" hidden>
+                  <span class="lp-label" data-i18n="learn.lookFor">What to look for</span>
+                  <p id="learn-now-hint"></p>
+                </div>
+                <div class="lp-info">
+                  <span class="lp-label" data-i18n="learn.algTap">Algorithm, tap a move to jump to it</span>
+                  <div id="learn-toks" class="lp-toks"></div>
+                  <p id="learn-no-toks" class="lp-strong" data-i18n="learn.nothing" hidden>Nothing to do here: skip to the next step.</p>
+                </div>
+              </div>
+            </div>
+            <div class="lp-controls">
+              <button id="learn-btn-prev-step" class="lp-btn" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"></path><path d="m18 17-5-5 5-5"></path></svg>
+                <span class="lp-hide-sm" data-i18n="learn.prevStep">Prev step</span>
+              </button>
+              <button id="learn-btn-prev-move" class="lp-btn lp-icon" type="button" aria-label="Previous move" data-i18n-aria-label="learn.prevMove">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <button id="learn-btn-play" class="lp-btn lp-btn-primary lp-play" type="button">
+                <svg class="ic-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"></path></svg>
+                <svg class="ic-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4.5" height="16" rx="1"></rect><rect x="13.5" y="4" width="4.5" height="16" rx="1"></rect></svg>
+                <span id="learn-play-label" data-i18n="learn.play">Play</span>
+              </button>
+              <button id="learn-btn-next-move" class="lp-btn lp-icon" type="button" aria-label="Next move" data-i18n-aria-label="learn.nextMove">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+              </button>
+              <button id="learn-btn-next-step" class="lp-btn" type="button">
+                <span class="lp-hide-sm" data-i18n="learn.nextStep">Next step</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 17 5-5-5-5"></path><path d="m13 17 5-5-5-5"></path></svg>
+              </button>
+              <div id="learn-lp-switches" class="lp-switches" hidden>
+                <button id="learn-opt-loop" class="lp-switch" type="button" aria-pressed="false">
+                  <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
+                  <span data-i18n="learn.repeat">Repeat this step</span>
+                </button>
+                <button id="learn-opt-highlight" class="lp-switch" type="button" aria-pressed="true">
+                  <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
+                  <span data-i18n="learn.highlightStep">Highlight this step's pieces</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="lp-steps" aria-label="All steps" data-i18n-aria-label="learn.allSteps">
+            <div class="lp-steps-head">
+              <h2 data-i18n="learn.steps">Steps</h2>
+              <span id="learn-step-count" class="muted"></span>
+              <button id="learn-btn-copy" class="lp-btn" type="button" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>
+                <span id="learn-copy-label" data-i18n="learn.copySolution">Copy solution</span>
+              </button>
+            </div>
+            <ol id="learn-steps" class="lp-step-list"></ol>
+          </section>
+        </main>
+
+        <footer class="lp-footer">
+          <span data-i18n="learn.footer">Cross: optimal search · F2L: shortest trigger sequences for every case · OLL / PLL: standard algorithms ·</span>
+          <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
+        </footer>
+      </div>
+    </div>
+    <script type="module" src="./app.ts"></script>
   </body>
 </html>
