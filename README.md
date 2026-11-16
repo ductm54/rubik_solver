@@ -89,17 +89,15 @@ npm run build    # static site in dist/
 | `demo/timer.ts`, `demo/chart.ts` | Timer view: scramble + preview, timing pad, stats, history chart, solve table (`timer.html` redirects to `#timer`) |
 | `demo/scan.ts` | Scan panel of the Cube view (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
 | `demo/main.ts` | Cube view: scan, edit (2D net, Solved / Random) or review a scanned cube, then Generate, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
-| `tests/` | Cube, solver and timer tests; `scan-real.test.ts` runs the scanner on the real photos in `tests/fixtures` |
+| `tests/` | Core logic only: the cube model, validation and scrambles, face assembly, the CFOP and beginner solvers, and the timer |
 
 ## Notes
 
 - **No OpenCV.js.** The plan named it for finding the sticker grid; the vision code here is plain
-  TypeScript instead of a ~10 MB download, and it runs unchanged in Node, so it is tested there.
-- **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
-  overexposed stickered cube, cube-free views, and a phone video of the
-  cube being turned by hand (three of them, in different light, replayed frame by frame the
-  way the page does it). Each photo is shrunk to video sizes and the whole cube must come out
-  right. The earlier synthetic-image tests passed while real cubes failed, so they are gone.
+  TypeScript instead of a ~10 MB download.
+- **The scanner and the translations have no automated tests.** The scanner used to be run on
+  real photos and phone videos; those tests and their images were removed to keep the suite
+  small (they are in the git history). Check a change to `src/vision` by hand with a real cube.
 
 - **Free-hand detection without gaps.** The first detector looked for sticker-sized square regions
   between edges. On a stickerless cube same-coloured neighbours merge into one region and border
@@ -171,6 +169,5 @@ npm run build    # static site in dist/
   for the 41 cases, front-right and front-left (`src/solve/cfop/algs/f2l.ts`). The case each algorithm
   solves is worked out by undoing it on a solved cube, so the table needs no hand-made case setups, and
   the tests check that every pair placement is covered and the cross and other slots are kept.
-- **Deploys:** `.github/workflows/deploy.yml` runs tests and builds on every push and pull
-  request, and publishes `dist/` to GitHub Pages on pushes to the default branch. In the repo's **Settings → Pages**, set
-  **Source** to **GitHub Actions** once.
+- **Deploys:** Cloudflare builds and publishes the site (`npm run build`, output in `dist/`).
+  Nothing runs the tests automatically: run `npm test` before pushing.
