@@ -168,7 +168,7 @@ worker.onmessage = (e) => {
   btnTime.href = `./timer.html#${new URLSearchParams({ scramble: d.scramble, source })}`;
   btnTime.classList.toggle('hidden', !d.scramble);
   const btnLearn = $<HTMLAnchorElement>('btn-learn');
-  btnLearn.href = `./learn.html#cube=${encodeCube(state())}`;
+  btnLearn.href = `./learn.html#scramble=${encodeURIComponent(d.scramble)}`;
   btnLearn.classList.toggle('hidden', !d.scramble);
 };
 

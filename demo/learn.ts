@@ -47,6 +47,9 @@ let planScramble = '';
 /** The step shown (index into plan.steps) and how many of its moves are done. */
 let sel = 0;
 let mv = 0;
+/** Whole solve: the viewer holds every step in one go, and `sel` / `mv` follow it as it plays. */
+let whole = false;
+let offsets: number[] = []; // where each step starts in the whole solve, in moves
 let playing = false;
 let loop = false;
 let loadSeq = 0;
@@ -56,14 +59,17 @@ let ready = false;
 let requestId = 0;
 
 // ---------------------------------------------------------------- setup panel
-const setupPanel = $('setup-panel');
-const btnSetup = $<HTMLButtonElement>('btn-setup');
-function setSetupOpen(open: boolean) {
-  setupPanel.hidden = !open;
-  btnSetup.setAttribute('aria-expanded', String(open));
-  $('setup-label').textContent = t(open ? 'learn.closeSetup' : 'learn.editSetup');
+// Two panels, opened separately: the cube painter and the solver settings.
+const cubePanel = $('cube-panel');
+const settingsPanel = $('settings-panel');
+function setPanel(panel: HTMLElement, btn: HTMLElement, open: boolean) {
+  panel.hidden = !open;
+  btn.setAttribute('aria-expanded', String(open));
+  $('setup-panel').hidden = cubePanel.hidden && settingsPanel.hidden;
 }
-btnSetup.onclick = () => setSetupOpen(setupPanel.hidden);
+const setCubeOpen = (open: boolean) => setPanel(cubePanel, $('btn-cube'), open);
+$('btn-cube').onclick = () => setCubeOpen(cubePanel.hidden);
+$('btn-settings').onclick = () => setPanel(settingsPanel, $('btn-settings'), settingsPanel.hidden);
 
 const net = createNet($('net'), $('palette'), () => {
   scramble = undefined;
@@ -123,7 +129,7 @@ $('scramble-form').onsubmit = (e) => {
     setScramble(scrambleIn.value.trim());
     onCubeChange();
   } catch (err) {
-    setSetupOpen(true);
+    setCubeOpen(true);
     status.className = 'status bad';
     status.textContent = (err as Error).message;
   }
@@ -163,6 +169,7 @@ worker.onmessage = (e) => {
   if (d.type === 'plan') {
     plan = d.plan as SolvePlan;
     planScramble = d.scramble as string;
+    if (!scramble) scrambleIn.value = planScramble; // painted or scanned cube: show a scramble that makes it
     renderPlan();
   }
 };
@@ -171,7 +178,7 @@ function solve() {
   if (!checkCube()) {
     plan = null;
     summary.textContent = t('learn.fixCube');
-    setSetupOpen(true);
+    setCubeOpen(true);
     renderPlan();
     return;
   }
@@ -196,6 +203,12 @@ function renderPlan() {
   btnCopy.disabled = !plan;
   note.textContent = '';
   $('step-count').textContent = '';
+  offsets = [];
+  let total = 0;
+  for (const s of plan?.steps ?? []) {
+    offsets.push(total);
+    total += tokens(s.alg).length;
+  }
   if (!plan) {
     sel = 0;
     void load(0, 0);
@@ -251,7 +264,18 @@ const FULL_MASK = 'EDGES:------------,CORNERS:--------,CENTERS:------';
 
 function applyMask() {
   const mask = plan?.steps[sel]?.mask;
-  player.experimentalStickeringMaskOrbits = highlight && mask ? mask : FULL_MASK;
+  player.experimentalStickeringMaskOrbits = !whole && highlight && mask ? mask : FULL_MASK;
+}
+
+/** Step (one with moves) that whole-solve position `g` falls in: the last one once past the end. */
+function stepAt(g: number): number {
+  let last = -1;
+  for (let i = 0; i < (plan?.steps.length ?? 0); i++) {
+    if (!len(i)) continue;
+    if (g < offsets[i] + len(i)) return i;
+    last = i;
+  }
+  return last;
 }
 
 /** Show step `i` with `m` of its moves done. */
@@ -264,6 +288,9 @@ async function load(i: number, m: number) {
   if (!plan) {
     player.experimentalSetupAlg = '';
     player.alg = '';
+  } else if (whole) {
+    player.experimentalSetupAlg = planScramble;
+    player.alg = steps.map((s) => s.alg).filter(Boolean).join(' ');
   } else {
     player.experimentalSetupAlg = [planScramble, ...steps.slice(0, i).map((s) => s.alg)].filter(Boolean).join(' ');
     player.alg = steps[i].alg;
@@ -273,11 +300,12 @@ async function load(i: number, m: number) {
   const indexer = await player.experimentalModel.indexer.get();
   if (seq !== loadSeq) return;
   const n = indexer.numAnimatedLeaves();
-  const atEnd = m >= n;
-  expect = atEnd ? n : m;
+  mv = Math.min(m, len(i));
+  const at = whole && plan ? offsets[i] + mv : mv; // position in what the viewer holds
+  const atEnd = at >= n;
+  expect = atEnd ? n : at;
   setTimeout(() => seq === loadSeq && (expect = null), 1000);
-  player.timestamp = atEnd ? 'end' : indexer.indexToMoveStartTimestamp(m);
-  mv = Math.min(m, n);
+  player.timestamp = atEnd ? 'end' : indexer.indexToMoveStartTimestamp(at);
   render();
 }
 
@@ -295,13 +323,23 @@ player.experimentalModel.currentMoveInfo.addFreshListener(({ patternIndex, moves
     if (done !== expect) return;
     expect = null;
   }
-  mv = Math.min(done, len(sel));
+  if (whole) {
+    const i = stepAt(done);
+    if (i < 0) return;
+    sel = i;
+    mv = Math.min(Math.max(done - offsets[i], 0), len(i));
+  } else mv = Math.min(done, len(sel));
   render();
 });
 
 // When a step finishes while playing: repeat it, or carry on with the next step that has moves.
 player.experimentalModel.coarseTimelineInfo.addFreshListener((info) => {
-  if (!playing || info.playing || expect !== null || mv < len(sel)) return;
+  if (!playing || info.playing || expect !== null) return;
+  if (whole) {
+    if (info.atEnd) setPlaying(false);
+    return;
+  }
+  if (mv < len(sel)) return;
   const seq = loadSeq;
   setTimeout(() => {
     if (!playing || seq !== loadSeq) return;
@@ -331,6 +369,11 @@ btnPlay.onclick = async () => {
   if (!plan) return;
   if (playing) return stop();
   setPlaying(true);
+  if (whole) {
+    if (mv >= len(sel) && nextWithMoves(sel) < 0) await load(0, 0); // at the end: start over
+    if (playing) player.play();
+    return;
+  }
   if (mv >= len(sel)) {
     const next = loop && len(sel) ? sel : nextWithMoves(sel);
     if (next < 0) return setPlaying(false);
@@ -358,6 +401,19 @@ $('btn-prev-step').onclick = () => {
   if (mv > 0) pick(sel, 0);
   else if (sel > 0) pick(sel - 1, 0);
 };
+
+// ---------------------------------------------------------------- step by step / whole solve
+function setWhole(on: boolean) {
+  if (whole === on) return;
+  stop();
+  whole = on;
+  $('mode-step').setAttribute('aria-pressed', String(!on));
+  $('mode-whole').setAttribute('aria-pressed', String(on));
+  $('lp-switches').hidden = on; // repeat and highlight are per step
+  void load(sel, mv);
+}
+$('mode-step').onclick = () => setWhole(false);
+$('mode-whole').onclick = () => setWhole(true);
 
 // ---------------------------------------------------------------- toggles
 const HIGHLIGHT_KEY = 'learn.highlight';
@@ -396,7 +452,8 @@ function render() {
     $<HTMLButtonElement>('btn-prev-move').disabled = sel === 0 && mv === 0;
     $<HTMLButtonElement>('btn-next-step').disabled = sel >= last;
     $<HTMLButtonElement>('btn-next-move').disabled = sel >= last && mv >= n;
-    btnPlay.disabled = !playing && mv >= n && !(loop && n) && nextWithMoves(sel) < 0;
+    btnPlay.disabled = !whole && !playing && mv >= n && !(loop && n) && nextWithMoves(sel) < 0;
+    if (!plan.moves) btnPlay.disabled = true;
   }
 
   [...segsEl.children].forEach((c, k) => {
@@ -416,7 +473,7 @@ function render() {
   tag.className = s ? `stage-tag stage-${s.stage}` : 'stage-tag hidden';
   tag.textContent = s ? stageLabel(s.stage) : '';
   $('now-title').textContent = s ? s.title : plan ? t('common.cubeSolved') : '';
-  $('now-pos').textContent = s ? t('learn.stepPos', { step: sel + 1, steps: plan!.steps.length, move: mv, moves: n }) : '';
+  $('now-pos').textContent = s ? (whole ? t('learn.wholePrefix') : '') + t('learn.stepPos', { step: sel + 1, steps: plan!.steps.length, move: mv, moves: n }) : '';
   $('now-case-box').hidden = !s?.caseName;
   $('now-case').textContent = s?.caseName ?? '';
   $('now-hint-box').hidden = !s?.hint;
@@ -465,5 +522,5 @@ else if (scrFromHash) {
   }
 } else setScramble(formatAlg(randomMoves(20)));
 renderNetView($('mini-net'), net.get());
-if (!checkCube()) setSetupOpen(true);
+if (!checkCube()) setCubeOpen(true);
 render();
