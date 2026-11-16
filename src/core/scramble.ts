@@ -6,15 +6,19 @@ import Cube from 'cubejs';
 import {
   type Color,
   type CubeState,
+  FACES,
   type FaceName,
+  type Move,
   STANDARD_SCHEME,
   applyMoves,
   formatAlg,
   fromFacelets,
   invertAlg,
+  movePerm,
   parseAlg,
   solvedState,
   statesEqual,
+  toColorArray,
   toFacelets,
 } from './cube';
 import { validate } from './validate';
@@ -26,6 +30,35 @@ export function initSolver(): void {
   if (initialised) return;
   Cube.initSolver();
   initialised = true;
+}
+
+/** The 18 face turns with their permutations (next[p[i]] = prev[i]). */
+const TURNS = FACES.flatMap((base) => ([1, 2, 3] as const).map((amount) => ({ move: { base, amount } as Move, perm: movePerm({ base, amount }) })));
+const SHORT_DEPTH = 4;
+
+/**
+ * Shortest solution of up to SHORT_DEPTH moves, or null. The two-phase solver returns the first
+ * solution it meets and never tries "no phase 1 moves", so a cube a turn or two from solved would
+ * otherwise get a scramble of a dozen moves.
+ */
+function shortSolution(start: readonly Color[], goal: readonly Color[]): Move[] | null {
+  const path: Move[] = [];
+  const search = (cur: readonly Color[], depth: number, lastFace: number): boolean => {
+    if (depth === 0) return cur.every((c, i) => c === goal[i]);
+    for (let k = 0; k < TURNS.length; k++) {
+      const face = (k / 3) | 0;
+      if (face === lastFace) continue;
+      const { move, perm } = TURNS[k];
+      const next = new Array<Color>(54);
+      for (let i = 0; i < 54; i++) next[perm[i]] = cur[i];
+      path.push(move);
+      if (search(next, depth - 1, face)) return true;
+      path.pop();
+    }
+    return false;
+  };
+  for (let depth = 1; depth <= SHORT_DEPTH; depth++) if (search(start, depth, -1)) return [...path];
+  return null;
 }
 
 export interface ScrambleResult {
@@ -50,8 +83,13 @@ export function generateScramble(state: CubeState): ScrambleResult {
 
   if (statesEqual(state, solved)) return { scramble: '', solution: '', moveCount: 0 };
 
-  initSolver();
-  const solution = Cube.fromString(facelets).solve().trim();
+  const short = shortSolution(toColorArray(state), toColorArray(solved));
+  let solution: string;
+  if (short) solution = formatAlg(short);
+  else {
+    initSolver();
+    solution = Cube.fromString(facelets).solve().trim();
+  }
   const scrambleMoves = invertAlg(parseAlg(solution));
   const scramble = formatAlg(scrambleMoves);
 

@@ -44,6 +44,7 @@ const fr: Translation = {
   'tour.s10.tip': 'Les résolutions sont enregistrées dans ce navigateur seulement. {export} les sauvegarde ou les transfère.',
   'common.copy': 'Copier',
   'common.copied': 'Copié',
+  'common.solverFailed': 'Le solveur n’a pas pu être chargé. Rechargez la page pour réessayer.',
   'common.delete': 'Supprimer',
   'common.scramble': 'Mélange',
   'common.validCube': 'Cube valide ✓',

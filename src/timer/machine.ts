@@ -101,7 +101,7 @@ export class TimerMachine {
     }
   }
 
-  /** Call every frame: promotes holding → ready, and reports inspection overrun. */
+  /** Call every frame: promotes holding → ready. */
   tick(t: number): void {
     if (this.state === 'holding' && t - this.holdStart >= this.opts.holdMs) this.state = 'ready';
   }

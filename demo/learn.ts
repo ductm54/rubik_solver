@@ -178,6 +178,10 @@ worker.onmessage = (e) => {
   }
 };
 
+worker.onerror = () => {
+  if (!ready) summary.textContent = t('common.solverFailed');
+};
+
 function solve() {
   if (!checkCube()) {
     plan = null;
@@ -533,7 +537,11 @@ function keepVisible(i: number) {
 btnCopy.onclick = async () => {
   if (!plan) return;
   const text = plan.steps.filter((s) => s.alg).map((s) => `${s.alg} // ${s.title}${s.caseName ? ` (${s.caseName})` : ''}`).join('\n');
-  await navigator.clipboard.writeText(`${t('common.scramble')}: ${planScramble}\n${text}`);
+  try {
+    await navigator.clipboard.writeText(`${t('common.scramble')}: ${planScramble}\n${text}`);
+  } catch {
+    return; // no clipboard access (insecure page, or permission denied)
+  }
   $('copy-label').textContent = t('common.copied');
   setTimeout(() => ($('copy-label').textContent = t('learn.copySolution')), 1200);
 };

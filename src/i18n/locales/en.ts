@@ -11,6 +11,7 @@ const en = {
   'nav.learn': 'Learn',
   'common.copy': 'Copy',
   'common.copied': 'Copied',
+  'common.solverFailed': 'The solver could not be loaded. Reload the page to try again.',
   'common.delete': 'Delete',
   'common.scramble': 'Scramble',
   'common.validCube': 'Valid cube ✓',

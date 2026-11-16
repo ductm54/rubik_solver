@@ -84,6 +84,9 @@ export interface Stats {
 
 export const AVERAGES = [5, 12, 100] as const;
 
+const least = (v: number[]) => v.reduce((a, b) => Math.min(a, b), Infinity);
+const most = (v: number[]) => v.reduce((a, b) => Math.max(a, b), -Infinity);
+
 /** Stats for solves in chronological order. */
 export function computeStats(solves: Solve[]): Stats {
   const t = solves.map(effective);
@@ -94,13 +97,13 @@ export function computeStats(solves: Solve[]): Stats {
     const roll = rollingAverage(solves, n);
     current[n] = roll.length ? roll[roll.length - 1] : null;
     const vals = roll.filter((x): x is number => x !== null);
-    bestAvg[n] = vals.length ? Math.min(...vals) : null;
+    bestAvg[n] = vals.length ? least(vals) : null;
   }
   return {
     count: solves.length,
     completed: finite.length,
-    best: finite.length ? Math.min(...finite) : null,
-    worst: finite.length ? Math.max(...finite) : null,
+    best: finite.length ? least(finite) : null,
+    worst: finite.length ? most(finite) : null,
     mean: finite.length ? finite.reduce((a, b) => a + b, 0) / finite.length : null,
     current,
     bestAvg,

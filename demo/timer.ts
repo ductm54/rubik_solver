@@ -1,7 +1,7 @@
 import { lang } from './i18n';
-import { FACES, applyMoves, solvedState, type CubeState } from '../src/core/cube';
+import { FACES, applyMoves, formatAlg, parseAlg, solvedState, type CubeState } from '../src/core/cube';
 import { t } from '../src/i18n';
-import { fromCsTimer, toCsTimer } from '../src/timer/cstimer';
+import { fromCsTimer, solveKey, toCsTimer } from '../src/timer/cstimer';
 import { TimerMachine, INSPECTION_MS, DNF_AFTER_MS } from '../src/timer/machine';
 import { AVERAGES, type Penalty, type Solve, computeStats, formatSolve, formatTime, rollingAverage } from '../src/timer/stats';
 import { type SolveStore, openStore } from '../src/timer/store';
@@ -71,6 +71,9 @@ worker.onmessage = (e) => {
   } else {
     nextScramble = d.scramble;
   }
+};
+worker.onerror = () => {
+  if (!solverReady && !scramble) scrambleEl.textContent = t('common.solverFailed');
 };
 let pendingShow = -1;
 function requestRandom(show: boolean) {
@@ -383,8 +386,8 @@ $<HTMLInputElement>('file-import').onchange = async (e) => {
   if (!file) return;
   try {
     const imported = fromCsTimer(await file.text());
-    const have = new Set(solves.map((s) => `${s.date}|${s.time}`));
-    const fresh = imported.filter((s) => !have.has(`${s.date}|${s.time}`));
+    const have = new Set(solves.map(solveKey));
+    const fresh = imported.filter((s) => !have.has(solveKey(s)));
     await store.putMany(fresh);
     solves = (await store.list()).slice();
     renderAll();
@@ -422,8 +425,15 @@ function takeHanded() {
   const params = new URLSearchParams(location.hash.slice(1));
   const handed = params.get('scramble');
   if (handed === null) return;
-  setScramble(handed, params.get('source') === 'scan' ? 'scan' : 'manual');
   history.replaceState(null, '', '#timer'); // taken: coming back later keeps whatever is shown then
+  let alg: string;
+  try {
+    alg = formatAlg(parseAlg(handed));
+  } catch {
+    return; // not a scramble (a mistyped or cut-off link): keep the one shown
+  }
+  pendingShow = -1; // a random scramble still on its way is kept for later, not shown over this one
+  setScramble(alg, params.get('source') === 'scan' ? 'scan' : 'manual');
 }
 
 /** The Timer tab was opened again. */

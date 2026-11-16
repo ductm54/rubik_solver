@@ -44,6 +44,7 @@ const ru: Translation = {
   'tour.s10.tip': 'Сборки хранятся только в этом браузере. {export} сохраняет копию или переносит их.',
   'common.copy': 'Копировать',
   'common.copied': 'Скопировано',
+  'common.solverFailed': 'Не удалось загрузить решатель. Перезагрузите страницу, чтобы попробовать снова.',
   'common.delete': 'Удалить',
   'common.scramble': 'Скрамбл',
   'common.validCube': 'Кубик корректен ✓',

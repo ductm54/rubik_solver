@@ -24,6 +24,12 @@ export function toCsTimer(solves: Solve[], sessionName = 'Rubik Solver'): string
   });
 }
 
+/**
+ * What makes two records the same solve across an export and an import: the format keeps whole
+ * seconds for the date and whole milliseconds for the time, so compare at that precision.
+ */
+export const solveKey = (s: Pick<Solve, 'date' | 'time'>) => `${Math.floor(s.date / 1000)}|${Math.round(s.time)}`;
+
 /** Parse a csTimer export; solves from every session, oldest first. */
 export function fromCsTimer(json: string): Solve[] {
   let data: unknown;

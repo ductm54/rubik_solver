@@ -44,6 +44,7 @@ const de: Translation = {
   'tour.s10.tip': 'Solves werden nur in diesem Browser gespeichert. {export} sichert oder überträgt sie.',
   'common.copy': 'Kopieren',
   'common.copied': 'Kopiert',
+  'common.solverFailed': 'Der Löser konnte nicht geladen werden. Lade die Seite neu, um es erneut zu versuchen.',
   'common.delete': 'Löschen',
   'common.scramble': 'Verdrehung',
   'common.validCube': 'Gültiger Würfel ✓',

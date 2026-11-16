@@ -44,6 +44,7 @@ const es: Translation = {
   'tour.s10.tip': 'Las resoluciones se guardan solo en este navegador. {export} las respalda o las traslada.',
   'common.copy': 'Copiar',
   'common.copied': 'Copiado',
+  'common.solverFailed': 'No se pudo cargar el solucionador. Recarga la página para volver a intentarlo.',
   'common.delete': 'Borrar',
   'common.scramble': 'Mezcla',
   'common.validCube': 'Cubo válido ✓',

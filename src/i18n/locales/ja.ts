@@ -44,6 +44,7 @@ const ja: Translation = {
   'tour.s10.tip': '記録はこのブラウザにのみ保存されます。{export}でバックアップや移行ができます。',
   'common.copy': 'コピー',
   'common.copied': 'コピーしました',
+  'common.solverFailed': 'ソルバーを読み込めませんでした。ページを再読み込みしてください。',
   'common.delete': '削除',
   'common.scramble': 'スクランブル',
   'common.validCube': '有効なキューブです ✓',

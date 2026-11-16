@@ -44,6 +44,7 @@ const vi: Translation = {
   'tour.s10.tip': 'Các lần giải chỉ được lưu trong trình duyệt này. {export} để sao lưu hoặc chuyển đi.',
   'common.copy': 'Sao chép',
   'common.copied': 'Đã sao chép',
+  'common.solverFailed': 'Không tải được bộ giải. Hãy tải lại trang để thử lại.',
   'common.delete': 'Xóa',
   'common.scramble': 'Xáo trộn',
   'common.validCube': 'Khối hợp lệ ✓',

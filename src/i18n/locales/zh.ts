@@ -44,6 +44,7 @@ const zh: Translation = {
   'tour.s10.tip': '成绩只保存在此浏览器中。{export}可备份或迁移。',
   'common.copy': '复制',
   'common.copied': '已复制',
+  'common.solverFailed': '无法加载求解器。请刷新页面重试。',
   'common.delete': '删除',
   'common.scramble': '打乱',
   'common.validCube': '魔方有效 ✓',
