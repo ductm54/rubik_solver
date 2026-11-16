@@ -48,7 +48,7 @@ let planScramble = '';
 let sel = 0;
 let mv = 0;
 /** Whole solve: the viewer holds every step in one go, and `sel` / `mv` follow it as it plays. */
-let whole = false;
+let whole = true;
 let offsets: number[] = []; // where each step starts in the whole solve, in moves
 let playing = false;
 let loop = false;
