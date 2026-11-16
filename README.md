@@ -4,9 +4,9 @@ A cube scanner + timer app: turn the cube freely in front of the camera, the app
 faces, works out a scramble that reproduces that exact state, and times your solve.
 
 Done so far:
-- **Phase 0**: core cube logic. Type in 54 colours, get a valid scramble ([demo](https://ductm54.github.io/rubik_solver/)).
+- **Phase 0**: core cube logic. Type in 54 colours, get a valid scramble ([demo](https://solve-rubik.pages.dev/)).
 - **Phase 1**: live face detection in the camera and colour reading of one face, with
-  auto-capture ([demo](https://ductm54.github.io/rubik_solver/#scan)).
+  auto-capture ([demo](https://solve-rubik.pages.dev/#scan)).
 - **Phase 2**: free-hand 6-face scan: faces in any order and rotation, neighbour-strip
   orientation, whole-cube colour reading, a review / manual fix screen, and hand-off to the
   scramble page.
@@ -15,9 +15,9 @@ Done so far:
 - **Phase 3**: timer with WCA inspection (+2 after 15 s, DNF after 17 s), hold-and-release start,
   random-state scrambles, solve history with ao5 / ao12 / ao100, a history chart, penalties and
   notes, csTimer import / export, saved in IndexedDB
-  ([demo](https://ductm54.github.io/rubik_solver/timer.html)). Plan: [Rubik Cube Scanner App — Plan](https://claude.ai/artifact/K7kwAwiXBCjcMvoC7A37Yv).
+  ([demo](https://solve-rubik.pages.dev/#timer)). Plan: [Rubik Cube Scanner App — Plan](https://claude.ai/artifact/K7kwAwiXBCjcMvoC7A37Yv).
 
-- **Phase 4**: solve helper for learning CFOP ([demo](https://ductm54.github.io/rubik_solver/learn.html)).
+- **Phase 4**: solve helper for learning CFOP ([demo](https://solve-rubik.pages.dev/#learn)).
   Enter, scan or scramble a cube and see the solve as steps: an optimal cross, 4 F2L pairs (each
   with its case described, its SpeedCubeDB case number and the most-voted algorithm for it), then OLL and PLL with the
   case name and a recognition hint. Each step plays in the 3D viewer from the cube as it is at that
@@ -40,7 +40,7 @@ Done so far:
   language on a first visit. Everything is translated: pages, scanner messages, cube errors, timer, and
   the solver's step titles, case names and hints.
 
-**Live demo:** https://ductm54.github.io/rubik_solver/ · timer: https://ductm54.github.io/rubik_solver/timer.html · learn: https://ductm54.github.io/rubik_solver/learn.html
+**Live demo:** https://solve-rubik.pages.dev/ · timer: https://solve-rubik.pages.dev/#timer · learn: https://solve-rubik.pages.dev/#learn
 
 ## Develop
 
@@ -94,7 +94,7 @@ npm run build    # static site in dist/
 ## Notes
 
 - **No OpenCV.js.** The plan named it for finding the sticker grid; the vision code here is plain
-  TypeScript instead of a ~10 MB download, and it runs unchanged in Node, so it is tested there.
+  TypeScript instead of a ~10 MB download.
 - **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
   overexposed stickered cube, cube-free views, and a phone video of the
   cube being turned by hand (three of them, in different light, replayed frame by frame the
@@ -171,6 +171,11 @@ npm run build    # static site in dist/
   for the 41 cases, front-right and front-left (`src/solve/cfop/algs/f2l.ts`). The case each algorithm
   solves is worked out by undoing it on a solved cube, so the table needs no hand-made case setups, and
   the tests check that every pair placement is covered and the cross and other slots are kept.
-- **Deploys:** `.github/workflows/deploy.yml` runs tests and builds on every push and pull
-  request, and publishes `dist/` to GitHub Pages on pushes to the default branch. In the repo's **Settings → Pages**, set
-  **Source** to **GitHub Actions** once.
+- **Deploys:** Cloudflare builds and publishes the site (`npm run build`, output in `dist/`) at
+  https://solve-rubik.pages.dev/.
+  `.github/workflows/test.yml` runs the tests and a build on every push and pull request; it
+  does not deploy.
+
+## License
+
+[MIT](LICENSE). Found a bug? [Open an issue](https://github.com/ductm54/rubik_solver/issues).

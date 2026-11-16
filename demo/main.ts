@@ -172,6 +172,12 @@ worker.onmessage = (e) => {
   btnLearn.classList.toggle('hidden', !d.scramble);
 };
 
+worker.onerror = () => {
+  if (solverReady) return;
+  btnGenerate.textContent = t('cube.generate');
+  meta.textContent = t('common.solverFailed');
+};
+
 btnGenerate.onclick = () => {
   if (!renderStatus()) return;
   requestId++;
@@ -181,7 +187,11 @@ btnGenerate.onclick = () => {
 };
 
 btnCopy.onclick = async () => {
-  await navigator.clipboard.writeText(scrambleEl.textContent ?? '');
+  try {
+    await navigator.clipboard.writeText(scrambleEl.textContent ?? '');
+  } catch {
+    return; // no clipboard access (insecure page, or permission denied)
+  }
   btnCopy.textContent = t('common.copied');
   setTimeout(() => (btnCopy.textContent = t('common.copy')), 1200);
 };

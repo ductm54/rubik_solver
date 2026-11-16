@@ -75,20 +75,38 @@ const worker = new Worker(new URL('./vision.worker.ts', import.meta.url), { type
 
 // ---------------------------------------------------------------- sources
 
+/** Counts camera starts and stops, so a camera that answers after it was stopped is turned off. */
+let cameraSeq = 0;
+
 async function startCamera() {
   stopAll();
+  const seq = cameraSeq;
+  let got: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    got = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     });
   } catch (err) {
+    if (seq === cameraSeq) statusEl.textContent = t('scan.cameraUnavailable', { error: (err as Error).message });
+    return;
+  }
+  if (seq !== cameraSeq) {
+    // Stopped, or started again, while the permission prompt was open.
+    got.getTracks().forEach((t) => t.stop());
+    return;
+  }
+  stream = got;
+  video.srcObject = stream;
+  try {
+    await video.play();
+  } catch (err) {
+    if (seq !== cameraSeq) return;
+    stopAll();
     statusEl.textContent = t('scan.cameraUnavailable', { error: (err as Error).message });
     return;
   }
-  video.srcObject = stream;
-  await video.play();
-  setMode('camera');
+  if (seq === cameraSeq) setMode('camera');
 }
 
 // Uploaded files: either one video, played like the camera, or photos looked at one after another.
@@ -146,6 +164,11 @@ function nextPhoto() {
     photoStart = performance.now();
     statusEl.textContent = photoPrefix() + t('scan.looking');
   };
+  // A picture the browser cannot show (HEIC, a broken file): say so and go on to the next one.
+  photo.onerror = () => {
+    statusEl.textContent = (photos.length > 1 ? t('scan.photoPrefix', { i: photoIdx + 1, n: photos.length }) : '') + t('scan.noFace');
+    setTimeout(nextPhoto, photos.length > 1 ? 800 : 0);
+  };
   photo.src = fileSrc(photos[photoIdx]);
 }
 
@@ -165,6 +188,7 @@ function loadVideo(file: File) {
 }
 
 function stopAll() {
+  cameraSeq++;
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   video.pause();
@@ -439,6 +463,7 @@ export function initScanner(h: ScannerHandlers) {
 
 /** Turn the camera / video off (the panel was closed); captured faces are kept. */
 export function pauseScanner() {
+  cameraSeq++; // a camera still waiting for permission must not start behind the closed panel
   if (mode === 'camera') stopCamera();
   else if (mode === 'video') video.pause();
 }

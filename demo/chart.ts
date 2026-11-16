@@ -52,12 +52,14 @@ export function renderChart(container: HTMLElement, legend: HTMLElement, tooltip
   const H = 220;
   const m = { l: 40, r: 64, t: 12, b: 26 };
   const singles = solves.map(effective).map((t) => (Number.isFinite(t) ? t / 1000 : null));
-  const ao5 = rollingAverage(solves, 5).map((t) => (t !== null && Number.isFinite(t) ? t / 1000 : null));
-  const ao12 = rollingAverage(solves, 12).map((t) => (t !== null && Number.isFinite(t) ? t / 1000 : null));
+  const raw5 = rollingAverage(solves, 5);
+  const raw12 = rollingAverage(solves, 12);
+  const ao5 = raw5.map((t) => (t !== null && Number.isFinite(t) ? t / 1000 : null));
+  const ao12 = raw12.map((t) => (t !== null && Number.isFinite(t) ? t / 1000 : null));
   const vals = [...singles, ...ao5, ...ao12].filter((v): v is number => v !== null);
   if (!vals.length) return;
-  let lo = Math.min(...vals);
-  let hi = Math.max(...vals);
+  let lo = vals.reduce((a, b) => Math.min(a, b), Infinity);
+  let hi = vals.reduce((a, b) => Math.max(a, b), -Infinity);
   const pad = (hi - lo) * 0.08 || 1;
   lo = Math.max(0, lo - pad);
   hi += pad;
@@ -139,8 +141,8 @@ export function renderChart(container: HTMLElement, legend: HTMLElement, tooltip
       }
     });
     const fmt = (v: number | null, raw: number | null) => (v !== null ? formatTime(v * 1000) : raw === null ? '—' : 'DNF');
-    const ro5 = rollingAverage(solves, 5)[i];
-    const ro12 = rollingAverage(solves, 12)[i];
+    const ro5 = raw5[i];
+    const ro12 = raw12[i];
     tooltip.innerHTML = '';
     const title = document.createElement('div');
     title.className = 'tt-title';

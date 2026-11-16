@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyMoves, solvedState, statesEqual } from '../src/core/cube';
-import { randomStateScramble } from '../src/core/scramble';
+import { generateScramble, randomStateScramble } from '../src/core/scramble';
 import { validate } from '../src/core/validate';
-import { fromCsTimer, toCsTimer } from '../src/timer/cstimer';
+import { fromCsTimer, solveKey, toCsTimer } from '../src/timer/cstimer';
 import { TimerMachine } from '../src/timer/machine';
 import { type Solve, averageOf, computeStats, formatSolve, formatTime, rollingAverage, trimCount } from '../src/timer/stats';
 import { MemoryStore } from '../src/timer/store';
@@ -132,6 +132,13 @@ describe('csTimer format', () => {
     );
   });
 
+  it('an exported solve is recognised when it is imported again', () => {
+    const mine = { ...solve(12345.678, 'none', 1), date: 1700000000123 };
+    const [back] = fromCsTimer(toCsTimer([mine]));
+    expect(solveKey(back)).toBe(solveKey(mine));
+    expect(solveKey({ ...mine, time: 12347 })).not.toBe(solveKey(mine));
+  });
+
   it('reads a csTimer export with several sessions', () => {
     const json = JSON.stringify({
       session1: [[[0, 11230], "R U2 F'", '', 1700000100], [[-1, 9000], 'D L', 'oops', 1700000200]],
@@ -146,6 +153,17 @@ describe('csTimer format', () => {
   it('rejects files that are not csTimer exports', () => {
     expect(() => fromCsTimer('hello')).toThrow(/not valid JSON/);
     expect(() => fromCsTimer('{"a":1}')).toThrow(/no sessions/);
+  });
+});
+
+describe('scrambles for cubes close to solved', () => {
+  it('are as short as the cube allows', () => {
+    for (const [alg, n] of [['R2', 1], ["R U'", 2], ["F R U'", 3], ['L2 D B2 U', 4]] as const) {
+      const st = applyMoves(solvedState(), alg);
+      const r = generateScramble(st);
+      expect(r.moveCount, alg).toBe(n);
+      expect(statesEqual(applyMoves(solvedState(), r.scramble), st), alg).toBe(true);
+    }
   });
 });
 
