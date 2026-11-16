@@ -12,6 +12,8 @@ const en = {
   'common.copy': 'Copy',
   'common.copied': 'Copied',
   'common.solverFailed': 'The solver could not be loaded. Reload the page to try again.',
+  'site.source': 'Source code on GitHub',
+  'site.report': 'Report a problem',
   'common.delete': 'Delete',
   'common.scramble': 'Scramble',
   'common.validCube': 'Valid cube ✓',

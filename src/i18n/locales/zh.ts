@@ -45,6 +45,8 @@ const zh: Translation = {
   'common.copy': '复制',
   'common.copied': '已复制',
   'common.solverFailed': '无法加载求解器。请刷新页面重试。',
+  'site.source': 'GitHub 上的源代码',
+  'site.report': '报告问题',
   'common.delete': '删除',
   'common.scramble': '打乱',
   'common.validCube': '魔方有效 ✓',

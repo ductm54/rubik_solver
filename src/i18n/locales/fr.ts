@@ -45,6 +45,8 @@ const fr: Translation = {
   'common.copy': 'Copier',
   'common.copied': 'Copié',
   'common.solverFailed': 'Le solveur n’a pas pu être chargé. Rechargez la page pour réessayer.',
+  'site.source': 'Code source sur GitHub',
+  'site.report': 'Signaler un problème',
   'common.delete': 'Supprimer',
   'common.scramble': 'Mélange',
   'common.validCube': 'Cube valide ✓',

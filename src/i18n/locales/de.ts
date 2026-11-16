@@ -45,6 +45,8 @@ const de: Translation = {
   'common.copy': 'Kopieren',
   'common.copied': 'Kopiert',
   'common.solverFailed': 'Der Löser konnte nicht geladen werden. Lade die Seite neu, um es erneut zu versuchen.',
+  'site.source': 'Quellcode auf GitHub',
+  'site.report': 'Problem melden',
   'common.delete': 'Löschen',
   'common.scramble': 'Verdrehung',
   'common.validCube': 'Gültiger Würfel ✓',

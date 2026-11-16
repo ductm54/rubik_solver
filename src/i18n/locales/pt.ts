@@ -45,6 +45,8 @@ const pt: Translation = {
   'common.copy': 'Copiar',
   'common.copied': 'Copiado',
   'common.solverFailed': 'Não foi possível carregar o solucionador. Recarregue a página para tentar de novo.',
+  'site.source': 'Código-fonte no GitHub',
+  'site.report': 'Relatar um problema',
   'common.delete': 'Apagar',
   'common.scramble': 'Embaralhamento',
   'common.validCube': 'Cubo válido ✓',

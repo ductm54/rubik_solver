@@ -45,6 +45,8 @@ const ja: Translation = {
   'common.copy': 'コピー',
   'common.copied': 'コピーしました',
   'common.solverFailed': 'ソルバーを読み込めませんでした。ページを再読み込みしてください。',
+  'site.source': 'GitHub のソースコード',
+  'site.report': '問題を報告',
   'common.delete': '削除',
   'common.scramble': 'スクランブル',
   'common.validCube': '有効なキューブです ✓',

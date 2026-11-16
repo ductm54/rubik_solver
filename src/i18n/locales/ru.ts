@@ -45,6 +45,8 @@ const ru: Translation = {
   'common.copy': 'Копировать',
   'common.copied': 'Скопировано',
   'common.solverFailed': 'Не удалось загрузить решатель. Перезагрузите страницу, чтобы попробовать снова.',
+  'site.source': 'Исходный код на GitHub',
+  'site.report': 'Сообщить о проблеме',
   'common.delete': 'Удалить',
   'common.scramble': 'Скрамбл',
   'common.validCube': 'Кубик корректен ✓',

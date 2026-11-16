@@ -45,6 +45,8 @@ const vi: Translation = {
   'common.copy': 'Sao chép',
   'common.copied': 'Đã sao chép',
   'common.solverFailed': 'Không tải được bộ giải. Hãy tải lại trang để thử lại.',
+  'site.source': 'Mã nguồn trên GitHub',
+  'site.report': 'Báo lỗi',
   'common.delete': 'Xóa',
   'common.scramble': 'Xáo trộn',
   'common.validCube': 'Khối hợp lệ ✓',
