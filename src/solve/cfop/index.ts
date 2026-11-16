@@ -176,21 +176,23 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     let best: ReturnType<typeof planPair> = null;
     for (const s of SLOTS.filter((s) => !done.includes(s))) {
       const p = planPair(st, s, colorWord(cross));
-      if (p && (!best || p.moves < best.moves)) best = p;
+      if (p && (!best || p.cost < best.cost)) best = p;
     }
     if (!best) throw new Error('F2L: no case matched (internal error)');
     const colors = slotColors(st, best.slot);
     pairs.push(colors);
+    const fl = best.side === 'FL';
     push(
       {
         stage: 'f2l',
         title: t('cfop.pairTitle', { n: pairs.length, pair: pairName(colors) }),
-        caseName: best.extractedFrom
-          ? t(best.rotation.length ? 'cfop.stuckAfterTurn' : 'cfop.stuck', { slot: slotName(best.extractedFrom) })
-          : undefined,
+        caseName: [
+          best.extractedFrom ? t(best.rotation.length ? 'cfop.stuckAfterTurn' : 'cfop.stuck', { slot: slotName(best.extractedFrom) }) : '',
+          best.caseId ? `F2L ${best.caseId}` : '',
+        ].filter(Boolean).join(' · ') || undefined,
         hint: best.rotation.length
-          ? t('cfop.turnToSlot', { rotation: formatAlg(best.rotation), desc: best.description })
-          : t('cfop.slotAtFR', { desc: best.description }),
+          ? t(fl ? 'cfop.turnToSlotFL' : 'cfop.turnToSlot', { rotation: formatAlg(best.rotation), desc: best.description })
+          : t(fl ? 'cfop.slotAtFL' : 'cfop.slotAtFR', { desc: best.description }),
       },
       [...best.rotation, ...best.extraction, ...best.alg],
       { kind: 'f2l', cross, pairs: [...pairs] },
@@ -310,7 +312,7 @@ export const CFOP: MethodDef = {
     {
       key: 'f2l',
       label: 'F2L',
-      help: 'Standard: turn the cube so each pair goes in at the front-right, one case at a time. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) when it is shorter: the fewest moves found.',
+      help: 'Standard: the usual F2L algorithms (most-voted on SpeedCubeDB), one case at a time, with the cube turned so the pair goes in at the front-right or the front-left. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) when it is shorter: the fewest moves found.',
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },

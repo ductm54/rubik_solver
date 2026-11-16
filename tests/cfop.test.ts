@@ -16,6 +16,7 @@ import { CFOP, solveCfop } from '../src/solve/cfop';
 import { crossDistance, solveCross, solveXCross } from '../src/solve/cfop/cross';
 import { LEFT_HAND, RIGHT_HAND, backTurns, countRegrips, effort, planGrip } from '../src/solve/cfop/grip';
 import { crossSolved, f2lTable, slotSolved, SLOTS } from '../src/solve/cfop/f2l';
+import { F2L_CASES } from '../src/solve/cfop/algs/f2l';
 import { buildTable, matchLL, stageDone } from '../src/solve/cfop/ll';
 
 const solved = solvedState();
@@ -131,15 +132,25 @@ describe('last-layer algorithm tables', () => {
 });
 
 describe('F2L', () => {
-  it('has an algorithm for all 150 places of a pair, each keeping cross and other slots', () => {
-    const t = f2lTable();
-    expect(t.size).toBe(150);
-    for (const { alg } of t.values()) {
-      const x = applyMovesToArray(solvedArr, invertAlg(alg));
-      expect(crossSolved(x) && ['FL', 'BL', 'BR'].every((s) => slotSolved(x, s as 'FL'))).toBe(true);
-      expect(centersHome(x)).toBe(true);
+  for (const side of ['FR', 'FL'] as const) {
+    it(`has a SpeedCubeDB algorithm (most-voted) for all 150 places of the ${side} pair, each keeping cross and other slots`, () => {
+      const t = f2lTable(side);
+      expect(t.size).toBe(150);
+      const ids = new Set<string>();
+      for (const { alg, id } of t.values()) {
+        const x = applyMovesToArray(solvedArr, invertAlg(alg));
+        // An alg may end with the cube turned (y', d): compare with the centers, as the solver does.
+        expect(crossSolved(x) && SLOTS.filter((s) => s !== side).every((s) => slotSolved(x, s))).toBe(true);
+        ids.add(id);
+      }
+      expect(ids.size).toBe(42); // 41 cases + already solved
+    });
+  }
+  it('uses the most-voted algorithm of every case', () => {
+    for (const side of ['FR', 'FL'] as const) {
+      const used = new Map([...f2lTable(side).values()].map((v) => [v.id, v.source]));
+      for (const c of F2L_CASES) expect([side, c.id, used.get(c.id)]).toEqual([side, c.id, c[side][0]]);
     }
-    expect(Math.max(...[...t.values()].map((v) => v.moves))).toBeLessThanOrEqual(11);
   });
 });
 
