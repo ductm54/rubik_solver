@@ -83,10 +83,11 @@ npm run build    # static site in dist/
 | `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; never a B turn: the cube is turned instead. The cross edge by edge: the slot turned to the front, then a distance table for each set of cross edges with U, R, F, D, L only (`solveCrossEdge` in `cfop/cross.ts`) |
 | `src/i18n/` | `t(key, params)` with plural forms; `locales/en.ts` holds every key, the other languages load on demand (one chunk each). Solver texts are made in the page's language: the worker gets it with each request |
 | `demo/i18n.ts` | Page language (`?lang=`, saved choice, browser), `data-i18n` attributes in the HTML, the language picker |
-| `demo/learn.*`, `demo/settings.ts` | Learn page: cube input, settings view, step list and viewer |
-| `demo/timer.*`, `demo/chart.ts` | Timer page: scramble + preview, timing pad, stats, history chart, solve table |
-| `demo/scan.ts` | Scan panel on the front page (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
-| `demo/index.html`, `demo/main.ts` | Front page: scan, edit (2D net, Solved / Random) or review a scanned cube, then Generate, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
+| `demo/index.html`, `demo/app.ts` | The one page and its shell: Cube, Timer and Learn are views picked by the URL hash (`#cube`, `#timer`, `#learn`), so switching never reloads; each view's code loads on first use and is told when it is shown or hidden (camera off, playback and timing stopped) |
+| `demo/learn.ts`, `demo/settings.ts` | Learn view: cube input, settings view, step list and viewer (`learn.html` redirects to `#learn`) |
+| `demo/timer.ts`, `demo/chart.ts` | Timer view: scramble + preview, timing pad, stats, history chart, solve table (`timer.html` redirects to `#timer`) |
+| `demo/scan.ts` | Scan panel of the Cube view (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
+| `demo/main.ts` | Cube view: scan, edit (2D net, Solved / Random) or review a scanned cube, then Generate, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |
 | `tests/` | Cube, solver and timer tests; `scan-real.test.ts` runs the scanner on the real photos in `tests/fixtures` |
 
 ## Notes

@@ -7,7 +7,9 @@ import { AVERAGES, type Penalty, type Solve, computeStats, formatSolve, formatTi
 import { type SolveStore, openStore } from '../src/timer/store';
 import { renderChart } from './chart';
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(`timer-${id}`) as T;
+/** False while another tab is open: keys and the clock are left alone. */
+let active = true;
 const pad = $('pad');
 const clock = $('clock');
 const hint = $('hint');
@@ -91,7 +93,7 @@ function setScramble(s: string, src: Solve['source']) {
   scramble = s;
   source = src;
   scrambleEl.textContent = s || t('timer.solvedCube');
-  ($('btn-learn') as HTMLAnchorElement).href = `./learn.html#scramble=${encodeURIComponent(s)}`;
+  ($('btn-learn') as HTMLAnchorElement).href = `#learn&scramble=${encodeURIComponent(s)}`;
   sourceEl.textContent = src === 'scan' ? t('timer.fromScan') : src === 'manual' ? t('timer.fromManual') : '';
   sourceEl.classList.toggle('hidden', src === 'random');
   renderPreview(applyMoves(solvedState(), s));
@@ -187,7 +189,7 @@ const typing = (e: Event) =>
   e.target instanceof HTMLSelectElement ||
   (e.target instanceof HTMLInputElement && !['checkbox', 'button', 'file'].includes(e.target.type));
 window.addEventListener('keydown', (e) => {
-  if (typing(e)) return;
+  if (!active || typing(e)) return;
   if (machine.state === 'running') {
     e.preventDefault();
     press(performance.now());
@@ -203,7 +205,7 @@ window.addEventListener('keydown', (e) => {
   press(performance.now());
 });
 window.addEventListener('keyup', (e) => {
-  if (typing(e)) return;
+  if (!active || typing(e)) return;
   if (e.code === 'Space' || machine.state === 'stopped') {
     e.preventDefault();
     release(performance.now());
@@ -221,7 +223,7 @@ pad.addEventListener('pointerup', (e) => {
 pad.addEventListener('pointercancel', () => machine.cancel());
 // While running, a touch anywhere stops the clock.
 window.addEventListener('pointerdown', (e) => {
-  if (machine.state === 'running' && !pad.contains(e.target as Node)) {
+  if (active && machine.state === 'running' && !pad.contains(e.target as Node)) {
     press(performance.now());
     machine.release(performance.now());
   }
@@ -409,13 +411,35 @@ new ResizeObserver(() => renderChart($('chart'), $('legend'), $('tooltip'), solv
   $('storage-note').textContent = store.persistent
     ? t('timer.storageOk')
     : t('timer.storageNo');
-  // A scramble handed over from the scramble page: #scramble=<alg>&source=scan|manual
-  const params = new URLSearchParams(location.hash.slice(1));
-  const handed = params.get('scramble');
-  if (handed !== null) setScramble(handed, params.get('source') === 'scan' ? 'scan' : 'manual');
+  takeHanded();
   renderAll();
   cancelAnimationFrame(raf);
-  frame();
+  if (active) frame();
 })();
+
+/** A scramble handed over from another tab: #timer&scramble=<alg>&source=scan|manual */
+function takeHanded() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const handed = params.get('scramble');
+  if (handed === null) return;
+  setScramble(handed, params.get('source') === 'scan' ? 'scan' : 'manual');
+  history.replaceState(null, '', '#timer'); // taken: coming back later keeps whatever is shown then
+}
+
+/** The Timer tab was opened again. */
+export function show() {
+  active = true;
+  takeHanded();
+  cancelAnimationFrame(raf);
+  frame();
+}
+
+/** Another tab was opened: drop a solve in progress and stop the clock loop. */
+export function hide() {
+  active = false;
+  machine.cancel();
+  cancelAnimationFrame(raf);
+  document.body.classList.remove('focus');
+}
 
 Object.assign(window, { timer: { machine, get solves() { return solves; } } });

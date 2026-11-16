@@ -304,7 +304,9 @@ body.focus header { opacity: 0.12; }
 }
 
 .lp { max-width: 1280px; margin: 0 auto; padding: 0 32px 40px; display: flex; flex-direction: column; gap: 16px; }
-.lp > header, .lp > main, .lp > footer { max-width: none; margin: 0; padding: 0; }
+.lp header, .lp main, .lp footer { max-width: none; margin: 0; padding: 0; }
+.page { display: flex; flex-direction: column; gap: 16px; }
+.page[hidden] { display: none; }
 .lp-intro .sub { margin: 0; }
 .lp-intro h1 { margin: 0 0 4px; }
 
@@ -349,7 +351,7 @@ body.focus header { opacity: 0.12; }
 .lp-paint .hint, .lp-paint .status { margin: 0; }
 .lp-settings { flex: 1 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .lp-settings .setting { margin: 0; display: flex; flex-direction: column; gap: 6px; }
-.lp-settings #settings { display: flex; flex-direction: column; gap: 16px; }
+.lp-settings #learn-settings { display: flex; flex-direction: column; gap: 16px; }
 .lp-method { font-weight: 600; font-size: 14px; }
 .lp-method select { font: inherit; font-weight: 400; min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--strong-border); background: var(--card); color: var(--text); max-width: 320px; }
 .lp-settings .segmented, .lp-settings .chips { display: flex; flex-wrap: wrap; gap: 6px; border: 0; border-radius: 0; overflow: visible; }

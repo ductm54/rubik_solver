@@ -8,7 +8,7 @@ import type { SettingValues, SolvePlan, SolveStep } from '../src/solve/types';
 import { createNet, decodeCube, encodeCube, renderNetView } from './net';
 import { renderSettings, savedMethod, settingChips, valuesFor } from './settings';
 
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(`learn-${id}`) as T;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = '') =>
   Object.assign(document.createElement(tag), { className, textContent: text });
 
@@ -101,8 +101,11 @@ function drawChips() {
 drawSettings();
 
 // ---------------------------------------------------------------- cube input
+/** Keep the cube in the URL, so a reload or a shared link shows the same one. */
+const syncHash = () => history.replaceState(null, '', scramble ? `#learn&scramble=${encodeURIComponent(scramble)}` : `#learn&cube=${encodeCube(net.get())}`);
+
 function onCubeChange() {
-  history.replaceState(null, '', scramble ? `#scramble=${encodeURIComponent(scramble)}` : `#cube=${encodeCube(net.get())}`);
+  syncHash();
   renderNetView($('mini-net'), net.get());
   solve();
 }
@@ -509,18 +512,43 @@ btnCopy.onclick = async () => {
 };
 
 // ---------------------------------------------------------------- start: cube from the URL
-// #cube=<54 letters> (scanner, scramble page) or #scramble=<moves> (timer).
-const hash = location.hash;
-const cubeFromHash = decodeCube(/cube=([A-Z]{54})/.exec(hash)?.[1] ?? '');
-const scrFromHash = /scramble=([^&]+)/.exec(hash)?.[1];
-if (cubeFromHash) net.set(cubeFromHash);
-else if (scrFromHash) {
-  try {
-    setScramble(decodeURIComponent(scrFromHash));
-  } catch {
+/**
+ * Take the cube a link carries: #learn&cube=<54 letters> (scanner, cube tab) or
+ * #learn&scramble=<moves> (cube tab, timer). False when it carries none, or the one already shown.
+ */
+function takeHash(): boolean {
+  const cube = decodeCube(/cube=([A-Z]{54})/.exec(location.hash)?.[1] ?? '');
+  const scr = /scramble=([^&]+)/.exec(location.hash)?.[1];
+  if (cube) {
+    if (!scramble && encodeCube(cube) === encodeCube(net.get())) return false;
     scramble = undefined;
+    scrambleIn.value = '';
+    net.set(cube);
+    return true;
   }
-} else setScramble(formatAlg(randomMoves(20)));
+  if (!scr) return false;
+  try {
+    const text = formatAlg(parseAlg(decodeURIComponent(scr)));
+    if (text === scramble) return false;
+    setScramble(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!takeHash()) setScramble(formatAlg(randomMoves(20)));
 renderNetView($('mini-net'), net.get());
 if (!checkCube()) setCubeOpen(true);
 render();
+
+/** The Learn tab was opened again: load the cube the link carries, if it is a new one. */
+export function show() {
+  if (takeHash()) onCubeChange();
+  else syncHash();
+}
+
+/** Another tab was opened: stop playback. */
+export function hide() {
+  stop();
+}
