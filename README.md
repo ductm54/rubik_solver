@@ -173,7 +173,8 @@ npm run build    # static site in dist/
   the tests check that every pair placement is covered and the cross and other slots are kept.
 - **Deploys:** Cloudflare builds and publishes the site (`npm run build`, output in `dist/`) at
   https://solve-rubik.pages.dev/.
-  Nothing runs the tests automatically: run `npm test` before pushing.
+  `.github/workflows/test.yml` runs the tests and a build on every push and pull request; it
+  does not deploy.
 
 ## License
 
