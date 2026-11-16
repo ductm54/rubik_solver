@@ -23,6 +23,7 @@ type Player = HTMLElement & {
   experimentalModel: {
     currentMoveInfo: { addFreshListener(f: (info: { patternIndex: number; movesFinishing: unknown[] }) => void): void };
     coarseTimelineInfo: { addFreshListener(f: (info: { playing: boolean; atStart: boolean; atEnd: boolean }) => void): void };
+    playingInfo: { set(v: { playing: boolean; direction?: 1 | -1; untilBoundary?: string }): void };
     indexer: { get(): Promise<{ indexToMoveStartTimestamp(i: number): number; numAnimatedLeaves(): number }> };
   };
 };
@@ -386,16 +387,42 @@ btnPlay.onclick = async () => {
   player.play();
 };
 
-$('btn-next-move').onclick = () => {
+/** Animate exactly one move forwards (+1) or backwards (-1) from the current position. */
+async function animateMove(dir: 1 | -1) {
   if (!plan) return;
-  if (mv < len(sel)) pick(sel, mv + 1);
-  else if (sel + 1 < plan.steps.length) pick(sel + 1, len(sel + 1) ? 1 : 0);
-};
-$('btn-prev-move').onclick = () => {
-  if (!plan) return;
-  if (mv > 0) pick(sel, mv - 1);
-  else if (sel > 0) pick(sel - 1, Math.max(len(sel - 1) - 1, 0));
-};
+  stop();
+  let target: [number, number]; // step, moves done afterwards
+  let from: [number, number] | null = null; // set when the view has to be loaded at a different spot first
+  if (dir === 1) {
+    if (mv < len(sel)) target = [sel, mv + 1];
+    else {
+      const k = nextWithMoves(sel);
+      if (k < 0) return;
+      target = [k, 1];
+      if (!whole) from = [k, 0];
+    }
+  } else if (mv > 0) target = [sel, mv - 1];
+  else {
+    let k = sel - 1;
+    while (k >= 0 && !len(k)) k--;
+    if (k < 0) return pick(Math.max(sel - 1, 0), 0);
+    target = [k, len(k) - 1];
+    if (!whole) from = [k, len(k)];
+  }
+  if (from) await load(from[0], from[1]);
+  else ++loadSeq;
+  const seq = loadSeq;
+  const done = whole ? offsets[target[0]] + target[1] : target[1];
+  expect = done; // ignore progress reports until the move has finished
+  sel = target[0];
+  mv = target[1];
+  render();
+  setTimeout(() => seq === loadSeq && expect === done && (expect = null), 2000);
+  player.experimentalModel.playingInfo.set({ playing: true, direction: dir, untilBoundary: 'move' });
+}
+
+$('btn-next-move').onclick = () => void animateMove(1);
+$('btn-prev-move').onclick = () => void animateMove(-1);
 $('btn-next-step').onclick = () => {
   if (plan && sel + 1 < plan.steps.length) pick(sel + 1, 0);
 };
