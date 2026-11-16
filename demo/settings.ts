@@ -105,3 +105,14 @@ export function renderSettings(el: HTMLElement, m: MethodDef, values: SettingVal
     el.append(field);
   }
 }
+
+/** Short "Label: value" summaries of the current settings, for the chips above the solve. */
+export function settingChips(m: MethodDef, values: SettingValues): string[] {
+  return m.settings.map((def) => {
+    const label = tr(`set.${m.id}.${def.key}.label`, def.label);
+    const colorOpt = def.key === 'crossColors' || def.key === 'crossColor';
+    const name = (v: string) => (colorOpt ? t(`color.${v}`) : tr(`set.${m.id}.${def.key}.${v}`, def.options.find((o) => o.value === v)?.label ?? v));
+    const cur = values[def.key];
+    return `${label}: ${(Array.isArray(cur) ? cur : [cur]).map(name).join(', ')}`;
+  });
+}

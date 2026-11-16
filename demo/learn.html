@@ -6,81 +6,166 @@
     <title data-i18n="learn.docTitle">Solve Helper</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
-  <body>
-    <header>
-      <nav class="tabs">
-        <a href="./index.html" data-i18n="nav.cube">Cube</a>
-        <a href="./timer.html" data-i18n="nav.timer">Timer</a>
-        <a href="./learn.html" aria-current="page" data-i18n="nav.learn">Learn</a>
-      </nav>
-      <h1 data-i18n="learn.title">Solve Helper</h1>
-      <p class="sub" data-i18n="learn.sub">Enter a cube and see how to solve it step by step, with the case names and algorithms to learn.</p>
-    </header>
+  <body class="learn-page">
+    <div class="lp">
+      <header class="lp-header">
+        <a class="lp-brand" href="./index.html">
+          <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="5" fill="#1b1b1f"></rect><rect x="4" y="4" width="5" height="5" rx="1" fill="#ffd500"></rect><rect x="10.5" y="4" width="5" height="5" rx="1" fill="#ffffff"></rect><rect x="17" y="4" width="5" height="5" rx="1" fill="#ff5800"></rect><rect x="4" y="10.5" width="5" height="5" rx="1" fill="#009b48"></rect><rect x="10.5" y="10.5" width="5" height="5" rx="1" fill="#ffd500"></rect><rect x="17" y="10.5" width="5" height="5" rx="1" fill="#2a78d6"></rect><rect x="4" y="17" width="5" height="5" rx="1" fill="#ffffff"></rect><rect x="10.5" y="17" width="5" height="5" rx="1" fill="#b71234"></rect><rect x="17" y="17" width="5" height="5" rx="1" fill="#ffd500"></rect></svg>
+          Rubik Solver
+        </a>
+        <nav class="tabs" aria-label="Sections">
+          <a href="./index.html" data-i18n="nav.cube">Cube</a>
+          <a href="./timer.html" data-i18n="nav.timer">Timer</a>
+          <a href="./learn.html" aria-current="page" data-i18n="nav.learn">Learn</a>
+        </nav>
+        <div class="lang-slot"></div>
+      </header>
 
-    <main class="learn-main">
-        <section class="card area-cube">
-          <div class="row between">
-            <h2 data-i18n="learn.yourCube">Your cube</h2>
-            <div class="row gap">
-              <button id="btn-solved" class="ghost" data-i18n="learn.solved">Solved</button>
-              <button id="btn-random" class="ghost" data-i18n="learn.random">Random cube</button>
+      <section class="card lp-setup" aria-label="Your cube and solver settings" data-i18n-aria-label="learn.setupLabel">
+        <div class="lp-setup-bar">
+          <div id="mini-net" class="net mini-net" aria-hidden="true"></div>
+          <form id="scramble-form" class="lp-scramble">
+            <label class="lp-field">
+              <span data-i18n="common.scramble">Scramble</span>
+              <input id="scramble-in" type="text" placeholder="Or type a scramble, e.g. R U R' F2 D…" data-i18n-placeholder="learn.scramblePlaceholder" autocomplete="off" spellcheck="false" />
+            </label>
+            <button class="lp-btn" type="submit" data-i18n="learn.apply">Apply</button>
+          </form>
+          <div class="lp-actions">
+            <button id="btn-random" class="lp-btn" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="m4 4 5 5"></path></svg>
+              <span data-i18n="learn.random">Random cube</span>
+            </button>
+            <a class="lp-btn" href="./index.html">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M21 16v3a2 2 0 0 1-2 2h-3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg>
+              <span data-i18n="learn.scan">Scan</span>
+            </a>
+          </div>
+          <div class="lp-chips-row">
+            <div id="chips" class="lp-chips"></div>
+            <button id="btn-setup" class="lp-btn lp-btn-accent" type="button" aria-expanded="false" aria-controls="setup-panel">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10"></path><path d="M18 6h2"></path><circle cx="16" cy="6" r="2"></circle><path d="M4 12h2"></path><path d="M10 12h10"></path><circle cx="8" cy="12" r="2"></circle><path d="M4 18h10"></path><path d="M18 18h2"></path><circle cx="16" cy="18" r="2"></circle></svg>
+              <span id="setup-label" data-i18n="learn.editSetup">Edit cube and settings</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="setup-panel" class="lp-setup-panel" hidden>
+          <div class="lp-paint">
+            <div class="row between">
+              <h2 data-i18n="learn.paint">Paint your cube</h2>
+              <button id="btn-solved" class="lp-btn" type="button" data-i18n="learn.solved">Solved</button>
+            </div>
+            <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour" data-i18n-aria-label="common.paintColour"></div>
+            <div id="net" class="net" aria-label="Cube net" data-i18n-aria-label="common.cubeNet"></div>
+            <p class="hint" data-i18n="learn.cubeHint">Paint stickers to match your cube (white top, green front), scan it on the Cube tab, or apply a scramble.</p>
+            <div id="status" class="status" aria-live="polite"></div>
+          </div>
+          <div class="lp-settings">
+            <h2 data-i18n="learn.settings">Solver settings</h2>
+            <label class="setting lp-method">
+              <span data-i18n="learn.method">Method</span>
+              <select id="method"></select>
+            </label>
+            <div id="settings"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-overview" aria-label="Solve overview" data-i18n-aria-label="learn.overviewLabel">
+        <div class="lp-overview-head">
+          <h1 id="summary" data-i18n="common.loadingSolver">Loading solver…</h1>
+          <p id="note" class="muted"></p>
+        </div>
+        <div id="segs" class="lp-segs"></div>
+        <div id="groups" class="lp-groups" aria-hidden="true"></div>
+      </section>
+
+      <main class="lp-main">
+        <section class="card lp-now" aria-label="Current step" data-i18n-aria-label="learn.currentLabel">
+          <div class="lp-now-head">
+            <span id="now-tag" class="stage-tag"></span>
+            <h2 id="now-title"></h2>
+            <span id="now-pos" class="muted lp-now-pos"></span>
+          </div>
+          <div class="lp-now-body">
+            <div class="lp-viewer">
+              <twisty-player
+                id="player"
+                puzzle="3x3x3"
+                alg=""
+                background="none"
+                control-panel="none"
+                hint-facelets="floating"
+              ></twisty-player>
+            </div>
+            <div class="lp-now-info">
+              <div id="now-case-box" class="lp-info" hidden>
+                <span class="lp-label" data-i18n="learn.case">Case</span>
+                <span id="now-case" class="lp-case"></span>
+              </div>
+              <div id="now-hint-box" class="lp-info" hidden>
+                <span class="lp-label" data-i18n="learn.lookFor">What to look for</span>
+                <p id="now-hint"></p>
+              </div>
+              <div class="lp-info">
+                <span class="lp-label" data-i18n="learn.algTap">Algorithm, tap a move to jump to it</span>
+                <div id="toks" class="lp-toks"></div>
+                <p id="no-toks" class="lp-strong" data-i18n="learn.nothing" hidden>Nothing to do here: skip to the next step.</p>
+              </div>
             </div>
           </div>
-          <form id="scramble-form" class="scramble-input">
-            <input id="scramble-in" type="text" placeholder="Or type a scramble, e.g. R U R' F2 D…" data-i18n-placeholder="learn.scramblePlaceholder" autocomplete="off" spellcheck="false" aria-label="Scramble" data-i18n-aria-label="common.scramble" />
-            <button class="ghost" type="submit" data-i18n="learn.apply">Apply</button>
-          </form>
-          <div id="palette" class="palette" role="radiogroup" aria-label="Paint colour" data-i18n-aria-label="common.paintColour"></div>
-          <div id="net" class="net" aria-label="Cube net" data-i18n-aria-label="common.cubeNet"></div>
-          <p class="hint" data-i18n="learn.cubeHint">Paint stickers to match your cube (white top, green front), scan it on the Cube tab, or apply a scramble.</p>
-          <div id="status" class="status" aria-live="polite"></div>
+          <div class="lp-controls">
+            <button id="btn-prev-step" class="lp-btn" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"></path><path d="m18 17-5-5 5-5"></path></svg>
+              <span class="lp-hide-sm" data-i18n="learn.prevStep">Prev step</span>
+            </button>
+            <button id="btn-prev-move" class="lp-btn lp-icon" type="button" aria-label="Previous move" data-i18n-aria-label="learn.prevMove">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+            </button>
+            <button id="btn-play" class="lp-btn lp-btn-primary lp-play" type="button">
+              <svg class="ic-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"></path></svg>
+              <svg class="ic-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4.5" height="16" rx="1"></rect><rect x="13.5" y="4" width="4.5" height="16" rx="1"></rect></svg>
+              <span id="play-label" data-i18n="learn.play">Play</span>
+            </button>
+            <button id="btn-next-move" class="lp-btn lp-icon" type="button" aria-label="Next move" data-i18n-aria-label="learn.nextMove">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+            </button>
+            <button id="btn-next-step" class="lp-btn" type="button">
+              <span class="lp-hide-sm" data-i18n="learn.nextStep">Next step</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 17 5-5-5-5"></path><path d="m13 17 5-5-5-5"></path></svg>
+            </button>
+            <div class="lp-switches">
+              <button id="opt-loop" class="lp-switch" type="button" aria-pressed="false">
+                <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
+                <span data-i18n="learn.repeat">Repeat this step</span>
+              </button>
+              <button id="opt-highlight" class="lp-switch" type="button" aria-pressed="true">
+                <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
+                <span data-i18n="learn.highlightStep">Highlight this step's pieces</span>
+              </button>
+            </div>
+          </div>
         </section>
 
-        <section class="card area-settings">
-          <details id="settings-box" open>
-            <summary><h2 data-i18n="learn.settings">Solver settings</h2></summary>
-            <fieldset class="setting">
-              <legend data-i18n="learn.method">Method</legend>
-              <select id="method"></select>
-              <p class="hint" data-i18n="learn.methodHint">More methods (Roux, ZZ) will use the same settings view.</p>
-            </fieldset>
-            <div id="settings"></div>
-          </details>
+        <section class="lp-steps" aria-label="All steps" data-i18n-aria-label="learn.allSteps">
+          <div class="lp-steps-head">
+            <h2 data-i18n="learn.steps">Steps</h2>
+            <span id="step-count" class="muted"></span>
+            <button id="btn-copy" class="lp-btn" type="button" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>
+              <span id="copy-label" data-i18n="learn.copySolution">Copy solution</span>
+            </button>
+          </div>
+          <ol id="steps" class="lp-step-list"></ol>
         </section>
+      </main>
 
-      <section class="card area-solution">
-        <div class="row between">
-          <h2 data-i18n="learn.solution">Solution</h2>
-          <button id="btn-copy" class="ghost small" disabled data-i18n="common.copy">Copy</button>
-        </div>
-        <p id="summary" class="summary" data-i18n="common.loadingSolver">Loading solver…</p>
-        <div id="breakdown" class="breakdown"></div>
-        <div id="now" class="now" aria-live="polite"></div>
-        <twisty-player
-          id="player"
-          puzzle="3x3x3"
-          alg=""
-          background="none"
-          control-panel="bottom-row"
-          hint-facelets="floating"
-        ></twisty-player>
-        <div class="row between step-nav">
-          <button id="btn-prev" class="ghost small" data-i18n="learn.prev">← Prev step</button>
-          <button id="btn-whole" class="ghost small" aria-pressed="true" data-i18n="learn.whole">Whole solve</button>
-          <button id="btn-next" class="ghost small" data-i18n="learn.next">Next step →</button>
-        </div>
-        <label class="check">
-          <input id="opt-highlight" type="checkbox" checked />
-          <span data-i18n="learn.highlight">Highlight the pieces each step works on (grey out the rest)</span>
-        </label>
-        <ol id="steps" class="steps"></ol>
-      </section>
-    </main>
-
-    <footer>
-      <span data-i18n="learn.footer">Cross: optimal search · F2L: shortest trigger sequences for every case · OLL / PLL: standard algorithms ·</span>
-      <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
-    </footer>
+      <footer class="lp-footer">
+        <span data-i18n="learn.footer">Cross: optimal search · F2L: shortest trigger sequences for every case · OLL / PLL: standard algorithms ·</span>
+        <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
+      </footer>
+    </div>
     <script type="module" src="./learn.ts"></script>
   </body>
 </html>

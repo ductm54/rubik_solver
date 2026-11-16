@@ -5,52 +5,73 @@ import { type CubeState, applyMoves, formatAlg, parseAlg, randomMoves, solvedSta
 import { validate } from '../src/core/validate';
 import { METHODS, getMethod } from '../src/solve/methods';
 import type { SettingValues, SolvePlan, SolveStep } from '../src/solve/types';
-import { createNet, decodeCube, encodeCube } from './net';
-import { renderSettings, savedMethod, valuesFor } from './settings';
+import { createNet, decodeCube, encodeCube, renderNetView } from './net';
+import { renderSettings, savedMethod, settingChips, valuesFor } from './settings';
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = '') =>
+  Object.assign(document.createElement(tag), { className, textContent: text });
+
 /** The parts of cubing.js's TwistyPlayer used here. */
 type Player = HTMLElement & {
   alg: string;
   experimentalSetupAlg: string;
   experimentalStickeringMaskOrbits: string;
   timestamp: number | 'start' | 'end';
+  play(): void;
+  pause(): void;
   experimentalModel: {
     currentMoveInfo: { addFreshListener(f: (info: { patternIndex: number; movesFinishing: unknown[] }) => void): void };
+    coarseTimelineInfo: { addFreshListener(f: (info: { playing: boolean; atStart: boolean; atEnd: boolean }) => void): void };
     indexer: { get(): Promise<{ indexToMoveStartTimestamp(i: number): number; numAnimatedLeaves(): number }> };
   };
 };
-const player = $('player') as Player;
+const player = $<Player>('player');
 const status = $('status');
 const summary = $('summary');
-const breakdown = $('breakdown');
+const note = $('note');
 const stepsEl = $('steps');
+const segsEl = $('segs');
+const groupsEl = $('groups');
+const toksEl = $('toks');
 const btnCopy = $<HTMLButtonElement>('btn-copy');
+const btnPlay = $<HTMLButtonElement>('btn-play');
 const methodSel = $<HTMLSelectElement>('method');
+const scrambleIn = $<HTMLInputElement>('scramble-in');
 
 let method = getMethod(savedMethod() ?? 'cfop');
 let settings: SettingValues = valuesFor(method);
 let scramble: string | undefined; // set when the cube came from a typed scramble
 let plan: SolvePlan | null = null;
 let planScramble = '';
-/** What the viewer shows: the whole solve, or one step (index into plan.steps). */
-let view: 'whole' | number = 'whole';
-/** Position in the whole solve, in moves (rotations count, as in the viewer). */
-let pos = 0;
-let offsets: number[] = []; // where each step starts in the whole solve
-let total = 0;
+/** The step shown (index into plan.steps) and how many of its moves are done. */
+let sel = 0;
+let mv = 0;
+let playing = false;
+let loop = false;
 let loadSeq = 0;
-/** While a view loads, ignore viewer reports until it reaches this move (then null). */
+/** While a step loads, ignore viewer reports until it reaches this move (then null). */
 let expect: number | null = null;
 let ready = false;
 let requestId = 0;
 
+// ---------------------------------------------------------------- setup panel
+const setupPanel = $('setup-panel');
+const btnSetup = $<HTMLButtonElement>('btn-setup');
+function setSetupOpen(open: boolean) {
+  setupPanel.hidden = !open;
+  btnSetup.setAttribute('aria-expanded', String(open));
+  $('setup-label').textContent = t(open ? 'learn.closeSetup' : 'learn.editSetup');
+}
+btnSetup.onclick = () => setSetupOpen(setupPanel.hidden);
+
 const net = createNet($('net'), $('palette'), () => {
   scramble = undefined;
+  scrambleIn.value = '';
   onCubeChange();
 });
 
-// --- method + settings
+// ---------------------------------------------------------------- method + settings
 for (const m of METHODS) methodSel.add(new Option(t(`method.${m.id}.name`), m.id, false, m.id === method.id));
 methodSel.add(new Option(t('learn.moreComing'), '', false, false));
 methodSel.options[methodSel.options.length - 1].disabled = true;
@@ -63,37 +84,46 @@ methodSel.onchange = () => {
 function drawSettings() {
   renderSettings($('settings'), method, settings, (v) => {
     settings = v;
+    drawChips();
     solve();
   });
+  drawChips();
+}
+function drawChips() {
+  $('chips').replaceChildren(...[t(`method.${method.id}.name`), ...settingChips(method, settings)].map((c) => el('span', 'lp-chip', c)));
 }
 drawSettings();
 
-// --- cube input
+// ---------------------------------------------------------------- cube input
 function onCubeChange() {
   history.replaceState(null, '', scramble ? `#scramble=${encodeURIComponent(scramble)}` : `#cube=${encodeCube(net.get())}`);
+  renderNetView($('mini-net'), net.get());
   solve();
+}
+
+function setScramble(text: string) {
+  scramble = formatAlg(parseAlg(text));
+  scrambleIn.value = scramble;
+  net.set(applyMoves(solvedState(), scramble));
 }
 
 $('btn-solved').onclick = () => {
   scramble = undefined;
+  scrambleIn.value = '';
   net.set(solvedState());
   onCubeChange();
 };
 $('btn-random').onclick = () => {
-  scramble = formatAlg(randomMoves(20));
-  ($('scramble-in') as HTMLInputElement).value = scramble;
-  net.set(applyMoves(solvedState(), scramble));
+  setScramble(formatAlg(randomMoves(20)));
   onCubeChange();
 };
 $('scramble-form').onsubmit = (e) => {
   e.preventDefault();
-  const text = ($('scramble-in') as HTMLInputElement).value.trim();
   try {
-    const moves = parseAlg(text);
-    scramble = formatAlg(moves);
-    net.set(applyMoves(solvedState(), moves));
+    setScramble(scrambleIn.value.trim());
     onCubeChange();
   } catch (err) {
+    setSetupOpen(true);
     status.className = 'status bad';
     status.textContent = (err as Error).message;
   }
@@ -101,7 +131,7 @@ $('scramble-form').onsubmit = (e) => {
 
 function checkCube(): boolean {
   const v = validate(net.get());
-  status.innerHTML = '';
+  status.replaceChildren();
   if (v.ok) {
     status.className = 'status ok';
     status.textContent = t('common.validCube');
@@ -109,12 +139,12 @@ function checkCube(): boolean {
   }
   status.className = 'status bad';
   const ul = document.createElement('ul');
-  for (const e of v.errors) ul.append(Object.assign(document.createElement('li'), { textContent: e }));
+  for (const e of v.errors) ul.append(el('li', '', e));
   status.append(ul);
   return false;
 }
 
-// --- solving (in the worker: the scramble for the viewer needs the Kociemba tables)
+// ---------------------------------------------------------------- solving (worker: the viewer's scramble needs the Kociemba tables)
 const worker = new Worker(new URL('./solver.worker.ts', import.meta.url), { type: 'module' });
 worker.onmessage = (e) => {
   const d = e.data;
@@ -141,6 +171,7 @@ function solve() {
   if (!checkCube()) {
     plan = null;
     summary.textContent = t('learn.fixCube');
+    setSetupOpen(true);
     renderPlan();
     return;
   }
@@ -150,137 +181,113 @@ function solve() {
   worker.postMessage({ id: requestId, kind: 'learn', state: net.get() as CubeState, method: method.id, settings, scramble, lang });
 }
 
-// --- output
+// ---------------------------------------------------------------- plan: overview bar and step list
 const stageLabel = (stage: string) => t(`stage.${stage}`);
+const tokens = (alg: string) => alg.split(/\s+/).filter(Boolean);
+const len = (i: number) => (plan ? tokens(plan.steps[i].alg).length : 0);
+const stageTag = (stage: string, extra = '') => el('span', `stage-tag stage-${stage}${extra}`, stageLabel(stage));
+const countText = (s: SolveStep) => (s.moves ? t('learn.moves', { count: s.moves }) : t(s.stage === 'inspection' ? 'learn.inspection' : 'learn.skip'));
 
 function renderPlan() {
-  stepsEl.innerHTML = '';
-  breakdown.innerHTML = '';
+  stop();
+  stepsEl.replaceChildren();
+  segsEl.replaceChildren();
+  groupsEl.replaceChildren();
   btnCopy.disabled = !plan;
-  offsets = [];
-  total = 0;
+  note.textContent = '';
+  $('step-count').textContent = '';
   if (!plan) {
-    void load('whole', 0);
+    sel = 0;
+    void load(0, 0);
     return;
   }
-  for (const s of plan.steps) {
-    offsets.push(total);
-    total += tokens(s.alg).length;
+  if (plan.moves) {
+    summary.textContent = t('learn.solveIn', { count: plan.moves });
+    note.textContent = [plan.note, t('learn.pickHint')].filter(Boolean).join(' ');
+  } else summary.textContent = t('learn.alreadySolved');
+  $('step-count').textContent = t('learn.stepCount', { count: plan.steps.length });
+
+  const groups: { stage: string; w: number; moves: number }[] = [];
+  plan.steps.forEach((s, i) => {
+    const w = Math.max(len(i), 1);
+    const seg = el('button', `lp-seg stage-${s.stage}`);
+    seg.type = 'button';
+    seg.style.flexGrow = String(w);
+    seg.setAttribute('aria-label', `${stageLabel(s.stage)}, ${s.title}`);
+    seg.append(el('span', 'lp-seg-bar'));
+    seg.onclick = () => pick(i, 0);
+    segsEl.append(seg);
+    const last = groups[groups.length - 1];
+    if (last && last.stage === s.stage) {
+      last.w += w;
+      last.moves += s.moves;
+    } else groups.push({ stage: s.stage, w, moves: s.moves });
+
+    const li = document.createElement('li');
+    const btn = el('button', 'lp-step');
+    btn.type = 'button';
+    btn.onclick = () => pick(i, 0);
+    const head = el('span', 'lp-step-head');
+    head.append(stageTag(s.stage), el('span', 'lp-step-title', s.title), el('span', 'muted lp-step-count', countText(s)));
+    btn.append(head);
+    if (s.alg) btn.append(el('code', 'lp-step-alg', s.alg));
+    if (s.caseName) btn.append(el('span', 'muted lp-step-case', s.caseName));
+    li.append(btn);
+    stepsEl.append(li);
+  });
+  // Text labels for each run of same-stage steps, sized like the bar segments above them.
+  for (const g of groups) {
+    const lab = el('span', `lp-group stage-${g.stage}`, g.moves ? `${stageLabel(g.stage)} · ${g.moves}` : stageLabel(g.stage));
+    lab.style.flexGrow = String(g.w);
+    groupsEl.append(lab);
   }
-  summary.textContent = plan.moves ? t('learn.summary', { moves: plan.moves, note: plan.note ?? '' }) : t('learn.alreadySolved');
-  const byStage = new Map<string, number>();
-  for (const s of plan.steps) if (s.stage !== 'inspection') byStage.set(s.stage, (byStage.get(s.stage) ?? 0) + s.moves);
-  for (const [stage, n] of byStage) {
-    const b = document.createElement('span');
-    b.className = `stage-tag stage-${stage}`;
-    b.textContent = `${stageLabel(stage)} ${n}`;
-    breakdown.append(b);
-  }
-  plan.steps.forEach((s, i) => stepsEl.append(stepItem(s, i)));
-  void load('whole', 0);
+  sel = 0;
+  void load(0, 0);
 }
 
-function stepItem(s: SolveStep, i: number): HTMLLIElement {
-  const li = document.createElement('li');
-  li.className = 'step';
-  li.dataset.stage = s.stage;
-  const btn = document.createElement('button');
-  btn.className = 'step-btn';
-  // Keep the exact move if the whole solve is currently inside this step.
-  btn.onclick = () => void load(i, stepAt(pos) === i ? pos : offsets[i]);
-  const head = document.createElement('div');
-  head.className = 'step-head';
-  const tag = Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: stageLabel(s.stage) });
-  const title = Object.assign(document.createElement('span'), { className: 'step-title', textContent: s.title });
-  const count = Object.assign(document.createElement('span'), { className: 'muted step-count', textContent: s.moves ? t('learn.moves', { count: s.moves }) : t(s.stage === 'inspection' ? 'learn.inspection' : 'learn.skip') });
-  head.append(tag, title, count);
-  btn.append(head);
-  if (s.caseName) btn.append(Object.assign(document.createElement('div'), { className: 'step-case', textContent: s.caseName }));
-  if (s.alg) btn.append(Object.assign(document.createElement('code'), { className: 'step-alg', textContent: s.alg }));
-  if (s.hint) btn.append(Object.assign(document.createElement('div'), { className: 'hint step-hint', textContent: s.hint }));
-  li.append(btn);
-  return li;
-}
-
+// ---------------------------------------------------------------- viewer: one step at a time
 /** All pieces shown normally (a mask, once set, overrides the plain stickering setting). */
 const FULL_MASK = 'EDGES:------------,CORNERS:--------,CENTERS:------';
 
-// Step highlighting (grey out pieces the step doesn't work on), remembered per browser.
-const HIGHLIGHT_KEY = 'learn.highlight';
-let highlight = true;
-try {
-  highlight = localStorage.getItem(HIGHLIGHT_KEY) !== 'off';
-} catch {
-  /* storage unavailable: default on */
-}
-const optHighlight = $<HTMLInputElement>('opt-highlight');
-optHighlight.checked = highlight;
-optHighlight.onchange = () => {
-  highlight = optHighlight.checked;
-  try {
-    localStorage.setItem(HIGHLIGHT_KEY, highlight ? 'on' : 'off');
-  } catch {
-    /* not remembered */
-  }
-  if (plan && view !== 'whole') {
-    const mask = plan.steps[view].mask;
-    player.experimentalStickeringMaskOrbits = highlight && mask ? mask : FULL_MASK;
-  }
-};
-
-const tokens = (alg: string) => alg.split(/\s+/).filter(Boolean);
-const len = (i: number) => tokens(plan!.steps[i].alg).length;
-
-/** Step that a whole-solve position falls in (a step with moves), or -1. */
-function stepAt(g: number): number {
-  if (!plan) return -1;
-  let last = -1;
-  for (let i = 0; i < plan.steps.length; i++) {
-    if (!len(i)) continue;
-    if (g >= offsets[i] && g < offsets[i] + len(i)) return i;
-    if (offsets[i] + len(i) <= g) last = i;
-  }
-  return last;
+function applyMask() {
+  const mask = plan?.steps[sel]?.mask;
+  player.experimentalStickeringMaskOrbits = highlight && mask ? mask : FULL_MASK;
 }
 
-/**
- * Show the whole solve or one step, placed at whole-solve position `g` (in a step view the
- * position is clamped to that step).
- */
-async function load(next: 'whole' | number, g: number) {
-  view = next;
-  pos = g;
+/** Show step `i` with `m` of its moves done. */
+async function load(i: number, m: number) {
+  sel = i;
+  mv = m;
   const seq = ++loadSeq;
   expect = -1; // ignore reports about the half-loaded view
   const steps = plan?.steps ?? [];
   if (!plan) {
     player.experimentalSetupAlg = '';
     player.alg = '';
-    player.experimentalStickeringMaskOrbits = FULL_MASK;
-  } else if (next === 'whole') {
-    player.experimentalSetupAlg = planScramble;
-    player.alg = steps.map((s) => s.alg).filter(Boolean).join(' ');
-    player.experimentalStickeringMaskOrbits = FULL_MASK;
   } else {
-    player.experimentalSetupAlg = [planScramble, ...steps.slice(0, next).map((s) => s.alg)].filter(Boolean).join(' ');
-    player.alg = steps[next].alg;
-    if (highlight && steps[next].mask) player.experimentalStickeringMaskOrbits = steps[next].mask!;
-    else player.experimentalStickeringMaskOrbits = FULL_MASK;
+    player.experimentalSetupAlg = [planScramble, ...steps.slice(0, i).map((s) => s.alg)].filter(Boolean).join(' ');
+    player.alg = steps[i].alg;
   }
-  renderNav();
-  const local = next === 'whole' ? g : Math.min(Math.max(g - offsets[next], 0), len(next));
+  applyMask();
+  render();
   const indexer = await player.experimentalModel.indexer.get();
   if (seq !== loadSeq) return;
-  const atEnd = local >= indexer.numAnimatedLeaves();
-  expect = atEnd ? indexer.numAnimatedLeaves() : local;
+  const n = indexer.numAnimatedLeaves();
+  const atEnd = m >= n;
+  expect = atEnd ? n : m;
   setTimeout(() => seq === loadSeq && (expect = null), 1000);
-  player.timestamp = atEnd ? 'end' : indexer.indexToMoveStartTimestamp(local);
-  pos = next === 'whole' ? local : offsets[next] + local;
-  renderNow();
+  player.timestamp = atEnd ? 'end' : indexer.indexToMoveStartTimestamp(m);
+  mv = Math.min(m, n);
+  render();
 }
 
-// Follow the viewer as it plays or is scrubbed.
-// Moves done = patternIndex, plus a move that has just finished exactly at this timestamp.
+/** Jump to a step / move picked by the user (stops playback). */
+function pick(i: number, m: number) {
+  stop();
+  void load(i, m);
+}
+
+// Follow the viewer as it plays. Moves done = patternIndex, plus a move that has just finished.
 player.experimentalModel.currentMoveInfo.addFreshListener(({ patternIndex, movesFinishing }) => {
   if (!plan) return;
   const done = patternIndex + movesFinishing.length;
@@ -288,119 +295,175 @@ player.experimentalModel.currentMoveInfo.addFreshListener(({ patternIndex, moves
     if (done !== expect) return;
     expect = null;
   }
-  pos = view === 'whole' ? done : offsets[view] + Math.min(done, len(view));
-  renderNow();
+  mv = Math.min(done, len(sel));
+  render();
 });
 
-function renderNav() {
-  const whole = view === 'whole';
-  const btnWhole = $<HTMLButtonElement>('btn-whole');
-  btnWhole.setAttribute('aria-pressed', String(whole));
-  btnWhole.classList.toggle('on', whole);
-  btnWhole.disabled = !plan;
-  const cur = whole ? stepAt(pos) : view;
-  $<HTMLButtonElement>('btn-prev').disabled = !plan || prevStep(cur as number) < 0 && !(whole && pos > 0);
-  $<HTMLButtonElement>('btn-next').disabled = !plan || nextStep(cur as number) < 0;
-  [...stepsEl.children].forEach((el, k) => el.classList.toggle('active', !whole && k === view));
-}
+// When a step finishes while playing: repeat it, or carry on with the next step that has moves.
+player.experimentalModel.coarseTimelineInfo.addFreshListener((info) => {
+  if (!playing || info.playing || expect !== null || mv < len(sel)) return;
+  const seq = loadSeq;
+  setTimeout(() => {
+    if (!playing || seq !== loadSeq) return;
+    const next = loop ? sel : nextWithMoves(sel);
+    if (next < 0) stop();
+    else void load(next, 0).then(() => playing && player.play());
+  }, 450);
+});
 
-const nextStep = (i: number) => {
+const nextWithMoves = (i: number) => {
   for (let k = i + 1; k < (plan?.steps.length ?? 0); k++) if (len(k)) return k;
   return -1;
 };
-const prevStep = (i: number) => {
-  for (let k = i - 1; k >= 0; k--) if (len(k)) return k;
-  return -1;
-};
 
-/** The bar above the viewer: which step is playing and which move. */
-function renderNow() {
-  const now = $('now');
-  now.innerHTML = '';
-  const cur = view === 'whole' ? stepAt(pos) : view;
-  [...stepsEl.children].forEach((el, k) => el.classList.toggle('playing', view === 'whole' && k === cur));
-  if (view === 'whole') keepVisible(cur);
-  renderNav();
-  if (!plan || cur < 0) {
-    now.textContent = plan ? t('common.cubeSolved') : '';
-    return;
-  }
-  const s = plan.steps[cur];
-  const head = document.createElement('div');
-  head.className = 'now-head';
-  head.append(
-    Object.assign(document.createElement('span'), { className: `stage-tag stage-${s.stage}`, textContent: stageLabel(s.stage) }),
-    Object.assign(document.createElement('span'), { className: 'now-title', textContent: s.title }),
-  );
-  const done = Math.min(Math.max(pos - offsets[cur], 0), len(cur));
-  head.append(
-    Object.assign(document.createElement('span'), {
-      className: 'muted now-count',
-      textContent: (view === 'whole' ? t('learn.wholePrefix') : '') + t('learn.position', { step: cur + 1, steps: plan.steps.length, move: done, moves: len(cur) }),
-    }),
-  );
-  now.append(head);
-  if (s.caseName) now.append(Object.assign(document.createElement('div'), { className: 'now-case', textContent: s.caseName }));
-  const alg = document.createElement('div');
-  alg.className = 'now-alg';
-  tokens(s.alg).forEach((t, k) => {
-    alg.append(Object.assign(document.createElement('span'), { className: k < done ? 'done' : k === done ? 'current' : '', textContent: t }), ' ');
-  });
-  now.append(alg);
+function setPlaying(on: boolean) {
+  playing = on;
+  btnPlay.classList.toggle('playing', on);
+  $('play-label').textContent = t(on ? 'learn.pause' : 'learn.play');
 }
 
-/** Keep the playing step in view inside the (scrollable) step list, without moving the page. */
+function stop() {
+  if (playing) player.pause();
+  setPlaying(false);
+}
+
+btnPlay.onclick = async () => {
+  if (!plan) return;
+  if (playing) return stop();
+  setPlaying(true);
+  if (mv >= len(sel)) {
+    const next = loop && len(sel) ? sel : nextWithMoves(sel);
+    if (next < 0) return setPlaying(false);
+    await load(next, 0);
+    if (!playing) return;
+  }
+  player.play();
+};
+
+$('btn-next-move').onclick = () => {
+  if (!plan) return;
+  if (mv < len(sel)) pick(sel, mv + 1);
+  else if (sel + 1 < plan.steps.length) pick(sel + 1, len(sel + 1) ? 1 : 0);
+};
+$('btn-prev-move').onclick = () => {
+  if (!plan) return;
+  if (mv > 0) pick(sel, mv - 1);
+  else if (sel > 0) pick(sel - 1, Math.max(len(sel - 1) - 1, 0));
+};
+$('btn-next-step').onclick = () => {
+  if (plan && sel + 1 < plan.steps.length) pick(sel + 1, 0);
+};
+$('btn-prev-step').onclick = () => {
+  if (!plan) return;
+  if (mv > 0) pick(sel, 0);
+  else if (sel > 0) pick(sel - 1, 0);
+};
+
+// ---------------------------------------------------------------- toggles
+const HIGHLIGHT_KEY = 'learn.highlight';
+let highlight = true;
+try {
+  highlight = localStorage.getItem(HIGHLIGHT_KEY) !== 'off';
+} catch {
+  /* storage unavailable: default on */
+}
+const optHighlight = $<HTMLButtonElement>('opt-highlight');
+const optLoop = $<HTMLButtonElement>('opt-loop');
+optHighlight.setAttribute('aria-pressed', String(highlight));
+optHighlight.onclick = () => {
+  highlight = !highlight;
+  optHighlight.setAttribute('aria-pressed', String(highlight));
+  try {
+    localStorage.setItem(HIGHLIGHT_KEY, highlight ? 'on' : 'off');
+  } catch {
+    /* not remembered */
+  }
+  applyMask();
+};
+optLoop.onclick = () => {
+  loop = !loop;
+  optLoop.setAttribute('aria-pressed', String(loop));
+};
+
+// ---------------------------------------------------------------- current step card
+function render() {
+  const s = plan?.steps[sel];
+  const n = len(sel);
+  for (const id of ['btn-prev-step', 'btn-prev-move', 'btn-next-move', 'btn-next-step', 'btn-play']) $<HTMLButtonElement>(id).disabled = !plan;
+  if (plan) {
+    const last = plan.steps.length - 1;
+    $<HTMLButtonElement>('btn-prev-step').disabled = sel === 0 && mv === 0;
+    $<HTMLButtonElement>('btn-prev-move').disabled = sel === 0 && mv === 0;
+    $<HTMLButtonElement>('btn-next-step').disabled = sel >= last;
+    $<HTMLButtonElement>('btn-next-move').disabled = sel >= last && mv >= n;
+    btnPlay.disabled = !playing && mv >= n && !(loop && n) && nextWithMoves(sel) < 0;
+  }
+
+  [...segsEl.children].forEach((c, k) => {
+    c.classList.toggle('done', k <= sel);
+    if (k === sel) c.setAttribute('aria-current', 'step');
+    else c.removeAttribute('aria-current');
+  });
+  [...stepsEl.children].forEach((li, k) => {
+    const b = li.firstElementChild!;
+    b.classList.toggle('active', k === sel);
+    if (k === sel) b.setAttribute('aria-current', 'step');
+    else b.removeAttribute('aria-current');
+  });
+  keepVisible(sel);
+
+  const tag = $('now-tag');
+  tag.className = s ? `stage-tag stage-${s.stage}` : 'stage-tag hidden';
+  tag.textContent = s ? stageLabel(s.stage) : '';
+  $('now-title').textContent = s ? s.title : plan ? t('common.cubeSolved') : '';
+  $('now-pos').textContent = s ? t('learn.stepPos', { step: sel + 1, steps: plan!.steps.length, move: mv, moves: n }) : '';
+  $('now-case-box').hidden = !s?.caseName;
+  $('now-case').textContent = s?.caseName ?? '';
+  $('now-hint-box').hidden = !s?.hint;
+  $('now-hint').textContent = s?.hint ?? '';
+  $('no-toks').hidden = !s || n > 0;
+  toksEl.replaceChildren(
+    ...tokens(s?.alg ?? '').map((tok, k) => {
+      const b = el('button', k < mv ? 'lp-tok done' : k === mv ? 'lp-tok current' : 'lp-tok', tok);
+      b.type = 'button';
+      if (k === mv) b.setAttribute('aria-current', 'true');
+      b.onclick = () => pick(sel, k);
+      return b;
+    }),
+  );
+}
+
+/** Keep the current step in view inside the (scrollable) step list, without moving the page. */
 function keepVisible(i: number) {
-  const el = stepsEl.children[i] as HTMLElement | undefined;
-  if (!el || stepsEl.scrollHeight <= stepsEl.clientHeight) return;
-  const top = el.offsetTop - stepsEl.offsetTop;
-  if (top < stepsEl.scrollTop || top + el.offsetHeight > stepsEl.scrollTop + stepsEl.clientHeight) {
+  const item = stepsEl.children[i] as HTMLElement | undefined;
+  if (!item || stepsEl.scrollHeight <= stepsEl.clientHeight) return;
+  const top = item.offsetTop - stepsEl.offsetTop;
+  if (top < stepsEl.scrollTop || top + item.offsetHeight > stepsEl.scrollTop + stepsEl.clientHeight) {
     stepsEl.scrollTo({ top: top - 8, behavior: 'smooth' });
   }
 }
-
-$('btn-whole').onclick = () => void load('whole', pos);
-$('btn-prev').onclick = () => {
-  if (view === 'whole') {
-    const cur = stepAt(pos);
-    // Back to the start of this step, or to the previous step if already there.
-    const target = cur >= 0 && pos > offsets[cur] && pos < offsets[cur] + len(cur) ? cur : prevStep(cur);
-    void load('whole', target >= 0 ? offsets[target] : 0);
-  } else {
-    const p = prevStep(view);
-    if (p >= 0) void load(p, offsets[p]);
-  }
-};
-$('btn-next').onclick = () => {
-  const cur = view === 'whole' ? stepAt(pos) : view;
-  const n = nextStep(cur);
-  if (n >= 0) void load(view === 'whole' ? 'whole' : n, offsets[n]);
-};
 
 btnCopy.onclick = async () => {
   if (!plan) return;
   const text = plan.steps.filter((s) => s.alg).map((s) => `${s.alg} // ${s.title}${s.caseName ? ` (${s.caseName})` : ''}`).join('\n');
   await navigator.clipboard.writeText(`${t('common.scramble')}: ${planScramble}\n${text}`);
-  btnCopy.textContent = t('common.copied');
-  setTimeout(() => (btnCopy.textContent = t('common.copy')), 1200);
+  $('copy-label').textContent = t('common.copied');
+  setTimeout(() => ($('copy-label').textContent = t('learn.copySolution')), 1200);
 };
 
-// Cube from the URL: #cube=<54 letters> (scanner, scramble page) or #scramble=<moves> (timer).
+// ---------------------------------------------------------------- start: cube from the URL
+// #cube=<54 letters> (scanner, scramble page) or #scramble=<moves> (timer).
 const hash = location.hash;
 const cubeFromHash = decodeCube(/cube=([A-Z]{54})/.exec(hash)?.[1] ?? '');
 const scrFromHash = /scramble=([^&]+)/.exec(hash)?.[1];
 if (cubeFromHash) net.set(cubeFromHash);
 else if (scrFromHash) {
   try {
-    scramble = formatAlg(parseAlg(decodeURIComponent(scrFromHash)));
-    ($('scramble-in') as HTMLInputElement).value = scramble;
-    net.set(applyMoves(solvedState(), scramble));
+    setScramble(decodeURIComponent(scrFromHash));
   } catch {
     scramble = undefined;
   }
-} else {
-  scramble = formatAlg(randomMoves(20));
-  ($('scramble-in') as HTMLInputElement).value = scramble;
-  net.set(applyMoves(solvedState(), scramble));
-}
-checkCube();
+} else setScramble(formatAlg(randomMoves(20)));
+renderNetView($('mini-net'), net.get());
+if (!checkCube()) setSetupOpen(true);
+render();

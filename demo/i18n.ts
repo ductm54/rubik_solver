@@ -58,7 +58,14 @@ function addPicker() {
     url.searchParams.set('lang', sel.value);
     location.replace(url);
   };
-  nav.append(sel);
+  // A page can give the picker its own spot (with a visible label); otherwise it joins the nav.
+  const slot = document.querySelector('.lang-slot');
+  if (slot) {
+    const label = document.createElement('label');
+    label.className = 'lang-label';
+    label.append(t('lang.label'), sel);
+    slot.append(label);
+  } else nav.append(sel);
 }
 
 translateDom();
