@@ -8,6 +8,7 @@
  */
 import './i18n';
 import { t } from '../src/i18n';
+import { initTour } from './tour';
 
 type Route = 'cube' | 'timer' | 'learn';
 /** What a view exports: `show` runs each time its tab is opened again, `hide` when it is left. */
@@ -53,3 +54,4 @@ async function go() {
 
 window.addEventListener('hashchange', () => void go());
 void go();
+initTour();
