@@ -1,6 +1,7 @@
 import type { Color } from '../src/core/cube';
 import { t } from '../src/i18n';
 import { type Capture, type ReadCubeResult, captureOf, readCube } from '../src/scan/readCube';
+import { type Hint, type Turn, TurnGuide } from '../src/scan/turnHint';
 import { type RGB, nameTogether } from '../src/vision/color';
 import type { FaceReading } from '../src/vision/detect';
 import { findDuplicate } from '../src/vision/duplicate';
@@ -57,6 +58,18 @@ function renameSlots() {
   const names = nameTogether(capturedRgbs());
   let k = 0;
   for (const s of slots) if (s) s.colors = names.slice(k, (k += 9));
+}
+
+// Which way to turn the cube for a face that is still missing (camera only: a recording or a
+// photo cannot be turned).
+const guide = new TurnGuide();
+let hint: Hint | null = null;
+/** The face being held is one that was scanned before. */
+let dupHold = false;
+const TURN_KEY: Record<Turn, string> = { x: 'scan.turnX', "x'": 'scan.turnXp', y: 'scan.turnY', "y'": 'scan.turnYp', y2: 'scan.turnY2' };
+const hintText = () => (hint ? t(TURN_KEY[hint.turn]) : '');
+function refreshHint() {
+  hint = mode === 'camera' ? guide.next(slots.flatMap((s) => (s ? [s.colors[4]] : []))) : null;
 }
 
 // face detection
@@ -200,6 +213,8 @@ function stopAll() {
   photos = [];
   photoDone = false;
   last = null;
+  guide.reset();
+  hint = null;
 }
 
 function setMode(m: Mode) {
@@ -216,6 +231,7 @@ function setMode(m: Mode) {
 
 function resetView() {
   last = null;
+  drawOverlay(); // nothing is drawn while idle, so wipe the last frame's outline and turn hint
   perf.textContent = '';
   renderLive(null);
   if (mode !== 'idle') statusEl.textContent = t('scan.looking');
@@ -266,12 +282,19 @@ worker.onmessage = (e) => {
     const capture = captureOf(update.capture);
     const dup = findDuplicate(capture.labs, slots.map((s) => s?.capture.labs));
     const idx = slots.indexOf(null);
-    if (dup >= 0)
-      statusEl.textContent = mode === 'photo' ? photoPrefix() + t('scan.duplicate') : t('scan.duplicateTurn');
-    else if (idx >= 0) {
+    if (dup < 0 && idx >= 0) {
       slots[idx] = { capture, colors: update.capture.colors };
       onCapture();
     }
+    if (mode === 'camera') {
+      // The face in front of the camera is known now: point to one that is still missing.
+      const seen = slots[dup >= 0 ? dup : idx];
+      if (seen) guide.see(seen.colors[4]);
+      refreshHint();
+    }
+    dupHold = dup >= 0;
+    if (mode === 'camera') renderStatus(face, colors, update); // with the new hint
+    else if (dupHold) statusEl.textContent = duplicateText();
   }
   if (mode === 'photo' && (update.capture || now - photoStart > PHOTO_TIMEOUT)) {
     photoDone = true;
@@ -282,12 +305,23 @@ worker.onmessage = (e) => {
 
 // ---------------------------------------------------------------- UI
 
+/** "Already scanned", with the turn toward a missing face when one is known. */
+function duplicateText(): string {
+  if (mode === 'photo') return photoPrefix() + t('scan.duplicate');
+  return hint ? `${t('scan.duplicate')} ${hintText()}` : t('scan.duplicateTurn');
+}
+
 function renderStatus(face: FaceReading | null, colors: Color[], u: TrackUpdate) {
   const pre = photoPrefix();
+  if (u.status !== 'captured') dupHold = false;
+  if (dupHold) return void (statusEl.textContent = duplicateText());
   if (!face) statusEl.textContent = pre + t('scan.looking');
   else if (u.status === 'steadying') statusEl.textContent = pre + t('scan.reading', { color: colorName(colors[4]) });
-  else if (u.status === 'captured')
-    statusEl.textContent = pre + t(mode === 'photo' ? 'scan.captured' : 'scan.capturedNext', { color: colorName(colors[4]) });
+  else if (u.status === 'captured') {
+    const color = colorName(colors[4]);
+    if (hint) statusEl.textContent = `${t('scan.captured', { color })} ${hintText()}`;
+    else statusEl.textContent = pre + t(mode === 'photo' ? 'scan.captured' : 'scan.capturedNext', { color });
+  }
 }
 
 function miniFace(colors: Color[] | null, unsure: boolean[] = []): HTMLElement {
@@ -320,6 +354,7 @@ function renderCaptured() {
     slot.onclick = () => {
       slots[i] = null;
       tracker.reset();
+      refreshHint();
       renderCaptured();
       handlers.onIncomplete();
     };
@@ -366,6 +401,74 @@ function drawOverlay() {
   const ctx = overlay.getContext('2d')!;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
   drawDetected(ctx, dpr);
+  drawHint(ctx, dpr);
+}
+
+const TURN_DIR: Record<Turn, [number, number]> = { x: [0, -1], "x'": [0, 1], y: [-1, 0], "y'": [1, 0], y2: [-1, 0] };
+
+/** An arrow of length `len` centered on (cx, cy), pointing along (dx, dy); two heads for a half turn. */
+function drawArrow(ctx: CanvasRenderingContext2D, cx: number, cy: number, [dx, dy]: [number, number], len: number, double: boolean) {
+  const head = len * 0.34;
+  const half = len * 0.07; // half the shaft width
+  const wing = len * 0.22;
+  const at = (along: number, across: number): [number, number] => [cx + dx * along - dy * across, cy + dy * along + dx * across];
+  const tip = len / 2;
+  const heads = double ? [tip, tip - head * 0.75] : [tip];
+  const base = heads[heads.length - 1] - head;
+  ctx.beginPath();
+  const pts = [at(-tip, -half), at(base, -half), at(base, half), at(-tip, half)];
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  for (const h of heads) {
+    const tri = [at(h, 0), at(h - head, -wing), at(h - head, wing)];
+    tri.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+  }
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, len * 0.05);
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+}
+
+/**
+ * The turn toward a face that is still missing: a tag in the corner for as long as one is known,
+ * and a large arrow across the face just read, sliding the way the face should go.
+ */
+function drawHint(ctx: CanvasRenderingContext2D, dpr: number) {
+  if (!hint || mode !== 'camera') return;
+  const dir = TURN_DIR[hint.turn];
+  const double = hint.turn === 'y2';
+
+  const pad = 8 * dpr;
+  const h = 34 * dpr;
+  ctx.font = `700 ${18 * dpr}px ui-monospace, 'SF Mono', Menlo, monospace`;
+  ctx.textBaseline = 'middle';
+  const textW = ctx.measureText(hint.turn).width;
+  const dot = hint.color ? 14 * dpr + pad : 0;
+  const w = pad + h + textW + pad + dot + pad / 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, w, h, 8 * dpr);
+  ctx.fill();
+  drawArrow(ctx, pad + pad / 2 + h / 2, pad + h / 2, dir, h * 0.62, double);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(hint.turn, pad + h + pad / 2, pad + h / 2 + dpr);
+  if (hint.color) {
+    ctx.fillStyle = CSS_HEX[hint.color];
+    ctx.fillRect(pad + h + pad / 2 + textW + pad, pad + h / 2 - 7 * dpr, 14 * dpr, 14 * dpr);
+  }
+
+  const f = last?.face;
+  if (!f || last!.update.status !== 'captured' || !proc.width) return;
+  const k = overlay.width / proc.width;
+  const pitch = (Math.hypot(f.corners[0][0] - f.corners[1][0], f.corners[0][1] - f.corners[1][1]) / 3) * k;
+  const slide = ((performance.now() % 1100) / 1100 - 0.5) * pitch * 0.7;
+  const [cx, cy] = f.stickers[4].center;
+  ctx.globalAlpha = 0.9;
+  drawArrow(ctx, cx * k + dir[0] * slide, cy * k + dir[1] * slide, dir, pitch * 2.2, double);
+  ctx.globalAlpha = 1;
 }
 
 function drawDetected(ctx: CanvasRenderingContext2D, dpr: number) {
@@ -435,6 +538,7 @@ stage.onclick = () => {
 $('btn-clear').onclick = () => {
   tracker.reset();
   slots.fill(null);
+  refreshHint();
   renderCaptured();
   handlers.onIncomplete();
 };
