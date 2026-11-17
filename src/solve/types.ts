@@ -13,6 +13,8 @@ export interface SolveStep {
   caseName?: string;
   /** How to recognise the case or what to look for. */
   hint?: string;
+  /** How to read the cube before this step and why it is done this way, one point per entry. */
+  tips?: string[];
   /** Moves for this step in WCA notation (may start with a rotation). */
   alg: string;
   /** Move count without rotations. */

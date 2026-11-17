@@ -585,6 +585,8 @@ function render() {
   $('now-case').textContent = s?.caseName ?? '';
   $('now-hint-box').hidden = !s?.hint;
   $('now-hint').textContent = s?.hint ?? '';
+  $('now-tips-box').hidden = !s?.tips?.length;
+  $('now-tips').replaceChildren(...(s?.tips ?? []).map((tip) => el('li', '', tip)));
   $('no-toks').hidden = !s || n > 0;
   toksEl.replaceChildren(
     ...tokens(s?.alg ?? '').map((tok, k) => {

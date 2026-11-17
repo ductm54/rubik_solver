@@ -396,6 +396,7 @@ body.focus header { opacity: 0.12; }
 .lp-info p { margin: 0; text-wrap: pretty; }
 .lp-label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .lp-case { font-size: 17px; font-weight: 600; }
+.lp-tips { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; text-wrap: pretty; }
 .lp-strong { font-weight: 600; }
 .lp-toks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .lp-toks:empty { display: none; }
