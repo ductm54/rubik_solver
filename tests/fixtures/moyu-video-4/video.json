@@ -1,0 +1,23 @@
+{
+ "source": "Phone video by the repository owner: the stickerless cube one step from solved (only the last layer's corners and edges are out of place), turned by hand over a pale floor. 10 frames per second, shrunk to 270 x 480.",
+ "fps": 10,
+ "frames": 139,
+ "faces": [
+  "RYOOOOOOO",
+  "BGBBBBBBB",
+  "RYORRRRRR",
+  "YOYGGGGGG",
+  "YYYBYRGYG",
+  "WWWWWWWWW"
+ ],
+ "shown": [
+  0,
+  2.5,
+  5.4,
+  7.8,
+  10.1,
+  12.0
+ ],
+ "within": 1.5,
+ "note": "faces: the 9 colours of each face in the order shown, row by row as seen. shown: when each face first comes into view, in seconds. within: how long after that a face may take to be captured (the blue face is swept across the picture half a second after it comes up). The 54 stickers form a valid cube. The orange and the red face show the same pattern, one mostly orange and one mostly red. The white side is solved, has a large logo on its center and is held in front of a pale floor. While the cube is turned, blocks of two or three same-coloured stickers are in view."
+}

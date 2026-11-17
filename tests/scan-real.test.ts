@@ -8,15 +8,17 @@
  *   moyu-video        a phone video of the stickerless cube being turned by hand
  *   moyu-video-2      another, in dim warm light, with the white side solved and a reflection
  *   moyu-video-3      another, in low light over a pale cloth, phone held sideways
+ *   moyu-video-4, -5  the cube nearly solved: a red and an orange side with the same pattern, a
+ *                     solved white side with a large logo, in front of a pale floor
  */
 import { describe, expect, it } from 'vitest';
 import { type Color, FACES } from '../src/core/cube';
 import { validate } from '../src/core/validate';
 import { type Capture, captureOf, readCube } from '../src/scan/readCube';
-import { type Lab, nameTogether } from '../src/vision/color';
+import { nameTogether } from '../src/vision/color';
 import { detectFace } from '../src/vision/detect';
 import { isSolvedSide, refinePlacement } from '../src/vision/faceSearch';
-import { FaceFollower } from '../src/vision/follow';
+import { FaceFollower, knownFrom } from '../src/vision/follow';
 import { type Placement, placePoint } from '../src/vision/grid';
 import { CaptureTracker } from '../src/vision/tracker';
 import { findDuplicate } from '../src/vision/duplicate';
@@ -151,7 +153,7 @@ describe('free-hand detection, real photos', () => {
   });
 });
 
-for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3']) {
+for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3', 'moyu-video-4', 'moyu-video-5']) {
   describe(`free-hand scan of a real video (cube turned by hand, never held still): ${name}`, () => {
     const video = loadVideo(name);
     // the faces that are in view long enough to capture, in the order shown
@@ -163,7 +165,7 @@ for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3']) {
     function run(skip: number) {
       const follower = new FaceFollower();
       const tracker = new CaptureTracker();
-      const captures: { t: number; capture: Capture; alone: string; together: string }[] = [];
+      const captures: { t: number; capture: Capture; alone: string; together: string; pitch: number }[] = [];
       let seen = 0;
       let i = 0;
       for (const frame of video.frames()) {
@@ -174,10 +176,11 @@ for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3']) {
         const u = tracker.update(face, t);
         if (!u.capture) continue;
         const capture = captureOf(u.capture);
-        if (findDuplicate(capture.labs, captures.map((c) => c.capture.labs)) >= 0) continue;
+        if (findDuplicate(capture, captures.map((c) => c.capture)) >= 0) continue;
         // the preview as the page shows it: named together with the faces captured before
         const together = nameTogether([...captures.flatMap((c) => c.capture.rgbs!), ...capture.rgbs!]).slice(-9).join('');
-        captures.push({ t, capture, alone: u.capture.colors.join(''), together });
+        captures.push({ t, capture, alone: u.capture.colors.join(''), together, pitch: u.capture.placement.pitch });
+        follower.setKnown(knownFrom(captures.map((c) => ({ rgbs: c.capture.rgbs, pitch: c.pitch }))));
       }
       return { captures, seen, frames: Math.ceil(i / skip) };
     }
@@ -214,16 +217,16 @@ for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3']) {
       }
       const usual = widths.sort((a, b) => a - b)[widths.length >> 1];
       expect(plain.filter((f) => f.pitch < 0.6 * usual)).toEqual([]);
-      // the second video is the one with a solved side
-      if (name === 'moyu-video-2') expect(plain.length).toBeGreaterThanOrEqual(15);
+      // a solved side is in view for a second or two; without one, nothing is all one colour
+      if (video.faces.some((f) => new Set(f).size === 1)) expect(plain.length).toBeGreaterThanOrEqual(name === 'moyu-video-2' ? 15 : 8);
       else expect(plain).toEqual([]);
     }, 60_000);
 
-    it('captures each face within a second of it coming into view', () => {
+    it(`captures each face within ${video.within} s of it coming into view`, () => {
       const { captures } = scan();
       captures.forEach((c, n) => {
         expect(c.t / 1000).toBeGreaterThanOrEqual(video.shown[held[n]]);
-        expect(c.t / 1000 - video.shown[held[n]]).toBeLessThan(1);
+        expect(c.t / 1000 - video.shown[held[n]]).toBeLessThan(video.within);
       });
     }, 60_000);
 
@@ -269,18 +272,18 @@ describe('special cases in the second video', () => {
   it('a face read twice in changing light counts as a repeat, not as a seventh face', () => {
     const follower = new FaceFollower();
     const tracker = new CaptureTracker();
-    const labs: Lab[][] = [];
+    const seen: Capture[] = [];
     let repeats = 0;
     let i = 0;
     for (const frame of video.frames()) {
       const t = (i++ * 1000) / video.fps;
       const u = tracker.update(follower.detect(frame, t), t);
       if (!u.capture) continue;
-      const l = u.capture.stickers.map((s) => s.lab);
-      if (findDuplicate(l, labs) >= 0) repeats++;
-      else labs.push(l);
+      const c = captureOf(u.capture);
+      if (findDuplicate(c, seen) >= 0) repeats++;
+      else seen.push(c);
     }
-    expect(labs).toHaveLength(6);
+    expect(seen).toHaveLength(6);
     expect(repeats).toBeGreaterThanOrEqual(1);
   }, 60_000);
 
@@ -292,6 +295,64 @@ describe('special cases in the second video', () => {
       // the reflection sits in the top fifth of the frame and is a third of the cube's size
       if (face) expect(face.placement.cy).toBeGreaterThan(frame.height * 0.3);
     }
+  }, 60_000);
+});
+
+describe('nearly solved cube: the scanned faces tell what the next one can be', () => {
+  /** Scan a video the way the page does; `tell` = whether the detector is told what is scanned. */
+  function scan(name: string, tell: boolean) {
+    const video = loadVideo(name);
+    const follower = new FaceFollower();
+    const tracker = new CaptureTracker();
+    const captures: (Capture & { pitch: number })[] = [];
+    /** Sticker size of every face reported after the first capture. */
+    const sizes: number[] = [];
+    let i = 0;
+    for (const frame of video.frames()) {
+      const t = (i++ * 1000) / video.fps;
+      const face = follower.detect(frame, t);
+      if (face && captures.length) sizes.push(face.placement.pitch);
+      const u = tracker.update(face, t);
+      if (!u.capture) continue;
+      const capture = captureOf(u.capture);
+      if (findDuplicate(capture, captures) >= 0) continue;
+      captures.push({ ...capture, pitch: u.capture.placement.pitch });
+      if (tell) follower.setKnown(knownFrom(captures));
+    }
+    return { video, captures, sizes };
+  }
+  const told = { 'moyu-video-4': scan('moyu-video-4', true), 'moyu-video-5': scan('moyu-video-5', true) };
+  // (scanned once, when the file loads: the tests below only look at the results)
+
+  it('a red and an orange side with the same pattern are two faces', () => {
+    const [orange, , red] = told['moyu-video-4'].captures;
+    expect(findDuplicate(red, [orange])).toBe(-1);
+    // by the raw colours alone they pass as one face: red is that close to orange
+    expect(findDuplicate({ labs: red.labs }, [{ labs: orange.labs }])).toBe(0);
+    // and a face shown again is still a repeat
+    expect(findDuplicate(orange, [red, orange])).toBe(1);
+  });
+
+  for (const [name, { video, captures, sizes }] of Object.entries(told)) {
+    it(`${name}: the solved white side is captured: no white on the other five, so it is expected`, () => {
+      expect(captures).toHaveLength(6);
+      expect(readCube(captures).faces[5].join('')).toBe('WWWWWWWWW');
+      expect(video.faces[5]).toBe('WWWWWWWWW');
+    });
+
+    it(`${name}: a block of same-coloured stickers is not reported as a small face`, () => {
+      // While a nearly solved cube is turned, two or three stickers of one colour side by side
+      // look like a small solved side, seams and all. The cube stays the size it was scanned at.
+      const usual = captures.map((c) => c.pitch).sort((a, b) => a - b)[3];
+      expect(sizes.filter((p) => p < 0.5 * usual)).toEqual([]);
+    });
+  }
+
+  it('without the scanned faces, such blocks are reported and the white side is missed', () => {
+    const { captures, sizes } = scan('moyu-video-5', false);
+    const usual = captures.map((c) => c.pitch).sort((a, b) => a - b)[captures.length >> 1];
+    expect(sizes.filter((p) => p < 0.5 * usual).length).toBeGreaterThan(0);
+    expect(captures.length).toBeLessThan(6);
   }, 60_000);
 });
 

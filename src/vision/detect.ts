@@ -71,6 +71,11 @@ export interface DetectOptions {
   previous?: Placement;
   /** With `previous`: search the whole frame if the face is no longer there (default true). */
   searchIfLost?: boolean;
+  /**
+   * A face that is all one colour is expected (the scanned faces show its side must be solved):
+   * it is then accepted with part of its outline missing. See isPlainFace.
+   */
+  expectPlain?: boolean;
 }
 
 export interface DetectResult {
@@ -81,10 +86,10 @@ export function detectFace(img: RGBAImage, opts: DetectOptions = {}): DetectResu
   const { width: W, height: H, data } = img;
   let found: FoundFace | null = null;
   if (opts.previous) {
-    const again = refinePlacement(img, opts.previous, 6, 3);
+    const again = refinePlacement(img, opts.previous, 6, 3, 1, opts.expectPlain);
     if (isFace(again.score) || isSolvedSide(img, again)) found = again;
   }
-  if (!found && (!opts.previous || opts.searchIfLost !== false)) found = findFace(img);
+  if (!found && (!opts.previous || opts.searchIfLost !== false)) found = findFace(img, opts.expectPlain);
   if (!found) return { face: null };
 
   const corners = placementCorners(found) as [Point, Point, Point, Point];

@@ -44,8 +44,8 @@ export function loadNoCube(): { name: string; image: RGBAImage }[] {
 }
 
 /** A video under tests/fixtures as its frames, with the faces it shows in order. */
-export function loadVideo(set: string): { fps: number; faces: string[]; shown: number[]; brief: number[]; frames: () => Generator<RGBAImage> } {
-  const meta = JSON.parse(readFileSync(join(FIXTURES, set, 'video.json'), 'utf8')) as { fps: number; frames: number; faces: string[]; shown: number[]; brief?: number[] };
+export function loadVideo(set: string): { fps: number; faces: string[]; shown: number[]; brief: number[]; within: number; frames: () => Generator<RGBAImage> } {
+  const meta = JSON.parse(readFileSync(join(FIXTURES, set, 'video.json'), 'utf8')) as { fps: number; frames: number; faces: string[]; shown: number[]; brief?: number[]; within?: number };
   return {
     fps: meta.fps,
     faces: meta.faces,
@@ -53,6 +53,8 @@ export function loadVideo(set: string): { fps: number; faces: string[]; shown: n
     shown: meta.shown,
     /** Indexes of faces that are in view too briefly to be captured. */
     brief: meta.brief ?? [],
+    /** How long after coming into view a face may take to be captured, in seconds. */
+    within: meta.within ?? 1,
     *frames() {
       for (let i = 1; i <= meta.frames; i++) {
         const j = jpeg.decode(readFileSync(join(FIXTURES, set, `f_${String(i).padStart(3, '0')}.jpg`)), { useTArray: true, formatAsRGBA: true });

@@ -1,0 +1,23 @@
+{
+ "source": "Phone video by the repository owner: the same nearly solved cube after one more turn, over a white tiled floor. 10 frames per second, shrunk to 270 x 480.",
+ "fps": 10,
+ "frames": 150,
+ "faces": [
+  "YBYGGGGGG",
+  "OOYOOOOOO",
+  "RGOBBBBBB",
+  "YRRRRRRRR",
+  "GYGYYYBYB",
+  "WWWWWWWWW"
+ ],
+ "shown": [
+  0,
+  2.8,
+  4.8,
+  7.0,
+  10.5,
+  13.0
+ ],
+ "within": 2,
+ "note": "faces: the 9 colours of each face in the order shown, row by row as seen. shown: when each face first comes into view, in seconds. within: how long after that a face may take to be captured (the yellow face slides partly out of the picture twice before it is held still). The 54 stickers form a valid cube. The white side is solved and its right edge is in front of white floor tiles, so it has no outline there. The green face is shown twice."
+}
