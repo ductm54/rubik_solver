@@ -337,9 +337,13 @@ body.focus header { opacity: 0.12; }
 .lp-field { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
 .lp-field input { font-size: 15px; font-weight: 500; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--strong-border); background: var(--card); color: var(--text); min-width: 0; }
 .lp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.lp-chips-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1 1 100%; justify-content: space-between; }
+.lp-chips-row { position: relative; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1 1 100%; justify-content: space-between; }
 .lp-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.lp-chip { font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+.lp-chip { font-family: inherit; cursor: pointer; font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+.lp-chip:hover, .lp-chip[aria-expanded='true'] { border-color: var(--accent); }
+.lp-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lp-pop { position: absolute; z-index: 20; max-width: 100%; padding: 8px; border-radius: 12px; background: var(--card); border: 1px solid var(--strong-border); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+.lp-pop[hidden] { display: none; }
 
 .lp-setup-panel { display: flex; gap: 32px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 16px; }
 .lp-setup-panel[hidden] { display: none; }
@@ -354,10 +358,10 @@ body.focus header { opacity: 0.12; }
 .lp-settings #learn-settings { display: flex; flex-direction: column; gap: 16px; }
 .lp-method { font-weight: 600; font-size: 14px; }
 .lp-method select { font: inherit; font-weight: 400; min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--strong-border); background: var(--card); color: var(--text); max-width: 320px; }
-.lp-settings .segmented, .lp-settings .chips { display: flex; flex-wrap: wrap; gap: 6px; border: 0; border-radius: 0; overflow: visible; }
-.lp-settings .seg, .lp-settings .chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--strong-border); background: var(--card); font-size: 14px; font-weight: 500; }
-.lp-settings .seg + .seg { border-left: 1px solid var(--strong-border); }
-.lp-settings .seg:has(input:checked), .lp-settings .chip:has(input:checked) { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 700; box-shadow: none; }
+.lp-settings .segmented, .lp-settings .chips, .lp-pop .segmented, .lp-pop .chips { display: flex; flex-wrap: wrap; gap: 6px; border: 0; border-radius: 0; overflow: visible; }
+.lp-settings .seg, .lp-settings .chip, .lp-pop .seg, .lp-pop .chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--strong-border); background: var(--card); font-size: 14px; font-weight: 500; }
+.lp-settings .seg + .seg, .lp-pop .seg + .seg { border-left: 1px solid var(--strong-border); }
+.lp-settings .seg:has(input:checked), .lp-settings .chip:has(input:checked), .lp-pop .seg:has(input:checked), .lp-pop .chip:has(input:checked) { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 700; box-shadow: none; }
 .lp-settings .setting .hint { margin: 0; max-width: 60ch; }
 
 /* overview: stage bar */
