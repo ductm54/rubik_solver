@@ -12,6 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,5 +20,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Everything but the scanner tests on real photos and videos: those are slow and run in
+      # scanner.yml, only when something they cover changes.
       - run: npm test
       - run: npm run build

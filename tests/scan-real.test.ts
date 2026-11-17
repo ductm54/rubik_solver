@@ -24,6 +24,12 @@ import { CaptureTracker } from '../src/vision/tracker';
 import { findDuplicate } from '../src/vision/duplicate';
 import { type PhotoFace, loadNoCube, loadSet, loadVideo, shrink } from './helpers/image';
 
+/**
+ * Time allowed for a test that replays a whole video, in ms. Each takes a few seconds on a laptop;
+ * CI runners can be several times slower, so the scanner workflow sets SCAN_TEST_TIMEOUT higher.
+ */
+const SLOW = Number(process.env.SCAN_TEST_TIMEOUT) || 60_000;
+
 const SETS = { 'moyu-stickerless': loadSet('moyu-stickerless'), 'stickered-robot': loadSet('stickered-robot') };
 
 const truthOf = (faces: PhotoFace[]) => faces.map((f) => f.colors!.join(''));
@@ -201,7 +207,7 @@ for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3', 'moyu-video-4'
       expect(r.states).toHaveLength(1);
       // a face is in view for most of the video; the rest is turning
       expect(seen / frames).toBeGreaterThan(0.5);
-    }, 60_000);
+    }, SLOW);
 
     it('never takes one sticker for a solved side', () => {
       // Whatever is reported as a one-colour face must be as big as the cube's other faces. While
@@ -220,7 +226,7 @@ for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3', 'moyu-video-4'
       // a solved side is in view for a second or two; without one, nothing is all one colour
       if (video.faces.some((f) => new Set(f).size === 1)) expect(plain.length).toBeGreaterThanOrEqual(name === 'moyu-video-2' ? 15 : 8);
       else expect(plain).toEqual([]);
-    }, 60_000);
+    }, SLOW);
 
     it(`captures each face within ${video.within} s of it coming into view`, () => {
       const { captures } = scan();
@@ -228,21 +234,21 @@ for (const name of ['moyu-video', 'moyu-video-2', 'moyu-video-3', 'moyu-video-4'
         expect(c.t / 1000).toBeGreaterThanOrEqual(video.shown[held[n]]);
         expect(c.t / 1000 - video.shown[held[n]]).toBeLessThan(video.within);
       });
-    }, 60_000);
+    }, SLOW);
 
     it('still works on a slow phone that manages 5 frames per second', () => {
       const { captures } = scan(2);
       expect(captures).toHaveLength(held.length);
       const r = readCube(sixFaces(captures));
       expect(r.faces.map((f) => f.join(''))).toEqual(video.faces);
-    }, 60_000);
+    }, SLOW);
 
     it('the live preview names every sticker right, before the whole cube is known', () => {
       const { captures } = scan();
       const truth = held.map((k) => video.faces[k]);
       expect(captures.map((c) => c.together)).toEqual(truth);
       expect(captures.map((c) => c.alone)).toEqual(truth);
-    }, 60_000);
+    }, SLOW);
   });
 }
 
@@ -261,13 +267,13 @@ describe('special cases in the second video', () => {
       }
     }
     expect(white).toBeGreaterThanOrEqual(10); // it is in view for about 2 s = 20 frames
-  }, 60_000);
+  }, SLOW);
 
   it('a white square is not taken for a face when no cube was seen before it', () => {
     const follower = new FaceFollower();
     const frames = [...video.frames()].slice(80, 95); // the white side only
     expect(frames.map((f, k) => follower.detect(f, k * 100)).filter(Boolean)).toHaveLength(0);
-  }, 60_000);
+  }, SLOW);
 
   it('a face read twice in changing light counts as a repeat, not as a seventh face', () => {
     const follower = new FaceFollower();
@@ -285,7 +291,7 @@ describe('special cases in the second video', () => {
     }
     expect(seen).toHaveLength(6);
     expect(repeats).toBeGreaterThanOrEqual(1);
-  }, 60_000);
+  }, SLOW);
 
   it('the small reflection of the cube in the window is never reported', () => {
     const follower = new FaceFollower();
@@ -295,7 +301,7 @@ describe('special cases in the second video', () => {
       // the reflection sits in the top fifth of the frame and is a third of the cube's size
       if (face) expect(face.placement.cy).toBeGreaterThan(frame.height * 0.3);
     }
-  }, 60_000);
+  }, SLOW);
 });
 
 describe('nearly solved cube: the scanned faces tell what the next one can be', () => {
@@ -353,7 +359,7 @@ describe('nearly solved cube: the scanned faces tell what the next one can be', 
     const usual = captures.map((c) => c.pitch).sort((a, b) => a - b)[captures.length >> 1];
     expect(sizes.filter((p) => p < 0.5 * usual).length).toBeGreaterThan(0);
     expect(captures.length).toBeLessThan(6);
-  }, 60_000);
+  }, SLOW);
 });
 
 describe('fixture sanity', () => {

@@ -47,9 +47,17 @@ Done so far:
 ```bash
 npm install
 npm run dev      # demo at http://localhost:5173
-npm test         # Vitest
+npm test         # Vitest, without the scanner tests (under a minute)
+npm run test:scan  # scanner tests on the real photos and videos (a few minutes)
+npm run test:all   # both
 npm run build    # static site in dist/
 ```
+
+CI runs `npm test` and the build on every push (`.github/workflows/test.yml`). The scanner tests
+run in their own workflow (`.github/workflows/scanner.yml`), only when a push or pull request
+touches what they cover: `src/vision`, `src/scan`, the cube model they use, their fixtures and
+helpers, or the dependencies. They get 45 minutes there, and up to 10 per video. To run them on
+any branch, use "Run workflow" on the Scanner workflow in the Actions tab.
 
 ## Layout
 
