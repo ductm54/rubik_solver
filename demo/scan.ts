@@ -231,6 +231,7 @@ function setMode(m: Mode) {
 
 function resetView() {
   last = null;
+  drawOverlay(); // nothing is drawn while idle, so wipe the last frame's outline and turn hint
   perf.textContent = '';
   renderLive(null);
   if (mode !== 'idle') statusEl.textContent = t('scan.looking');
