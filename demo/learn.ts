@@ -6,7 +6,7 @@ import { validate } from '../src/core/validate';
 import { METHODS, getMethod } from '../src/solve/methods';
 import type { SettingValues, SolvePlan, SolveStep } from '../src/solve/types';
 import { createNet, decodeCube, encodeCube, renderNetView } from './net';
-import { renderSettings, savedMethod, settingChips, valuesFor } from './settings';
+import { renderOptions, renderSettings, savedMethod, settingChips, valuesFor } from './settings';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(`learn-${id}`) as T;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = '') =>
@@ -96,8 +96,81 @@ function drawSettings() {
   });
   drawChips();
 }
+
+// Each chip opens a small menu with just that setting's options, for a quick change.
+const pop = $('pop');
+let popKey: string | null = null; // '' is the method chip, otherwise a setting key
+const chipFor = (key: string) => $('chips').querySelector<HTMLElement>(`[data-key="${key}"]`);
+function closePop(refocus = false) {
+  if (popKey === null) return;
+  const chip = chipFor(popKey);
+  chip?.setAttribute('aria-expanded', 'false');
+  popKey = null;
+  pop.hidden = true;
+  if (refocus) chip?.focus();
+}
+function openPop(key: string) {
+  const chip = chipFor(key);
+  if (!chip) return;
+  closePop();
+  const def = method.settings.find((d) => d.key === key);
+  let body: HTMLElement;
+  if (def) {
+    body = renderOptions(method, def, () => settings, (v) => {
+      settings = v;
+      // A single choice is done once picked; a multi-pick stays open for more.
+      if (def.kind !== 'multi') closePop(true);
+      drawSettings();
+      solve();
+    }, 'quick-');
+  } else {
+    body = el('div', 'segmented');
+    for (const m of METHODS) {
+      const label = el('label', 'seg');
+      const input = Object.assign(el('input'), { type: 'radio', name: 'quick-method', value: m.id, checked: m.id === method.id });
+      input.onchange = () => {
+        closePop(true);
+        methodSel.value = m.id;
+        methodSel.dispatchEvent(new Event('change'));
+      };
+      label.append(input, t(`method.${m.id}.name`));
+      body.append(label);
+    }
+  }
+  pop.replaceChildren(body);
+  pop.setAttribute('aria-label', chip.textContent ?? '');
+  pop.hidden = false;
+  popKey = key;
+  chip.setAttribute('aria-expanded', 'true');
+  // Under the chip, pulled left if it would run past the row.
+  const row = pop.offsetParent as HTMLElement;
+  pop.style.left = `${Math.max(0, Math.min(chip.offsetLeft, row.clientWidth - pop.offsetWidth))}px`;
+  pop.style.top = `${chip.offsetTop + chip.offsetHeight + 6}px`;
+  (pop.querySelector<HTMLInputElement>('input:checked') ?? pop.querySelector('input'))?.focus();
+}
+document.addEventListener('pointerdown', (e) => {
+  const at = e.target as Node;
+  if (popKey !== null && !pop.contains(at) && !$('chips').contains(at)) closePop();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && popKey !== null) closePop(true);
+});
+
 function drawChips() {
-  $('chips').replaceChildren(...[t(`method.${method.id}.name`), ...settingChips(method, settings)].map((c) => el('span', 'lp-chip', c)));
+  const texts = [t(`method.${method.id}.name`), ...settingChips(method, settings)];
+  const keys = ['', ...method.settings.map((d) => d.key)];
+  $('chips').replaceChildren(
+    ...texts.map((c, i) => {
+      const b = el('button', 'lp-chip', c);
+      b.type = 'button';
+      b.dataset.key = keys[i];
+      b.setAttribute('aria-haspopup', 'true');
+      b.setAttribute('aria-expanded', String(popKey === keys[i]));
+      b.onclick = () => (popKey === keys[i] ? closePop() : openPop(keys[i]));
+      return b;
+    }),
+  );
+  if (popKey !== null && !chipFor(popKey)) closePop();
 }
 drawSettings();
 
