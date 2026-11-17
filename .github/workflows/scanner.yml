@@ -1,0 +1,59 @@
+name: Scanner
+
+# The scanner tests replay real photos and phone videos frame by frame (tests/scan-real.test.ts).
+# They take minutes, so they run only when the code or data they cover changes. Run by hand from
+# the Actions tab to check any branch.
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'src/vision/**'
+      - 'src/scan/**'
+      - 'src/core/cube.ts'
+      - 'src/core/orient.ts'
+      - 'src/core/validate.ts'
+      - 'tests/scan-real.test.ts'
+      - 'tests/helpers/**'
+      - 'tests/fixtures/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - '.github/workflows/scanner.yml'
+  pull_request:
+    paths:
+      - 'src/vision/**'
+      - 'src/scan/**'
+      - 'src/core/cube.ts'
+      - 'src/core/orient.ts'
+      - 'src/core/validate.ts'
+      - 'tests/scan-real.test.ts'
+      - 'tests/helpers/**'
+      - 'tests/fixtures/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - '.github/workflows/scanner.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scanner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scanner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:scan -- --testTimeout=300000
+        env:
+          # per video replay; the default (60 s) is for a laptop
+          SCAN_TEST_TIMEOUT: '600000'

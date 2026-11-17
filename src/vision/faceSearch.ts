@@ -28,6 +28,11 @@ const EDGE_STEP = 36;
 const MIN_OUTLINE = 10.6;
 /** A one-colour face has only its outline to go by, so it must be there nearly all the way round. */
 const MIN_PLAIN_OUTLINE = 11.2;
+/**
+ * The same for a one-colour face that is expected (see `expected` in isPlainFace): one side of the
+ * outline may be missing, where the face is held in front of something of its own colour.
+ */
+const MIN_EXPECTED_OUTLINE = 9.5;
 /** Cells closer in colour than this are one colour. */
 const SAME_COLOUR = 60;
 /** A one-colour face shows a seam at least this clear on half of the borders between its cells... */
@@ -107,15 +112,27 @@ function colourRange(s: PlacementScore): number {
  * clear step on all 12 outer cell edges, bar one. A wall or a table top has no such outline. A
  * single sticker of a scrambled face, a sheet of paper and a floor tile do, so this is only half
  * of the test: see isSolvedSide.
+ *
+ * @param expected A one-colour face is known to be coming (the faces scanned so far show none of
+ *   some colour, so its side is solved). Then three sides of outline are enough: a white side
+ *   held over a pale floor has no step on the side where only the floor is behind it. Measured
+ *   on such frames: 10 of the 12 edges show a step, strength 10.1 to 10.6.
  */
-export function isPlainFace(s: PlacementScore): boolean {
+export function isPlainFace(s: PlacementScore, expected = false): boolean {
   if (!s.inside) return false;
   const sorted = [...s.spread].sort((a, b) => a - b);
   if (sorted[7] > Math.max(FLAT_SPREAD, sorted[4] + 10)) return false;
   // a sticker colour: bright or vivid, never dark
   if (s.mean.some((m) => Math.max(m[0], m[1], m[2]) < 90)) return false;
   if (colourRange(s) > SAME_COLOUR) return false;
-  if (s.outline.filter((x) => x > OUTLINE_STEP).length < 11) return false;
+  const steps = s.outline.map((x) => x > OUTLINE_STEP);
+  if (expected) {
+    // every side but one has its whole outline
+    let whole = 0;
+    for (let side = 0; side < 4; side++) if (steps[side * 3] && steps[side * 3 + 1] && steps[side * 3 + 2]) whole++;
+    return whole >= 3 && outlineStrength(s) >= MIN_EXPECTED_OUTLINE;
+  }
+  if (steps.filter(Boolean).length < 11) return false;
   return outlineStrength(s) >= MIN_PLAIN_OUTLINE;
 }
 
@@ -351,23 +368,30 @@ function coarseSearch(s: Small, keep: number): { mixed: Candidate[]; plain: Cand
           // at least two colours, and not mostly dark
           const i0 = base + cellOff[0];
           let far = 0;
+          let farOuter = 0;
           let dark = 0;
           let cost = 0;
           for (let k = 0; k < 9; k++) {
             const i = base + cellOff[k];
             const d = Math.abs(mr[i] - mr[i0]) + Math.abs(mg[i] - mg[i0]) + Math.abs(mb[i] - mb[i0]);
             if (d > far) far = d;
+            if (k !== 4 && d > farOuter) farOuter = d;
             if (mr[i] < 45 && mg[i] < 45 && mb[i] < 45) dark++;
             const sp = spread[i];
             cost += k === 4 ? Math.min(sp, FLAT_SPREAD) : sp < SPREAD_CAP ? sp : SPREAD_CAP;
           }
           if (dark > 2) continue;
-          const onePlain = far <= SAME_COLOUR;
+          // All one colour, going by the 8 outer cells. The center may still differ: a large logo
+          // fills most of this small window, and then the placement is tried both ways (it could
+          // also be a real face whose center alone is another colour).
+          const onePlain = farOuter <= SAME_COLOUR;
           // A face has an outline around it, and a colour change inside it unless it is all one
           // colour; smooth areas (skin, a shaded wall) have neither.
           const inner = edgesIn(cx, cy, inBox);
           const ringEdges = edgesIn(cx, cy, outBox) - inner;
-          if (onePlain ? ringEdges < 6 * pitch || dark > 0 : inner < pitch || ringEdges < 4 * pitch) continue;
+          const plainOk = onePlain && ringEdges >= 6 * pitch && dark === 0;
+          const mixedOk = far > SAME_COLOUR && inner >= pitch && ringEdges >= 4 * pitch;
+          if (!plainOk && !mixedOk) continue;
           // outline on every side
           let steps = 0;
           let ok = true;
@@ -389,20 +413,17 @@ function coarseSearch(s: Small, keep: number): { mixed: Candidate[]; plain: Cand
             steps += sideSteps;
           }
           if (!ok) continue;
-          if (onePlain) {
-            // all one colour: the outline has to carry it
-            if (steps < 10) continue;
+          // all one colour: the outline has to carry it
+          if (plainOk && steps >= 10) {
             const same = plain.findIndex((b) => Math.abs(b.cx - cx) < pitch && Math.abs(b.cy - cy) < pitch);
-            if (same >= 0) {
-              if (plain[same].cost <= cost) continue;
-              plain.splice(same, 1);
+            if (same < 0 || plain[same].cost > cost) {
+              if (same >= 0) plain.splice(same, 1);
+              plain.push({ cx, cy, pitch, rot, cost });
+              plain.sort((a, b) => a.cost - b.cost);
+              if (plain.length > 2) plain.length = 2;
             }
-            plain.push({ cx, cy, pitch, rot, cost });
-            plain.sort((a, b) => a.cost - b.cost);
-            if (plain.length > 2) plain.length = 2;
-            continue;
           }
-          if (steps < 7 || cost >= worst) continue;
+          if (!mixedOk || steps < 7 || cost >= worst) continue;
           // keep the list short and varied: one entry per spot and size
           const same = best.findIndex((b) => Math.abs(b.cx - cx) < pitch && Math.abs(b.cy - cy) < pitch && b.pitch / pitch < 1.4 && pitch / b.pitch < 1.4);
           if (same >= 0) {
@@ -420,8 +441,11 @@ function coarseSearch(s: Small, keep: number): { mixed: Candidate[]; plain: Cand
   return { mixed: best, plain };
 }
 
-/** Step 3: nudge position, size and turn while the measured cost keeps dropping. */
-export function refinePlacement(img: RGBAImage, start: Placement, lattice: number, rounds = 3, reach = 1): FoundFace {
+/**
+ * Step 3: nudge position, size and turn while the measured cost keeps dropping.
+ * @param expectPlain a one-colour face is expected: see isPlainFace
+ */
+export function refinePlacement(img: RGBAImage, start: Placement, lattice: number, rounds = 3, reach = 1, expectPlain = false): FoundFace {
   let best: Placement = start;
   let score = scorePlacement(img, best, lattice);
   let cost = placementCost(score);
@@ -450,31 +474,35 @@ export function refinePlacement(img: RGBAImage, start: Placement, lattice: numbe
     }
     step = { d: step.d / 2, size: step.size / 2, rot: step.rot / 2 };
   }
-  return { ...best, score, cost, plain: !isFace(score) && isPlainFace(score) };
+  return { ...best, score, cost, plain: !isFace(score) && isPlainFace(score, expectPlain) };
 }
 
 const MOVES: [number, number, number, number][] = [];
 for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) for (const ds of [-1, 0, 1]) for (const dr of [-1, 0, 1]) if (dx || dy || ds || dr) MOVES.push([dx, dy, ds, dr]);
 
-/** The best cube face in the frame, or null. */
-export function findFace(img: RGBAImage): FoundFace | null {
+/**
+ * The best cube face in the frame, or null.
+ * @param expectPlain a one-colour face is expected: see isPlainFace
+ */
+export function findFace(img: RGBAImage, expectPlain = false): FoundFace | null {
   const small = shrinkFrame(img);
   const found = coarseSearch(small, 4);
   /** Carry a placement from the small frame back to the full frame and settle it there. */
   const settle = (f: FoundFace): FoundFace =>
-    small.k === 1 ? f : refinePlacement(img, { cx: (f.cx + 0.5) / small.k - 0.5, cy: (f.cy + 0.5) / small.k - 0.5, pitch: f.pitch / small.k, rot: f.rot }, 6, 2, 0.5);
+    small.k === 1 ? f : refinePlacement(img, { cx: (f.cx + 0.5) / small.k - 0.5, cy: (f.cy + 0.5) / small.k - 0.5, pitch: f.pitch / small.k, rot: f.rot }, 6, 2, 0.5, expectPlain);
   let best: FoundFace | null = null;
   for (const c of found.mixed) {
-    const fine = refinePlacement(small.image, c, 5);
+    const fine = refinePlacement(small.image, c, 5, 3, 1, expectPlain);
     if (!isFace(fine.score)) continue;
     if (!best || fine.cost < best.cost) best = fine;
   }
   if (best) {
     const full = settle(best);
-    return isFace(full.score) || isSolvedSide(img, full) ? full : null;
+    if (isFace(full.score) || isSolvedSide(img, full)) return full;
   }
-  // Only when no face with several colours is in view: one that is all one colour.
-  const plain = found.plain.map((c) => refinePlacement(small.image, c, 5)).filter((f) => f.plain);
+  // Only when no face with several colours is in view: one that is all one colour. (The mixed
+  // candidate may have been a one-colour face with a large logo in its middle.)
+  const plain = found.plain.map((c) => refinePlacement(small.image, c, 5, 3, 1, expectPlain)).filter((f) => f.plain);
   for (const fine of plain.sort((a, b) => a.cost - b.cost)) {
     const full = settle(fine);
     if (isSolvedSide(img, full)) return full;

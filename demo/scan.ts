@@ -5,6 +5,7 @@ import { type Hint, type Turn, TurnGuide } from '../src/scan/turnHint';
 import { type RGB, nameTogether } from '../src/vision/color';
 import type { FaceReading } from '../src/vision/detect';
 import { findDuplicate } from '../src/vision/duplicate';
+import { knownFrom } from '../src/vision/follow';
 import { CaptureTracker, type TrackUpdate } from '../src/vision/tracker';
 
 export interface ScannerHandlers {
@@ -45,6 +46,9 @@ interface Slot {
   capture: Capture;
   /** Colours for the thumbnail: the single-face guess, replaced by the whole-cube reading. */
   colors: Color[];
+  /** Sticker size in the frame, and which camera session or video it was scanned from. */
+  pitch: number;
+  source: number;
 }
 const slots: (Slot | null)[] = [null, null, null, null, null, null];
 const filled = () => slots.filter(Boolean).length;
@@ -150,10 +154,25 @@ function loadFiles(files: File[]) {
   nextPhoto();
 }
 
+/** Counts pictures: each camera session, video and photo shows the cube at its own size. */
+let sourceSeq = 0;
+
+/**
+ * Tell the detector which faces are scanned. They narrow down what the next one can be: which
+ * colours can still fill a whole side, and how large the cube is in this camera's picture.
+ */
+function sendKnown() {
+  const live = mode === 'camera' || mode === 'video';
+  const faces = slots.flatMap((s) => (s ? [{ rgbs: s.capture.rgbs, pitch: live && s.source === sourceSeq ? s.pitch : undefined }] : []));
+  worker.postMessage({ known: knownFrom(faces) });
+}
+
 /** The picture changed completely: start detection and the steady clock afresh. */
 function newPicture() {
   tracker.reset();
+  sourceSeq++;
   worker.postMessage({ reset: true });
+  sendKnown();
   minReq = reqId + 1;
   last = null;
 }
@@ -280,10 +299,10 @@ worker.onmessage = (e) => {
   renderStatus(face, colors, update);
   if (update.capture) {
     const capture = captureOf(update.capture);
-    const dup = findDuplicate(capture.labs, slots.map((s) => s?.capture.labs));
+    const dup = findDuplicate(capture, slots.map((s) => s?.capture));
     const idx = slots.indexOf(null);
     if (dup < 0 && idx >= 0) {
-      slots[idx] = { capture, colors: update.capture.colors };
+      slots[idx] = { capture, colors: update.capture.colors, pitch: update.capture.placement.pitch, source: sourceSeq };
       onCapture();
     }
     if (mode === 'camera') {
@@ -353,6 +372,7 @@ function renderCaptured() {
     slot.disabled = !s;
     slot.onclick = () => {
       slots[i] = null;
+      sendKnown();
       tracker.reset();
       refreshHint();
       renderCaptured();
@@ -366,6 +386,7 @@ function renderCaptured() {
 
 let audio: AudioContext | null = null;
 function onCapture() {
+  sendKnown();
   renameSlots();
   renderCaptured();
   if (filled() === 6) {
@@ -538,6 +559,7 @@ stage.onclick = () => {
 $('btn-clear').onclick = () => {
   tracker.reset();
   slots.fill(null);
+  sendKnown();
   refreshHint();
   renderCaptured();
   handlers.onIncomplete();

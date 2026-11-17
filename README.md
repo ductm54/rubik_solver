@@ -47,9 +47,17 @@ Done so far:
 ```bash
 npm install
 npm run dev      # demo at http://localhost:5173
-npm test         # Vitest
+npm test         # Vitest, without the scanner tests (under a minute)
+npm run test:scan  # scanner tests on the real photos and videos (a few minutes)
+npm run test:all   # both
 npm run build    # static site in dist/
 ```
+
+CI runs `npm test` and the build on every push (`.github/workflows/test.yml`). The scanner tests
+run in their own workflow (`.github/workflows/scanner.yml`), only when a push or pull request
+touches what they cover: `src/vision`, `src/scan`, the cube model they use, their fixtures and
+helpers, or the dependencies. They get 45 minutes there, and up to 10 per video. To run them on
+any branch, use "Run workflow" on the Scanner workflow in the Actions tab.
 
 ## Layout
 
@@ -62,9 +70,9 @@ npm run build    # static site in dist/
 | `src/vision/grid.ts` | A 3 × 3 face placed by position, size and turn, and its measurements: how flat each cell is, how strong the outline around the face is, and how clearly the seams between the cells show |
 | `src/vision/faceSearch.ts` | `findFace(frame)`: tries every position, size and turn on a shrunk frame (integral images), keeps placements with flat cells and an outline, fine-tunes the best; a one-colour face must also show seams |
 | `src/vision/detect.ts` | `detectFace(frame)`: `findFace`, then 9 Lab colour readings with glare rejection (center on a ring), and a neighbour strip when one shows |
-| `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms), re-searches the whole frame every third frame or when the colours change, and believes a plain white face only where a cube was just seen |
+| `src/vision/follow.ts` | `FaceFollower`: follows the face from frame to frame (about 4 ms), re-searches the whole frame every third frame or when the colours change, and believes a plain white face only where a cube was just seen; `setKnown` tells it the faces scanned so far, which narrow down what the next one can be |
 | `src/vision/color.ts` | sRGB → Lab, sticker distance, nearest-colour reading, `classifyBalanced` (centers as references, exactly 9 per colour, Hungarian assignment) |
-| `src/vision/duplicate.ts` | `findDuplicate` to spot a face scanned twice in any rotation |
+| `src/vision/duplicate.ts` | `findDuplicate` to spot a face scanned twice in any rotation; faces with different centers are never the same face |
 | `src/vision/tracker.ts` | Free-hand auto-capture: fires once the same nine colours have been read for 350 ms, even while the cube moves; the capture is the average over that time |
 | `src/scan/readCube.ts` | 6 captures → cube: centers name the faces, exactly 9 per colour, strips matched by colour proportions, `assemble()`, best guess for manual fixing |
 | `src/timer/machine.ts` | Timer state machine: inspection, hold-to-ready, false starts, +2 / DNF from inspection |
@@ -97,8 +105,8 @@ npm run build    # static site in dist/
   TypeScript instead of a ~10 MB download.
 - **Scanner tests use real photos** (`tests/fixtures`): a hand-held stickerless cube and an
   overexposed stickered cube, cube-free views, and a phone video of the
-  cube being turned by hand (three of them, in different light, replayed frame by frame the
-  way the page does it). Each photo is shrunk to video sizes and the whole cube must come out
+  cube being turned by hand (five of them, in different light, two of a nearly solved cube,
+  replayed frame by frame the way the page does it). Each photo is shrunk to video sizes and the whole cube must come out
   right. The earlier synthetic-image tests passed while real cubes failed, so they are gone.
 
 - **Free-hand detection without gaps.** The first detector looked for sticker-sized square regions
@@ -116,8 +124,8 @@ npm run build    # static site in dist/
 - **A side that is all one colour** (a solved side) has no colour changes inside it to go by, so it
   is found by its outline (a clear step on at least 11 of its 12 outer cell edges) and by the
   seams between its nine pieces. A floor tile can have both, so a vivid side is accepted as it is,
-  and a white one only where a cube was seen in the last 4 seconds. Show another face first if the
-  white side is solved.
+  and a white one only where a cube was seen in the last 4 seconds, or once two scanned faces
+  show no white at all (see below). Show another face first if the white side is solved.
 - **One sticker is not a solved side.** A single sticker of a scrambled face is also a flat square
   with other colours all round it. While a layer was being turned, or the face was tilted, no
   whole face was found and one sticker was reported as a solved side instead: in 4 frames of the
@@ -129,7 +137,27 @@ npm run build    # static site in dist/
   and the solved white side passes in every frame down to a face 50 px wide.
 - **Repeats.** The light on a turning cube changes, so the same face read twice is not the same
   numbers (on real video: up to 35 apart on one sticker, 24 on average). Two different faces
-  always have a sticker 90 or more apart. A repeat is a face with no sticker far off.
+  nearly always have a sticker 90 or more apart. A repeat is a face with no sticker far off.
+  The exception is red against orange, which are closer than that: on a nearly solved cube the
+  red and the orange side can show the same pattern (one corner and one edge out of place on
+  each), and the red side was refused as a repeat of the orange one. A center never moves, so two
+  faces whose centers differ are two faces, and the centers are named together with every sticker
+  scanned so far, which is what separates red from orange.
+- **The scanned faces help find the next one.** Each captured face is passed back to the detector
+  (`FaceFollower.setKnown`), which then knows three things. A colour that already shows on
+  another face cannot fill a whole side, so a one-colour "face" of it is not a face. A colour on
+  none of two or more scanned faces has its side solved and still to come: that side is then
+  accepted with the outline missing on one of its four sides (a white side held over a pale floor
+  has none where only the floor is behind it), and without the cube-seen-here test. And the cube
+  stays about the size it was scanned at, so anything under half that size is not a whole face.
+  The last one matters on a nearly solved cube: while it is turned, two or three stickers of one
+  colour side by side look like a small solved side, seams included. In the two videos of such a
+  cube, without this the white side is not captured and five such blocks are reported; with it
+  all six faces are captured and none are.
+- **A large logo.** The search runs on a frame shrunk to 160 px, where a logo covering most of
+  the white center turns that cell grey. The face then looked like one with two colours, failed
+  that test once measured properly, and was never tried as a solved side. Whether a face is all
+  one colour now goes by its 8 outer cells; one whose center alone differs is tried both ways.
 - **Preview colours.** Before the whole cube is known, stickers are named by hue. This cube's red
   sits at hue -7 to 17 and its orange at 23 to 45 depending on the light, so the boundary between
   them is set by the gap between the reddish stickers in view (within a face, and across the

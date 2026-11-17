@@ -62,7 +62,7 @@ describe('Phase 0', () => {
     }
     // Validity alone almost always pins down the one real cube.
     expect(unique).toBeGreaterThanOrEqual(45);
-  });
+  }, 30_000); // about 5 s on a laptop, right at vitest's default limit
 
   describe('4. impossible cubes are rejected with a clear message', () => {
     const base = applyMoves(solved, "R U F' L2 D B");
