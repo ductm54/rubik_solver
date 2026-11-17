@@ -84,7 +84,7 @@ npm run build    # static site in dist/
 | `src/i18n/` | `t(key, params)` with plural forms; `locales/en.ts` holds every key, the other languages load on demand (one chunk each). Solver texts are made in the page's language: the worker gets it with each request |
 | `demo/i18n.ts` | Page language (`?lang=`, saved choice, browser), `data-i18n` attributes in the HTML, the language picker |
 | `demo/index.html`, `demo/app.ts` | The one page and its shell: Cube, Learn and Timer are views picked by the URL hash (`#cube`, `#learn`, `#timer`), so switching never reloads; each view's code loads on first use and is told when it is shown or hidden (camera off, playback and timing stopped) |
-| `demo/tour.ts` | Guided tour for first-time visitors: opens once on the front page (remembered in `localStorage` under `rubik-tour-seen`), and again from the Tour button in the header |
+| `demo/tour.ts` | Guided tour of the three tabs, opened from the Tour button in the header (it never opens by itself) |
 | `demo/learn.ts`, `demo/settings.ts` | Learn view: cube input, settings view, step list and viewer (`learn.html` redirects to `#learn`) |
 | `demo/timer.ts`, `demo/chart.ts` | Timer view: scramble + preview, timing pad, stats, history chart, solve table (`timer.html` redirects to `#timer`) |
 | `demo/scan.ts` | Scan panel of the Cube view (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
