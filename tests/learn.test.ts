@@ -1,7 +1,8 @@
 /** The Learn tab's beginner course: every demo starts the way its text describes. */
 import { describe, expect, test } from 'vitest';
 import { applyMovesToArray, invertAlg, parseAlg, solvedState, toColorArray } from '../src/core/cube';
-import { BEGINNER, HOLD, holdOf, type Lesson, NOTATION_MOVES } from '../src/learn/beginner';
+import { BEGINNER, HOLD, holdOf, type Lesson, NOTATION_MOVES, SPEEDUPS } from '../src/learn/beginner';
+import { EN } from '../src/i18n/locales/en';
 import { type Stickers, centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 
 const SOLVED = toColorArray(solvedState());
@@ -9,7 +10,7 @@ const held = applyMovesToArray(SOLVED, HOLD);
 
 /** The state a case's demo starts from, as the viewer computes it (setup anchored at the end). */
 function start(lesson: string, id: string): Stickers {
-  const l = BEGINNER.find((k) => k.id === lesson)!;
+  const l = [...BEGINNER, ...SPEEDUPS].find((k) => k.id === lesson)!;
   const c = l.cases.find((k) => k.id === id)!;
   const hold = applyMovesToArray(SOLVED, holdOf(l));
   return applyMovesToArray(applyMovesToArray(hold, c.end ?? ''), invertAlg(parseAlg(c.alg)));
@@ -143,4 +144,82 @@ test('cube turned over, twisted corners at the bottom front-right and front-left
   expect(corners.filter((c) => !yellowDown(c))).toEqual(['DFR', 'DLF']);
   expect(corners.every((c) => inPlace(s, c))).toBe(true);
   expect(solved(s, 'UF', 'UR', 'UB', 'UL', 'UFR', 'URB', 'UBL', 'ULF', 'FR', 'FL', 'BR', 'BL', 'DF', 'DR', 'DB', 'DL', 'DRB', 'DBL')).toBe(true);
+});
+
+describe('going faster', () => {
+  const has = (k: string) => k in EN;
+  test('every tip, case and step link has its text, and every algorithm parses', () => {
+    for (const g of SPEEDUPS) {
+      expect(has(`learn.${g.id}.title`)).toBe(true);
+      if (g.step) expect(BEGINNER.some((l) => l.id === g.step)).toBe(true);
+      for (const tip of g.tips) {
+        expect(has(`learn.${g.id}.${tip.id}`), tip.id).toBe(true);
+        expect(has(`learn.${g.id}.${tip.id}.text`), tip.id).toBe(true);
+        expect(EN[`learn.${g.id}.${tip.id}.text` as keyof typeof EN].includes('{alg}')).toBe(!!tip.alg);
+        if (tip.alg) expect(parseAlg(tip.alg).length).toBeGreaterThan(0);
+      }
+      for (const c of g.cases) {
+        expect(has(`learn.${g.id}.${c.id}`), c.id).toBe(true);
+        expect(has(`learn.${g.id}.${c.id}.desc`), c.id).toBe(true);
+        expect(parseAlg(c.alg).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  const TOP_CROSS = ['UR', 'UB', 'UL'];
+  test('cross: an edge in the middle layer slides up with one turn', () => {
+    const s = start('fast.cross', 'slide');
+    expect(at(s, 'FR', 'F')).toBe('W');
+    expect(at(s, 'FR', 'R')).toBe(centerColor(s, 'F'));
+    expect(solved(s, ...TOP_CROSS)).toBe(true);
+    const d = start('fast.cross', 'direct');
+    expect(at(d, 'FR', 'R')).toBe('W');
+    expect(at(d, 'FR', 'F')).toBe(centerColor(d, 'F'));
+    expect(solved(d, ...TOP_CROSS)).toBe(true);
+  });
+
+  test('corners: white on top goes in with two sets', () => {
+    const s = start('fast.corners', 'up');
+    expect(at(s, 'UFR', 'U')).toBe('W');
+    expect(solved(s, ...CROSS, 'DRB', 'DBL', 'DLF')).toBe(true);
+    expect(parseAlg(SPEEDUPS[1].cases[0].alg)).toHaveLength(8);
+  });
+
+  for (const [id, face] of [['keepRight', 'R'], ['keepLeft', 'F'], ['keepUp', 'U']]) {
+    test(`corners: white facing ${face}, the front-right middle edge already solved and kept`, () => {
+      const s = start('fast.corners', id);
+      expect(at(s, 'UFR', face)).toBe('W');
+      expect(solved(s, ...CROSS, 'DRB', 'DBL', 'DLF', 'FR')).toBe(true);
+    });
+  }
+
+  test('middle: the two right edges swapped', () => {
+    const s = start('fast.middle', 'swap');
+    expect(solved(s, ...FIRST, 'FL', 'BL')).toBe(true);
+    expect(inPlace(s, 'FR') || inPlace(s, 'BR')).toBe(false);
+    const fr = cubie('FR').map((i) => s[i]).sort().join('');
+    expect(fr).toBe([centerColor(s, 'B'), centerColor(s, 'R')].sort().join(''));
+  });
+
+  test('top: an L at the front and right becomes the cross in one go', () => {
+    const s = start('fast.top', 'wide');
+    expect(['UB', 'UL', 'UR', 'UF'].filter((e) => yellowUp(s, e))).toEqual(['UR', 'UF']);
+    expect(solved(s, ...F2L)).toBe(true);
+  });
+
+  test('top: opposite edges, the second go is always after U2', () => {
+    const c = BEGINNER.find((l) => l.id === 'yedges')!.cases.find((k) => k.id === 'opposite')!;
+    expect(c.alg).toContain(' U2 ');
+  });
+
+  test('top: the left-hand corner cycle does in one go what the usual one does in two', () => {
+    expect(start('fast.top', 'corners')).toEqual(start('ycorners', 'twice'));
+    const leftColour = (st: Stickers) => cubie('ULF').some((i) => st[i] === centerColor(st, 'L'));
+    expect(leftColour(start('fast.top', 'corners'))).toBe(true);
+    expect(leftColour(start('ycorners', 'one'))).toBe(false);
+  });
+
+  test('twist: two backwards 4-moves are four 4-moves', () => {
+    expect(start('fast.twist', 'two')).toEqual(start('twist', 'two'));
+  });
 });

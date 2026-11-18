@@ -712,6 +712,63 @@ const en = {
   'learn.twist.alg.main': 'Right 4-moves',
   'learn.twist.two': 'Two twisted corners',
   'learn.twist.two.desc': 'The front-right corner needs two goes, the front-left one four. Watch the top come back at the end.',
+
+  // Going faster: J Perm's shortcuts for the beginner method.
+  'learn.fast': 'Go faster',
+  'learn.fast.label': 'Faster',
+  'learn.fast.intro': 'Once you can solve the cube, you can get much faster without learning a new method. These shortcuts, from J Perm\'s video on speeding up the beginner method, cut out repeated 4-moves and wasted turns. Learn one at a time.',
+  'learn.fast.from': 'Speeds up: {step}',
+
+  'learn.fast.cross.title': 'Faster cross',
+  'learn.fast.cross.slide': 'Slide a middle edge straight up',
+  'learn.fast.cross.slide.text': 'An edge with white in the middle layer does not need to go down to the bottom first. Look which way white can slide up: turn the side that does not have the white sticker. Turn U to bring the edge\'s spot on top over to it, slide it up with that one turn, and turn U back. Here: {alg}.',
+  'learn.fast.cross.direct': 'Already under its spot',
+  'learn.fast.cross.direct.desc': 'White faces right and the edge belongs at the front, right above it: one F\' slides it up.',
+  'learn.fast.cross.slide.desc': 'White faces the front and the edge belongs at the front. U\' moves its spot over the slot, R slides it up, U puts the cross back. Three moves instead of six.',
+
+  'learn.fast.corners.title': 'Faster white corners',
+  'learn.fast.corners.front': 'White facing you: use the left hand',
+  'learn.fast.corners.front.text': 'Five right 4-moves is the slowest case. Turn so the corner is at the front-left and the left 4-moves, {alg}, put it in at once (see step 2).',
+  'learn.fast.corners.up': 'White on top: one set less',
+  'learn.fast.corners.up.text': 'Instead of three 4-moves, make the first U a U2, then do the 4-moves once more: {alg}.',
+  'learn.fast.corners.stuck': 'Take a stuck corner out with the left hand',
+  'learn.fast.corners.stuck.text': 'A white corner in the wrong place on the bottom: take it out from the side where white ends up facing sideways, not up. Often that is the left hand, {alg}. A corner with white on the side then goes in with a single 4-moves.',
+  'learn.fast.corners.keep': 'Keep a middle edge that is already solved',
+  'learn.fast.corners.keep.text': 'Sometimes the middle edge next to a corner\'s slot is already in place. The plain 4-moves would knock it out. White facing right: turn U to move the corner away, do a 4-moves-style set, then put the corner in. White facing you: the same on the left. White on top: {alg} keeps the edge, no shortcut.',
+  'learn.fast.corners.up.desc': 'R U2 R\' U\' and one 4-moves: two sets instead of three.',
+  'learn.fast.corners.keepRight': 'Keep the edge: white right',
+  'learn.fast.corners.keepRight.desc': 'The front-right middle edge is already solved. U\' moves the corner away, R U2 R\' U sets it up, R U R\' puts it in. The edge stays.',
+  'learn.fast.corners.keepLeft': 'Keep the edge: white front',
+  'learn.fast.corners.keepLeft.desc': 'Turn the cube (y) so the corner is at the front-left with white facing left, and do the mirror image with the left hand.',
+  'learn.fast.corners.keepUp': 'Keep the edge: white on top',
+  'learn.fast.corners.keepUp.desc': 'Three plain 4-moves: the front-right middle edge comes back at the end.',
+
+  'learn.fast.middle.title': 'Faster middle layer',
+  'learn.fast.middle.swap': 'Swap two edges on the right',
+  'learn.fast.middle.swap.text': 'Two middle edges on the same side are in each other\'s slots: hold them on the right and do {alg}. No need to take one out and put it back.',
+  'learn.fast.middle.flipped': 'Flip an edge in its slot',
+  'learn.fast.middle.flipped.text': 'An edge in its own slot but flipped: hold it on the right and do {alg}, then take the corner out and put it back with the left hand. That is quicker than putting another edge in to knock it out.',
+  'learn.fast.middle.swap.desc': 'The front-right and back-right edges trade places. The top layer gets mixed up, which does not matter yet.',
+
+  'learn.fast.top.title': 'Faster last layer',
+  'learn.fast.top.wide': 'Backwards L: straight to the cross',
+  'learn.fast.top.wide.text': 'Hold the L pointing to the front and right (the other way from step 4) and do {alg}: f is the front two layers together. The 4-moves in between stay the same. One go instead of two.',
+  'learn.fast.top.opposite': 'Opposite edges: no need to look again',
+  'learn.fast.top.opposite.text': 'Two opposite edges match: do the swap once, turn the top with {alg} (two flicks of the left hand), and do it again. The pair is always in the right spot, so you do not have to look or turn the cube.',
+  'learn.fast.top.corners': 'Corners that need two goes: start with the left hand',
+  'learn.fast.top.corners.text': 'With one corner in place at the front-right, look at the top front-left corner before you start. If it has the colour of the left center on it, it belongs at the back-left and the corners must go the other way: do {alg} once, starting with the left hand, instead of the usual algorithm twice.',
+  'learn.fast.top.wide.desc': 'An L at the front and right: one go makes the whole cross.',
+  'learn.fast.top.corners.desc': 'The same case as "The other way round" in step 6: one go with the left-hand version, not two.',
+
+  'learn.fast.twist.title': 'Faster corner twists',
+  'learn.fast.twist.reverse': 'Four 4-moves? Do the backwards 4-moves twice',
+  'learn.fast.twist.reverse.text': 'A corner that needs four right 4-moves takes the same turns as two backwards 4-moves, {alg}: half the work. Push the top layer with your ring finger to keep it quick.',
+  'learn.fast.twist.two': 'Two twisted corners',
+  'learn.fast.twist.two.desc': 'The front-right corner still takes two 4-moves; the front-left one takes two backwards 4-moves instead of four.',
+
+  'learn.fast.habits.title': 'One more habit',
+  'learn.fast.habits.neutral': 'Start the cross on any colour',
+  'learn.fast.habits.neutral.text': 'Before you start, look around the cube and make the cross on whichever colour already has the most pieces in place, not always white. The rest of the method works the same with any colour on the bottom.',
 };
 
 export type Messages = Record<keyof typeof en, string>;
