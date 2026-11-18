@@ -41,7 +41,7 @@ export function valuesFor(m: MethodDef): SettingValues {
   for (const def of m.settings) {
     const v = saved[def.key];
     const ok = (x: unknown) => def.options.some((o) => o.value === x);
-    if (def.kind === 'multi' && Array.isArray(v) && v.length && v.every(ok)) out[def.key] = v;
+    if (def.kind === 'multi' && Array.isArray(v) && (v.length || def.allowEmpty) && v.every(ok)) out[def.key] = v;
     if (def.kind === 'choice' && typeof v === 'string' && ok(v)) out[def.key] = v;
   }
   return out;
@@ -70,7 +70,7 @@ export function renderOptions(m: MethodDef, def: SettingDef, get: () => SettingV
       let values = get();
       if (def.kind === 'multi') {
         const picked = [...opts.querySelectorAll<HTMLInputElement>('input:checked')].map((i) => i.value);
-        if (!picked.length) {
+        if (!picked.length && !def.allowEmpty) {
           input.checked = true; // keep at least one
           return;
         }
@@ -124,6 +124,7 @@ export function settingChips(m: MethodDef, values: SettingValues): string[] {
     const colorOpt = def.key === 'crossColors' || def.key === 'crossColor';
     const name = (v: string) => (colorOpt ? t(`color.${v}`) : tr(`set.${m.id}.${def.key}.${v}`, def.options.find((o) => o.value === v)?.label ?? v));
     const cur = values[def.key];
-    return `${label}: ${(Array.isArray(cur) ? cur : [cur]).map(name).join(', ')}`;
+    const list = (Array.isArray(cur) ? cur : [cur]).filter((v) => v !== undefined && v !== '');
+    return `${label}: ${list.length ? list.map(name).join(', ') : t('solve.none')}`;
   });
 }

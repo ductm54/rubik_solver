@@ -201,6 +201,14 @@ describe('going faster', () => {
     expect(fr).toBe([centerColor(s, 'B'), centerColor(s, 'R')].sort().join(''));
   });
 
+  test('middle: the front-right edge flipped in its slot', () => {
+    const s = start('fast.middle', 'flipped');
+    expect(inPlace(s, 'FR')).toBe(true);
+    expect(solved(s, 'FR')).toBe(false);
+    expect(solved(s, ...FIRST, 'FL', 'BR', 'BL')).toBe(true);
+    expect(parseAlg(SPEEDUPS[2].cases[1].alg)).toHaveLength(11);
+  });
+
   test('top: an L at the front and right becomes the cross in one go', () => {
     const s = start('fast.top', 'wide');
     expect(['UB', 'UL', 'UR', 'UF'].filter((e) => yellowUp(s, e))).toEqual(['UR', 'UF']);
