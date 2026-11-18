@@ -1,664 +1,258 @@
-import { lang } from './i18n';
+/**
+ * Learn view: how to solve the cube, method by method (the beginner method for now). Each step
+ * has its text and a 3D viewer with example cases; viewers are made when their step first
+ * scrolls near the screen, so the page opens fast.
+ */
 import 'cubing/twisty';
 import { t } from '../src/i18n';
-import { type CubeState, applyMoves, formatAlg, parseAlg, randomMoves, solvedState } from '../src/core/cube';
-import { validate } from '../src/core/validate';
-import { METHODS, getMethod } from '../src/solve/methods';
-import type { SettingValues, SolvePlan, SolveStep } from '../src/solve/types';
-import { createNet, decodeCube, encodeCube, renderNetView } from './net';
-import { renderOptions, renderSettings, savedMethod, settingChips, valuesFor } from './settings';
-
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(`learn-${id}`) as T;
-const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = '') =>
-  Object.assign(document.createElement(tag), { className, textContent: text });
+import { BEGINNER, FULL_MASK, HOLD, type Lesson, type LessonCase, NOTATION_MOVES } from '../src/learn/beginner';
 
 /** The parts of cubing.js's TwistyPlayer used here. */
 type Player = HTMLElement & {
   alg: string;
   experimentalSetupAlg: string;
+  experimentalSetupAnchor: 'start' | 'end';
   experimentalStickeringMaskOrbits: string;
   timestamp: number | 'start' | 'end';
   play(): void;
   pause(): void;
-  experimentalModel: {
-    currentMoveInfo: { addFreshListener(f: (info: { patternIndex: number; movesFinishing: unknown[] }) => void): void };
-    coarseTimelineInfo: { addFreshListener(f: (info: { playing: boolean; atStart: boolean; atEnd: boolean }) => void): void };
-    playingInfo: { set(v: { playing: boolean; direction?: 1 | -1; untilBoundary?: string }): void };
-    indexer: { get(): Promise<{ indexToMoveStartTimestamp(i: number): number; numAnimatedLeaves(): number }> };
+};
+
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = '') =>
+  Object.assign(document.createElement(tag), { className, textContent: text });
+
+const root = document.getElementById('learn-lessons')!;
+const toc = document.getElementById('learn-toc')!;
+const players: Player[] = [];
+
+/** Translate `key`, with `{alg}` shown as code. */
+function rich(key: string, alg = ''): DocumentFragment {
+  const frag = document.createDocumentFragment();
+  for (const part of t(key, { alg: '\u0001' }).split(/(\u0001)/)) {
+    if (part === '\u0001') frag.append(el('code', 'learn-inline', alg));
+    else if (part) frag.append(part);
+  }
+  return frag;
+}
+
+function makePlayer(): Player {
+  const p = document.createElement('twisty-player') as Player;
+  p.setAttribute('puzzle', '3x3x3');
+  p.setAttribute('background', 'none');
+  p.setAttribute('control-panel', 'bottom-row');
+  p.setAttribute('hint-facelets', 'floating');
+  players.push(p);
+  return p;
+}
+
+/** Show a case in a viewer, ready to play from its start. */
+function loadCase(p: Player, lesson: Lesson, c: LessonCase) {
+  p.pause();
+  p.experimentalSetupAnchor = 'end';
+  p.experimentalSetupAlg = [HOLD, c.end ?? ''].join(' ').trim();
+  p.alg = c.alg;
+  p.experimentalStickeringMaskOrbits = lesson.mask;
+  p.timestamp = 'start';
+}
+
+/** The example viewer with a button per case. */
+function caseDemo(lesson: Lesson): HTMLElement {
+  const box = el('div', 'learn-demo');
+  const picker = el('div', 'learn-cases');
+  picker.setAttribute('role', 'group');
+  picker.setAttribute('aria-label', t('learn.examples'));
+  const viewer = el('div', 'learn-viewer');
+  const desc = el('p', 'learn-case-desc');
+  const moves = el('div', 'learn-moves');
+  const label = el('span', 'lp-label', t('learn.moves'));
+  const code = el('code', '');
+  moves.append(label, code);
+  const buttons: HTMLButtonElement[] = [];
+  let player: Player | null = null;
+  let current = 0;
+
+  const pick = (i: number, play: boolean) => {
+    current = i;
+    const c = lesson.cases[i];
+    buttons.forEach((b, k) => b.setAttribute('aria-pressed', String(k === i)));
+    desc.textContent = t(`learn.${lesson.id}.${c.id}.desc`);
+    code.textContent = c.show ?? c.alg;
+    if (!player) return;
+    loadCase(player, lesson, c);
+    if (play) setTimeout(() => player?.play(), 150);
   };
-};
-const player = $<Player>('player');
-const status = $('status');
-const summary = $('summary');
-const note = $('note');
-const stepsEl = $('steps');
-const segsEl = $('segs');
-const groupsEl = $('groups');
-const toksEl = $('toks');
-const btnCopy = $<HTMLButtonElement>('btn-copy');
-const btnPlay = $<HTMLButtonElement>('btn-play');
-const methodSel = $<HTMLSelectElement>('method');
-const scrambleIn = $<HTMLInputElement>('scramble-in');
-
-let method = getMethod(savedMethod() ?? 'cfop');
-let settings: SettingValues = valuesFor(method);
-let scramble: string | undefined; // set when the cube came from a typed scramble
-let plan: SolvePlan | null = null;
-let planScramble = '';
-/** The step shown (index into plan.steps) and how many of its moves are done. */
-let sel = 0;
-let mv = 0;
-/** Whole solve: the viewer holds every step in one go, and `sel` / `mv` follow it as it plays. */
-let whole = true;
-let offsets: number[] = []; // where each step starts in the whole solve, in moves
-let playing = false;
-let loop = false;
-let loadSeq = 0;
-/** While a step loads, ignore viewer reports until it reaches this move (then null). */
-let expect: number | null = null;
-let ready = false;
-let requestId = 0;
-
-// ---------------------------------------------------------------- setup panel
-// Two panels, opened separately: the cube painter and the solver settings.
-const cubePanel = $('cube-panel');
-const settingsPanel = $('settings-panel');
-function setPanel(panel: HTMLElement, btn: HTMLElement, open: boolean) {
-  panel.hidden = !open;
-  btn.setAttribute('aria-expanded', String(open));
-  $('setup-panel').hidden = cubePanel.hidden && settingsPanel.hidden;
-}
-const setCubeOpen = (open: boolean) => setPanel(cubePanel, $('btn-cube'), open);
-$('btn-cube').onclick = () => setCubeOpen(cubePanel.hidden);
-$('btn-settings').onclick = () => setPanel(settingsPanel, $('btn-settings'), settingsPanel.hidden);
-
-const net = createNet($('net'), $('palette'), () => {
-  scramble = undefined;
-  scrambleIn.value = '';
-  onCubeChange();
-});
-
-// ---------------------------------------------------------------- method + settings
-for (const m of METHODS) methodSel.add(new Option(t(`method.${m.id}.name`), m.id, false, m.id === method.id));
-methodSel.add(new Option(t('learn.moreComing'), '', false, false));
-methodSel.options[methodSel.options.length - 1].disabled = true;
-methodSel.onchange = () => {
-  method = getMethod(methodSel.value);
-  settings = valuesFor(method);
-  drawSettings();
-  solve();
-};
-function drawSettings() {
-  renderSettings($('settings'), method, settings, (v) => {
-    settings = v;
-    drawChips();
-    solve();
+  lesson.cases.forEach((c, i) => {
+    const b = el('button', 'learn-case', t(`learn.${lesson.id}.${c.id}`));
+    b.type = 'button';
+    b.onclick = () => pick(i, true);
+    buttons.push(b);
+    picker.append(b);
   });
-  drawChips();
-}
+  if (lesson.cases.length < 2) picker.hidden = true;
 
-// Each chip opens a small menu with just that setting's options, for a quick change.
-const pop = $('pop');
-let popKey: string | null = null; // '' is the method chip, otherwise a setting key
-const chipFor = (key: string) => $('chips').querySelector<HTMLElement>(`[data-key="${key}"]`);
-function closePop(refocus = false) {
-  if (popKey === null) return;
-  const chip = chipFor(popKey);
-  chip?.setAttribute('aria-expanded', 'false');
-  popKey = null;
-  pop.hidden = true;
-  if (refocus) chip?.focus();
-}
-function openPop(key: string) {
-  const chip = chipFor(key);
-  if (!chip) return;
-  closePop();
-  const def = method.settings.find((d) => d.key === key);
-  let body: HTMLElement;
-  if (def) {
-    body = renderOptions(method, def, () => settings, (v) => {
-      settings = v;
-      // A single choice is done once picked; a multi-pick stays open for more.
-      if (def.kind !== 'multi') closePop(true);
-      drawSettings();
-      solve();
-    }, 'quick-');
-  } else {
-    body = el('div', 'segmented');
-    for (const m of METHODS) {
-      const label = el('label', 'seg');
-      const input = Object.assign(el('input'), { type: 'radio', name: 'quick-method', value: m.id, checked: m.id === method.id });
-      input.onchange = () => {
-        closePop(true);
-        methodSel.value = m.id;
-        methodSel.dispatchEvent(new Event('change'));
-      };
-      label.append(input, t(`method.${m.id}.name`));
-      body.append(label);
-    }
-  }
-  pop.replaceChildren(body);
-  pop.setAttribute('aria-label', chip.textContent ?? '');
-  pop.hidden = false;
-  popKey = key;
-  chip.setAttribute('aria-expanded', 'true');
-  // Under the chip, pulled left if it would run past the row.
-  const row = pop.offsetParent as HTMLElement;
-  pop.style.left = `${Math.max(0, Math.min(chip.offsetLeft, row.clientWidth - pop.offsetWidth))}px`;
-  pop.style.top = `${chip.offsetTop + chip.offsetHeight + 6}px`;
-  (pop.querySelector<HTMLInputElement>('input:checked') ?? pop.querySelector('input'))?.focus();
-}
-document.addEventListener('pointerdown', (e) => {
-  const at = e.target as Node;
-  if (popKey !== null && !pop.contains(at) && !$('chips').contains(at)) closePop();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && popKey !== null) closePop(true);
-});
-
-function drawChips() {
-  const texts = [t(`method.${method.id}.name`), ...settingChips(method, settings)];
-  const keys = ['', ...method.settings.map((d) => d.key)];
-  $('chips').replaceChildren(
-    ...texts.map((c, i) => {
-      const b = el('button', 'lp-chip', c);
-      b.type = 'button';
-      b.dataset.key = keys[i];
-      b.setAttribute('aria-haspopup', 'true');
-      b.setAttribute('aria-expanded', String(popKey === keys[i]));
-      b.onclick = () => (popKey === keys[i] ? closePop() : openPop(keys[i]));
-      return b;
-    }),
-  );
-  if (popKey !== null && !chipFor(popKey)) closePop();
-}
-drawSettings();
-
-// ---------------------------------------------------------------- cube input
-/** Keep the cube in the URL, so a reload or a shared link shows the same one. */
-const syncHash = () => history.replaceState(null, '', scramble ? `#learn&scramble=${encodeURIComponent(scramble)}` : `#learn&cube=${encodeCube(net.get())}`);
-
-function onCubeChange() {
-  syncHash();
-  renderNetView($('mini-net'), net.get());
-  solve();
-}
-
-function setScramble(text: string) {
-  scramble = formatAlg(parseAlg(text));
-  scrambleIn.value = scramble;
-  net.set(applyMoves(solvedState(), scramble));
-}
-
-$('btn-solved').onclick = () => {
-  scramble = undefined;
-  scrambleIn.value = '';
-  net.set(solvedState());
-  onCubeChange();
-};
-$('btn-random').onclick = () => {
-  setScramble(formatAlg(randomMoves(20)));
-  onCubeChange();
-};
-$('scramble-form').onsubmit = (e) => {
-  e.preventDefault();
-  try {
-    setScramble(scrambleIn.value.trim());
-    onCubeChange();
-  } catch (err) {
-    setCubeOpen(true);
-    status.className = 'status bad';
-    status.textContent = (err as Error).message;
-  }
-};
-
-function checkCube(): boolean {
-  const v = validate(net.get());
-  status.replaceChildren();
-  if (v.ok) {
-    status.className = 'status ok';
-    status.textContent = t('common.validCube');
-    return true;
-  }
-  status.className = 'status bad';
-  const ul = document.createElement('ul');
-  for (const e of v.errors) ul.append(el('li', '', e));
-  status.append(ul);
-  return false;
-}
-
-// ---------------------------------------------------------------- solving (worker: the viewer's scramble needs the Kociemba tables)
-const worker = new Worker(new URL('./solver.worker.ts', import.meta.url), { type: 'module' });
-worker.onmessage = (e) => {
-  const d = e.data;
-  if (d.type === 'ready') {
-    ready = true;
-    solve();
-    return;
-  }
-  if (d.id !== requestId) return;
-  if (d.type === 'error') {
-    plan = null;
-    summary.textContent = d.message;
-    renderPlan();
-    return;
-  }
-  if (d.type === 'plan') {
-    plan = d.plan as SolvePlan;
-    planScramble = d.scramble as string;
-    if (!scramble) scrambleIn.value = planScramble; // painted or scanned cube: show a scramble that makes it
-    renderPlan();
-  }
-};
-
-worker.onerror = () => {
-  if (!ready) summary.textContent = t('common.solverFailed');
-};
-
-function solve() {
-  if (!checkCube()) {
-    plan = null;
-    summary.textContent = t('learn.fixCube');
-    setCubeOpen(true);
-    renderPlan();
-    return;
-  }
-  if (!ready) return;
-  requestId++;
-  summary.textContent = t('common.solving');
-  worker.postMessage({ id: requestId, kind: 'learn', state: net.get() as CubeState, method: method.id, settings, scramble, lang });
-}
-
-// ---------------------------------------------------------------- plan: overview bar and step list
-const stageLabel = (stage: string) => t(`stage.${stage}`);
-const tokens = (alg: string) => alg.split(/\s+/).filter(Boolean);
-const len = (i: number) => (plan ? tokens(plan.steps[i].alg).length : 0);
-const stageTag = (stage: string, extra = '') => el('span', `stage-tag stage-${stage}${extra}`, stageLabel(stage));
-const countText = (s: SolveStep) => (s.moves ? t('learn.moves', { count: s.moves }) : t(s.stage === 'inspection' ? 'learn.inspection' : 'learn.skip'));
-
-function renderPlan() {
-  stop();
-  stepsEl.replaceChildren();
-  segsEl.replaceChildren();
-  groupsEl.replaceChildren();
-  btnCopy.disabled = !plan;
-  note.textContent = '';
-  $('step-count').textContent = '';
-  offsets = [];
-  let total = 0;
-  for (const s of plan?.steps ?? []) {
-    offsets.push(total);
-    total += tokens(s.alg).length;
-  }
-  if (!plan) {
-    sel = 0;
-    void load(0, 0);
-    return;
-  }
-  if (plan.moves) {
-    summary.textContent = t('learn.solveIn', { count: plan.moves });
-    note.textContent = [plan.note, t('learn.pickHint')].filter(Boolean).join(' ');
-  } else summary.textContent = t('learn.alreadySolved');
-  $('step-count').textContent = t('learn.stepCount', { count: plan.steps.length });
-
-  const groups: { stage: string; w: number; moves: number }[] = [];
-  plan.steps.forEach((s, i) => {
-    const w = Math.max(len(i), 1);
-    const seg = el('button', `lp-seg stage-${s.stage}`);
-    seg.type = 'button';
-    seg.style.flexGrow = String(w);
-    seg.setAttribute('aria-label', `${stageLabel(s.stage)}, ${s.title}`);
-    seg.append(el('span', 'lp-seg-bar'));
-    seg.onclick = () => pick(i, 0);
-    segsEl.append(seg);
-    const last = groups[groups.length - 1];
-    if (last && last.stage === s.stage) {
-      last.w += w;
-      last.moves += s.moves;
-    } else groups.push({ stage: s.stage, w, moves: s.moves });
-
-    const li = document.createElement('li');
-    const btn = el('button', 'lp-step');
-    btn.type = 'button';
-    btn.onclick = () => pick(i, 0);
-    const head = el('span', 'lp-step-head');
-    head.append(stageTag(s.stage), el('span', 'lp-step-title', s.title), el('span', 'muted lp-step-count', countText(s)));
-    btn.append(head);
-    if (s.alg) btn.append(el('code', 'lp-step-alg', s.alg));
-    if (s.caseName) btn.append(el('span', 'muted lp-step-case', s.caseName));
-    li.append(btn);
-    stepsEl.append(li);
+  box.append(picker, viewer, desc, moves);
+  pick(0, false);
+  lazily(viewer, () => {
+    player = makePlayer();
+    viewer.append(player);
+    pick(current, false);
   });
-  // Text labels for each run of same-stage steps, sized like the bar segments above them.
-  for (const g of groups) {
-    const lab = el('span', `lp-group stage-${g.stage}`, g.moves ? `${stageLabel(g.stage)} · ${g.moves}` : stageLabel(g.stage));
-    lab.style.flexGrow = String(g.w);
-    groupsEl.append(lab);
-  }
-  sel = 0;
-  void load(0, 0);
+  return box;
 }
 
-// ---------------------------------------------------------------- viewer: one step at a time
-/** All pieces shown normally (a mask, once set, overrides the plain stickering setting). */
-const FULL_MASK = 'EDGES:------------,CORNERS:--------,CENTERS:------';
+/** The notation step: a pad of moves to try on a cube. */
+function notationDemo(): HTMLElement {
+  const box = el('div', 'learn-demo');
+  const viewer = el('div', 'learn-viewer');
+  const pad = el('div', 'learn-pad');
+  pad.setAttribute('role', 'group');
+  pad.setAttribute('aria-label', t('learn.notation.pad'));
+  const done = el('code', 'learn-history');
+  const moves = el('div', 'learn-moves');
+  moves.append(el('span', 'lp-label', t('learn.moves')), done);
+  let history: string[] = [];
+  let player: Player | null = null;
 
-function applyMask() {
-  const mask = plan?.steps[sel]?.mask;
-  player.experimentalStickeringMaskOrbits = !whole && highlight && mask ? mask : FULL_MASK;
+  const show = (move: string) => {
+    done.textContent = history.join(' ') || '—';
+    if (!player) return;
+    player.pause();
+    player.experimentalSetupAnchor = 'start';
+    player.experimentalSetupAlg = [HOLD, ...history.slice(0, move ? -1 : undefined)].join(' ');
+    player.alg = move;
+    player.experimentalStickeringMaskOrbits = FULL_MASK;
+    player.timestamp = 'start';
+    if (move) setTimeout(() => player?.play(), 50);
+  };
+  for (const m of NOTATION_MOVES) {
+    const b = el('button', 'learn-move', m);
+    b.type = 'button';
+    b.onclick = () => {
+      history.push(m);
+      show(m);
+    };
+    pad.append(b);
+  }
+  const reset = el('button', 'learn-move learn-reset', t('learn.notation.reset'));
+  reset.type = 'button';
+  reset.onclick = () => {
+    history = [];
+    show('');
+  };
+  pad.append(reset);
+
+  box.append(el('span', 'lp-label', t('learn.notation.pad')), pad, viewer, moves);
+  show('');
+  lazily(viewer, () => {
+    player = makePlayer();
+    viewer.append(player);
+    show('');
+  });
+  return box;
 }
 
-/** Step (one with moves) that whole-solve position `g` falls in: the last one once past the end. */
-function stepAt(g: number): number {
-  let last = -1;
-  for (let i = 0; i < (plan?.steps.length ?? 0); i++) {
-    if (!len(i)) continue;
-    if (g < offsets[i] + len(i)) return i;
-    last = i;
-  }
-  return last;
+const pending = new Map<Element, () => void>();
+const io =
+  'IntersectionObserver' in window
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            io?.unobserve(e.target);
+            pending.get(e.target)?.();
+            pending.delete(e.target);
+          }
+        },
+        { rootMargin: '400px 0px' },
+      )
+    : null;
+
+/** Run `make` when `target` first comes near the screen. */
+function lazily(target: Element, make: () => void) {
+  if (!io) return make();
+  pending.set(target, make);
+  io.observe(target);
 }
 
-/** Show step `i` with `m` of its moves done. */
-async function load(i: number, m: number) {
-  sel = i;
-  mv = m;
-  const seq = ++loadSeq;
-  expect = -1; // ignore reports about the half-loaded view
-  const steps = plan?.steps ?? [];
-  if (!plan) {
-    player.experimentalSetupAlg = '';
-    player.alg = '';
-  } else if (whole) {
-    player.experimentalSetupAlg = planScramble;
-    player.alg = steps.map((s) => s.alg).filter(Boolean).join(' ');
-  } else {
-    player.experimentalSetupAlg = [planScramble, ...steps.slice(0, i).map((s) => s.alg)].filter(Boolean).join(' ');
-    player.alg = steps[i].alg;
+function lesson(l: Lesson, n: number): HTMLElement {
+  const sec = el('section', 'card learn-lesson');
+  sec.id = `learn-step-${l.id}`;
+  const textAlg = l.textAlg ?? Object.values(l.algs ?? {})[0] ?? '';
+
+  const head = el('header', 'learn-head');
+  head.append(el('span', `stage-tag stage-${l.stage}`, t('learn.stepN', { n })), el('h2', '', t(`learn.${l.id}.title`)));
+
+  const text = el('div', 'learn-text');
+  const goal = el('p', 'learn-goal');
+  goal.append(el('strong', '', `${t('learn.goal')}: `), t(`learn.${l.id}.goal`));
+  text.append(goal, el('h3', '', t('learn.how')));
+  const how = el('ol', 'learn-how');
+  for (let i = 1; i <= l.how; i++) {
+    const li = el('li');
+    li.append(rich(`learn.${l.id}.how${i}`, textAlg));
+    how.append(li);
   }
-  applyMask();
-  render();
-  const indexer = await player.experimentalModel.indexer.get();
-  if (seq !== loadSeq) return;
-  const n = indexer.numAnimatedLeaves();
-  mv = Math.min(m, len(i));
-  const at = whole && plan ? offsets[i] + mv : mv; // position in what the viewer holds
-  const atEnd = at >= n;
-  expect = atEnd ? n : at;
-  setTimeout(() => seq === loadSeq && (expect = null), 1000);
-  player.timestamp = atEnd ? 'end' : indexer.indexToMoveStartTimestamp(at);
-  render();
-}
+  text.append(how);
 
-/** Jump to a step / move picked by the user (stops playback). */
-function pick(i: number, m: number) {
-  stop();
-  void load(i, m);
-}
-
-// Follow the viewer as it plays. Moves done = patternIndex, plus a move that has just finished.
-player.experimentalModel.currentMoveInfo.addFreshListener(({ patternIndex, movesFinishing }) => {
-  if (!plan) return;
-  const done = patternIndex + movesFinishing.length;
-  if (expect !== null) {
-    if (done !== expect) return;
-    expect = null;
-  }
-  if (whole) {
-    const i = stepAt(done);
-    if (i < 0) return;
-    sel = i;
-    mv = Math.min(Math.max(done - offsets[i], 0), len(i));
-  } else mv = Math.min(done, len(sel));
-  render();
-});
-
-// When a step finishes while playing: repeat it, or carry on with the next step that has moves.
-player.experimentalModel.coarseTimelineInfo.addFreshListener((info) => {
-  if (!playing || info.playing || expect !== null) return;
-  if (whole) {
-    if (info.atEnd) setPlaying(false);
-    return;
-  }
-  if (mv < len(sel)) return;
-  const seq = loadSeq;
-  setTimeout(() => {
-    if (!playing || seq !== loadSeq) return;
-    const next = loop ? sel : nextWithMoves(sel);
-    if (next < 0) stop();
-    else void load(next, 0).then(() => playing && player.play());
-  }, 450);
-});
-
-const nextWithMoves = (i: number) => {
-  for (let k = i + 1; k < (plan?.steps.length ?? 0); k++) if (len(k)) return k;
-  return -1;
-};
-
-function setPlaying(on: boolean) {
-  playing = on;
-  btnPlay.classList.toggle('playing', on);
-  $('play-label').textContent = t(on ? 'learn.pause' : 'learn.play');
-}
-
-function stop() {
-  if (playing) player.pause();
-  setPlaying(false);
-}
-
-btnPlay.onclick = async () => {
-  if (!plan) return;
-  if (playing) return stop();
-  setPlaying(true);
-  if (whole) {
-    if (mv >= len(sel) && nextWithMoves(sel) < 0) await load(0, 0); // at the end: start over
-    if (playing) player.play();
-    return;
-  }
-  if (mv >= len(sel)) {
-    const next = loop && len(sel) ? sel : nextWithMoves(sel);
-    if (next < 0) return setPlaying(false);
-    await load(next, 0);
-    if (!playing) return;
-  }
-  player.play();
-};
-
-/** Animate exactly one move forwards (+1) or backwards (-1) from the current position. */
-async function animateMove(dir: 1 | -1) {
-  if (!plan) return;
-  stop();
-  let target: [number, number]; // step, moves done afterwards
-  let from: [number, number] | null = null; // set when the view has to be loaded at a different spot first
-  if (dir === 1) {
-    if (mv < len(sel)) target = [sel, mv + 1];
-    else {
-      const k = nextWithMoves(sel);
-      if (k < 0) return;
-      target = [k, 1];
-      if (!whole) from = [k, 0];
+  if (l.algs) {
+    text.append(el('h3', '', t('learn.learnAlgs')));
+    const list = el('dl', 'learn-algs');
+    for (const [k, alg] of Object.entries(l.algs)) {
+      const row = el('div', 'learn-alg');
+      const dd = el('dd');
+      dd.append(el('code', '', alg));
+      row.append(el('dt', '', t(`learn.${l.id}.alg.${k}`)), dd);
+      list.append(row);
     }
-  } else if (mv > 0) target = [sel, mv - 1];
-  else {
-    let k = sel - 1;
-    while (k >= 0 && !len(k)) k--;
-    if (k < 0) return pick(Math.max(sel - 1, 0), 0);
-    target = [k, len(k) - 1];
-    if (!whole) from = [k, len(k)];
+    text.append(list);
   }
-  if (from) await load(from[0], from[1]);
-  else ++loadSeq;
-  const seq = loadSeq;
-  const done = whole ? offsets[target[0]] + target[1] : target[1];
-  expect = done; // ignore progress reports until the move has finished
-  sel = target[0];
-  mv = target[1];
-  render();
-  setTimeout(() => seq === loadSeq && expect === done && (expect = null), 2000);
-  player.experimentalModel.playingInfo.set({ playing: true, direction: dir, untilBoundary: 'move' });
+
+  const tip = el('p', 'learn-tip');
+  tip.append(el('strong', '', `${t('learn.tip')}: `), rich(`learn.${l.id}.tip`, textAlg));
+  text.append(tip);
+
+  const body = el('div', 'learn-body');
+  body.append(text, l.id === 'notation' ? notationDemo() : caseDemo(l));
+  sec.append(head, body);
+  return sec;
 }
 
-$('btn-next-move').onclick = () => void animateMove(1);
-$('btn-prev-move').onclick = () => void animateMove(-1);
-$('btn-next-step').onclick = () => {
-  if (plan && sel + 1 < plan.steps.length) pick(sel + 1, 0);
-};
-$('btn-prev-step').onclick = () => {
-  if (!plan) return;
-  if (mv > 0) pick(sel, 0);
-  else if (sel > 0) pick(sel - 1, 0);
-};
-
-// ---------------------------------------------------------------- step by step / whole solve
-function setWhole(on: boolean) {
-  if (whole === on) return;
-  stop();
-  whole = on;
-  $('mode-step').setAttribute('aria-pressed', String(!on));
-  $('mode-whole').setAttribute('aria-pressed', String(on));
-  $('lp-switches').hidden = on; // repeat and highlight are per step
-  void load(sel, mv);
-}
-$('mode-step').onclick = () => setWhole(false);
-$('mode-whole').onclick = () => setWhole(true);
-
-// ---------------------------------------------------------------- toggles
-const HIGHLIGHT_KEY = 'learn.highlight';
-let highlight = true;
-try {
-  highlight = localStorage.getItem(HIGHLIGHT_KEY) !== 'off';
-} catch {
-  /* storage unavailable: default on */
-}
-const optHighlight = $<HTMLButtonElement>('opt-highlight');
-const optLoop = $<HTMLButtonElement>('opt-loop');
-optHighlight.setAttribute('aria-pressed', String(highlight));
-optHighlight.onclick = () => {
-  highlight = !highlight;
-  optHighlight.setAttribute('aria-pressed', String(highlight));
-  try {
-    localStorage.setItem(HIGHLIGHT_KEY, highlight ? 'on' : 'off');
-  } catch {
-    /* not remembered */
-  }
-  applyMask();
-};
-optLoop.onclick = () => {
-  loop = !loop;
-  optLoop.setAttribute('aria-pressed', String(loop));
-};
-
-// ---------------------------------------------------------------- current step card
 function render() {
-  const s = plan?.steps[sel];
-  const n = len(sel);
-  for (const id of ['btn-prev-step', 'btn-prev-move', 'btn-next-move', 'btn-next-step', 'btn-play']) $<HTMLButtonElement>(id).disabled = !plan;
-  if (plan) {
-    const last = plan.steps.length - 1;
-    $<HTMLButtonElement>('btn-prev-step').disabled = sel === 0 && mv === 0;
-    $<HTMLButtonElement>('btn-prev-move').disabled = sel === 0 && mv === 0;
-    $<HTMLButtonElement>('btn-next-step').disabled = sel >= last;
-    $<HTMLButtonElement>('btn-next-move').disabled = sel >= last && mv >= n;
-    btnPlay.disabled = !whole && !playing && mv >= n && !(loop && n) && nextWithMoves(sel) < 0;
-    if (!plan.moves) btnPlay.disabled = true;
-  }
+  const methods = el('div', 'learn-methods');
+  methods.append(el('span', 'lp-label', t('learn.methods')));
+  const chip = el('span', 'learn-method', t('learn.beginner'));
+  chip.setAttribute('aria-current', 'true');
+  methods.append(chip, el('span', 'muted learn-more', t('solve.moreComing')));
 
-  [...segsEl.children].forEach((c, k) => {
-    c.classList.toggle('done', k <= sel);
-    if (k === sel) c.setAttribute('aria-current', 'step');
-    else c.removeAttribute('aria-current');
+  const list = el('ol', 'learn-toc-list');
+  BEGINNER.forEach((l, i) => {
+    const li = el('li');
+    const b = el('button', `learn-toc-item stage-${l.stage}`);
+    b.type = 'button';
+    b.append(el('span', 'learn-toc-n', String(i)), el('span', '', t(`learn.${l.id}.title`)));
+    b.onclick = () => document.getElementById(`learn-step-${l.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    li.append(b);
+    list.append(li);
   });
-  [...stepsEl.children].forEach((li, k) => {
-    const b = li.firstElementChild!;
-    b.classList.toggle('active', k === sel);
-    if (k === sel) b.setAttribute('aria-current', 'step');
-    else b.removeAttribute('aria-current');
-  });
-  keepVisible(sel);
+  toc.append(methods, el('h2', '', t('learn.contents')), list);
 
-  const tag = $('now-tag');
-  tag.className = s ? `stage-tag stage-${s.stage}` : 'stage-tag hidden';
-  tag.textContent = s ? stageLabel(s.stage) : '';
-  $('now-title').textContent = s ? s.title : plan ? t('common.cubeSolved') : '';
-  $('now-pos').textContent = s ? (whole ? t('learn.wholePrefix') : '') + t('learn.stepPos', { step: sel + 1, steps: plan!.steps.length, move: mv, moves: n }) : '';
-  $('now-case-box').hidden = !s?.caseName;
-  $('now-case').textContent = s?.caseName ?? '';
-  $('now-hint-box').hidden = !s?.hint;
-  $('now-hint').textContent = s?.hint ?? '';
-  $('now-tips-box').hidden = !s?.tips?.length;
-  $('now-tips').replaceChildren(...(s?.tips ?? []).map((tip) => el('li', '', tip)));
-  $('no-toks').hidden = !s || n > 0;
-  toksEl.replaceChildren(
-    ...tokens(s?.alg ?? '').map((tok, k) => {
-      const b = el('button', k < mv ? 'lp-tok done' : k === mv ? 'lp-tok current' : 'lp-tok', tok);
-      b.type = 'button';
-      if (k === mv) b.setAttribute('aria-current', 'true');
-      b.onclick = () => pick(sel, k);
-      return b;
-    }),
-  );
+  const intro = el('section', 'card learn-lesson learn-intro-card');
+  intro.append(el('h2', '', t('learn.beginner')), el('p', '', t('learn.beginner.intro')));
+  root.append(intro);
+  BEGINNER.forEach((l, i) => root.append(lesson(l, i)));
+
+  const done = el('section', 'card learn-lesson learn-done');
+  const cta = el('a', 'primary button-like', t('learn.done.cta'));
+  cta.href = '#solve';
+  done.append(el('h2', '', t('learn.done.title')), el('p', '', t('learn.done.body')), cta);
+  root.append(done);
 }
 
-/** Keep the current step in view inside the (scrollable) step list, without moving the page. */
-function keepVisible(i: number) {
-  const item = stepsEl.children[i] as HTMLElement | undefined;
-  if (!item || stepsEl.scrollHeight <= stepsEl.clientHeight) return;
-  const top = item.offsetTop - stepsEl.offsetTop;
-  if (top < stepsEl.scrollTop || top + item.offsetHeight > stepsEl.scrollTop + stepsEl.clientHeight) {
-    stepsEl.scrollTo({ top: top - 8, behavior: 'smooth' });
-  }
-}
-
-btnCopy.onclick = async () => {
-  if (!plan) return;
-  const text = plan.steps.filter((s) => s.alg).map((s) => `${s.alg} // ${s.title}${s.caseName ? ` (${s.caseName})` : ''}`).join('\n');
-  try {
-    await navigator.clipboard.writeText(`${t('common.scramble')}: ${planScramble}\n${text}`);
-  } catch {
-    return; // no clipboard access (insecure page, or permission denied)
-  }
-  $('copy-label').textContent = t('common.copied');
-  setTimeout(() => ($('copy-label').textContent = t('learn.copySolution')), 1200);
-};
-
-// ---------------------------------------------------------------- start: cube from the URL
-/**
- * Take the cube a link carries: #learn&cube=<54 letters> (scanner, cube tab) or
- * #learn&scramble=<moves> (cube tab, timer). False when it carries none, or the one already shown.
- */
-function takeHash(): boolean {
-  const cube = decodeCube(/cube=([A-Z]{54})/.exec(location.hash)?.[1] ?? '');
-  const scr = /scramble=([^&]+)/.exec(location.hash)?.[1];
-  if (cube) {
-    if (!scramble && encodeCube(cube) === encodeCube(net.get())) return false;
-    scramble = undefined;
-    scrambleIn.value = '';
-    net.set(cube);
-    return true;
-  }
-  if (!scr) return false;
-  try {
-    const text = formatAlg(parseAlg(decodeURIComponent(scr)));
-    if (text === scramble) return false;
-    setScramble(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-if (!takeHash()) setScramble(formatAlg(randomMoves(20)));
-renderNetView($('mini-net'), net.get());
-if (!checkCube()) setCubeOpen(true);
 render();
 
-/** The Learn tab was opened again: load the cube the link carries, if it is a new one. */
-export function show() {
-  if (takeHash()) onCubeChange();
-  else syncHash();
-}
+export function show() {}
 
-/** Another tab was opened: stop playback. */
+/** Another tab was opened: stop the viewers. */
 export function hide() {
-  stop();
+  for (const p of players) p.pause();
 }

@@ -17,7 +17,11 @@ Done so far:
   notes, csTimer import / export, saved in IndexedDB
   ([demo](https://solve-rubik.pages.dev/#timer)). Plan: [Rubik Cube Scanner App — Plan](https://claude.ai/artifact/K7kwAwiXBCjcMvoC7A37Yv).
 
-- **Phase 4**: solve helper for learning CFOP ([demo](https://solve-rubik.pages.dev/#learn)).
+- **Learn tab**: a course on how to solve the cube ([demo](https://solve-rubik.pages.dev/#learn)), starting
+  with the beginner method: notation, then the seven layer-by-layer steps, each with example cases
+  played on a 3D cube.
+
+- **Phase 4**: solve helper for learning CFOP ([demo](https://solve-rubik.pages.dev/#solve)).
   Enter, scan or scramble a cube and see the solve as steps: an optimal cross, 4 F2L pairs (each
   with its case described, its SpeedCubeDB case number and the most-voted algorithm for it), then OLL and PLL with the
   case name and a recognition hint. Under each OLL and PLL step, **how to recognise it fast**, read from
@@ -45,7 +49,7 @@ Done so far:
   language on a first visit. Everything is translated: pages, scanner messages, cube errors, timer, and
   the solver's step titles, case names and hints.
 
-**Live demo:** https://solve-rubik.pages.dev/ · timer: https://solve-rubik.pages.dev/#timer · learn: https://solve-rubik.pages.dev/#learn
+**Live demo:** https://solve-rubik.pages.dev/ · solve: https://solve-rubik.pages.dev/#solve · learn: https://solve-rubik.pages.dev/#learn · timer: https://solve-rubik.pages.dev/#timer
 
 ## Develop
 
@@ -98,9 +102,10 @@ any branch, use "Run workflow" on the Scanner workflow in the Actions tab.
 | `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; never a B turn: the cube is turned instead. The cross edge by edge: the slot turned to the front, then a distance table for each set of cross edges with U, R, F, D, L only (`solveCrossEdge` in `cfop/cross.ts`) |
 | `src/i18n/` | `t(key, params)` with plural forms; `locales/en.ts` holds every key, the other languages load on demand (one chunk each). Solver texts are made in the page's language: the worker gets it with each request |
 | `demo/i18n.ts` | Page language (`?lang=`, saved choice, browser), `data-i18n` attributes in the HTML, the language picker |
-| `demo/index.html`, `demo/app.ts` | The one page and its shell: Cube, Learn and Timer are views picked by the URL hash (`#cube`, `#learn`, `#timer`), so switching never reloads; each view's code loads on first use and is told when it is shown or hidden (camera off, playback and timing stopped) |
-| `demo/tour.ts` | Guided tour of the three tabs, opened from the Tour button in the header (it never opens by itself) |
-| `demo/learn.ts`, `demo/settings.ts` | Learn view: cube input, settings view, step list and viewer (`learn.html` redirects to `#learn`) |
+| `demo/index.html`, `demo/app.ts`, `demo/route.ts` | The one page and its shell: Cube, Solve, Learn and Timer are views picked by the URL hash (`#cube`, `#solve`, `#learn`, `#timer`; an old `#learn&scramble=…` link still opens Solve), so switching never reloads; each view's code loads on first use and is told when it is shown or hidden (camera off, playback and timing stopped) |
+| `demo/tour.ts` | Guided tour of the Cube, Solve and Timer tabs, opened from the Tour button in the header (it never opens by itself) |
+| `demo/solve.ts`, `demo/settings.ts` | Solve view: cube input, settings view, step list and viewer (`learn.html` redirects to `#solve`) |
+| `src/learn/beginner.ts`, `demo/learn.ts` | Learn view: how to solve, step by step. The beginner method (the same steps and algorithms as the beginner solver), each step with its goal, how-to, algorithms to learn and example cases to play in a 3D viewer (made when the step scrolls near); `tests/learn.test.ts` checks every example starts as its text says |
 | `demo/timer.ts`, `demo/chart.ts` | Timer view: scramble + preview, timing pad, stats, history chart, solve table (`timer.html` redirects to `#timer`) |
 | `demo/scan.ts` | Scan panel of the Cube view (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
 | `demo/main.ts` | Cube view: scan, edit (2D net, Solved / Random) or review a scanned cube, then Generate, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |

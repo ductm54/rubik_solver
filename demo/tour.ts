@@ -1,11 +1,10 @@
 /**
  * Guided tour: a dimmed overlay with holes cut around the parts of the page it talks about, and
- * a card that walks through Cube → Learn → Timer. It opens from the "Tour" button in the header,
+ * a card that walks through Cube → Solve → Timer. It opens from the "Tour" button in the header,
  * never by itself.
  */
 import { t } from '../src/i18n';
-
-type Route = 'cube' | 'learn' | 'timer';
+import { type Route, routeOf } from './route';
 
 interface Step {
   page: Route;
@@ -35,7 +34,7 @@ const STEPS: Step[] = [
     where: [],
     targets: ['nav.tabs'],
     id: 'tour.s1',
-    names: { cube: 'nav.cube', learn: 'nav.learn', timer: 'nav.timer' },
+    names: { cube: 'nav.cube', solve: 'nav.solve', timer: 'nav.timer' },
   },
   {
     page: 'cube',
@@ -64,30 +63,30 @@ const STEPS: Step[] = [
   {
     page: 'cube',
     where: ['nav.cube', 'common.scramble'],
-    targets: ['#scramble', '#btn-generate', '#btn-learn', '#btn-time'],
+    targets: ['#scramble', '#btn-generate', '#btn-solve', '#btn-time'],
     id: 'tour.s5',
     names: { generate: 'cube.generate', howTo: 'cube.howTo', timeIt: 'cube.timeIt' },
   },
   {
-    page: 'learn',
-    where: ['nav.learn'],
-    targets: ['#learn-scramble-form', '#learn-chips'],
+    page: 'solve',
+    where: ['nav.solve'],
+    targets: ['#solve-scramble-form', '#solve-chips'],
     id: 'tour.s6',
-    names: { howTo: 'cube.howTo', apply: 'learn.apply', random: 'learn.random', scan: 'learn.scan', editCube: 'learn.editCube' },
+    names: { howTo: 'cube.howTo', apply: 'solve.apply', random: 'solve.random', scan: 'solve.scan', editCube: 'solve.editCube' },
     // Coming from the Cube page with a scramble: take it along, as "How to solve it" would.
     href: () => {
-      const a = $('#btn-learn') as HTMLAnchorElement | null;
-      return a && !a.classList.contains('hidden') ? a.getAttribute('href')! : '#learn';
+      const a = $('#btn-solve') as HTMLAnchorElement | null;
+      return a && !a.classList.contains('hidden') ? a.getAttribute('href')! : '#solve';
     },
   },
   {
-    page: 'learn',
-    where: ['nav.learn', 'learn.settings'],
-    targets: ['#learn-btn-settings', '#learn-settings-panel'],
+    page: 'solve',
+    where: ['nav.solve', 'solve.settings'],
+    targets: ['#solve-btn-settings', '#solve-settings-panel'],
     id: 'tour.s7',
-    names: { settings: 'learn.editSettings', cfop: 'method.cfop.name', beginner: 'method.beginner.name' },
+    names: { settings: 'solve.editSettings', cfop: 'method.cfop.name', beginner: 'method.beginner.name' },
     enter: () => {
-      const btn = $('#learn-btn-settings');
+      const btn = $('#solve-btn-settings');
       if (!btn || btn.getAttribute('aria-expanded') === 'true') return;
       btn.click();
       return () => {
@@ -96,16 +95,16 @@ const STEPS: Step[] = [
     },
   },
   {
-    page: 'learn',
-    where: ['nav.learn', 'learn.steps'],
-    targets: ['#learn-segs', '#learn-btn-play', '#learn-btn-next-step'],
+    page: 'solve',
+    where: ['nav.solve', 'solve.steps'],
+    targets: ['#solve-segs', '#solve-btn-play', '#solve-btn-next-step'],
     id: 'tour.s8',
     names: {
-      play: 'learn.play',
-      nextStep: 'learn.nextStep',
-      whole: 'learn.whole',
-      oneStep: 'learn.oneStep',
-      copy: 'learn.copySolution',
+      play: 'solve.play',
+      nextStep: 'solve.nextStep',
+      whole: 'solve.whole',
+      oneStep: 'solve.oneStep',
+      copy: 'solve.copySolution',
     },
   },
   {
@@ -165,8 +164,7 @@ let opener: HTMLElement | null = null;
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function routeNow(): Route {
-  const head = location.hash.slice(1).split(/[&=?]/)[0];
-  return head === 'timer' || head === 'learn' ? head : 'cube';
+  return routeOf(location.hash);
 }
 
 function build() {
