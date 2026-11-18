@@ -37,6 +37,29 @@ const groupsEl = $('groups');
 const toksEl = $('toks');
 const btnCopy = $<HTMLButtonElement>('btn-copy');
 const btnPlay = $<HTMLButtonElement>('btn-play');
+
+// When the step text sits below the cube (narrow screens), a shorter step would make the page shorter,
+// and near the bottom of the page the browser then scrolls up, moving the buttons. So while one solve
+// is shown, the text only grows; it starts afresh with a new solve, a new view or a new width.
+const infoEl = $('now-info');
+let infoMin = 0;
+function holdInfoHeight() {
+  const h = infoEl.offsetHeight;
+  if (h > infoMin) infoEl.style.minHeight = `${(infoMin = h)}px`;
+}
+function resetInfoHeight() {
+  infoMin = 0;
+  infoEl.style.minHeight = '';
+}
+let infoWidth = 0;
+new ResizeObserver(([e]) => {
+  const w = Math.round(e.contentRect.width);
+  if (w === infoWidth) return;
+  infoWidth = w;
+  resetInfoHeight();
+  holdInfoHeight();
+}).observe(infoEl);
+
 const methodSel = $<HTMLSelectElement>('method');
 const scrambleIn = $<HTMLInputElement>('scramble-in');
 
@@ -292,6 +315,7 @@ function renderPlan() {
   }
   if (!plan) {
     sel = 0;
+    resetInfoHeight();
     void load(0, 0);
     return;
   }
@@ -336,6 +360,7 @@ function renderPlan() {
     groupsEl.append(lab);
   }
   sel = 0;
+  resetInfoHeight();
   void load(0, 0);
 }
 
@@ -517,6 +542,7 @@ function setWhole(on: boolean) {
   $('mode-step').setAttribute('aria-pressed', String(!on));
   $('mode-whole').setAttribute('aria-pressed', String(on));
   $('lp-switches').hidden = on; // repeat and highlight are per step
+  resetInfoHeight();
   void load(sel, mv);
 }
 $('mode-step').onclick = () => setWhole(false);
@@ -597,7 +623,9 @@ function render() {
       return b;
     }),
   );
+  holdInfoHeight();
 }
+
 
 /** Keep the current step in view inside the (scrollable) step list, without moving the page. */
 function keepVisible(i: number) {

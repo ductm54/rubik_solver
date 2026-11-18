@@ -388,7 +388,13 @@ body.focus header { opacity: 0.12; }
 .lp-mode button { min-height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .lp-mode button[aria-pressed='true'] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .lp-now-pos { margin-left: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
-.lp-now-body { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.lp-now-body { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; container-type: inline-size; }
+/* Side by side (340 + 24 + 340), the text column takes the cube column's height and scrolls inside
+   if it needs more. The card then keeps one height from step to step, so its buttons never move,
+   even while the card is stuck to the edge of the page as it scrolls. */
+@container (min-width: 704px) {
+  .lp-now-info { align-self: stretch; contain: size; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+}
 .lp-stage { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
 .lp-viewer { min-width: 0; height: 380px; border-radius: 12px; background: var(--tint); overflow: hidden; }
 .lp-viewer twisty-player { width: 100%; height: 100%; margin: 0; }
