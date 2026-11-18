@@ -579,7 +579,7 @@ function render() {
   const tag = $('now-tag');
   tag.className = s ? `stage-tag stage-${s.stage}` : 'stage-tag hidden';
   tag.textContent = s ? stageLabel(s.stage) : '';
-  $('now-title').textContent = s ? s.title : plan ? t('common.cubeSolved') : '';
+  $('now-title').textContent = $('now-title').title = s ? s.title : plan ? t('common.cubeSolved') : ''; // title: the full text when cut short
   $('now-pos').textContent = s ? (whole ? t('solve.wholePrefix') : '') + t('solve.stepPos', { step: sel + 1, steps: plan!.steps.length, move: mv, moves: n }) : '';
   $('now-case-box').hidden = !s?.caseName;
   $('now-case').textContent = s?.caseName ?? '';

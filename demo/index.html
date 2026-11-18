@@ -283,15 +283,49 @@
               </div>
             </div>
             <div class="lp-now-body">
-              <div class="lp-viewer">
-                <twisty-player
-                  id="solve-player"
-                  puzzle="3x3x3"
-                  alg=""
-                  background="none"
-                  control-panel="none"
-                  hint-facelets="floating"
-                ></twisty-player>
+              <!-- The cube and its controls share a column, so the controls stay put while the step text changes. -->
+              <div class="lp-stage">
+                <div class="lp-viewer">
+                  <twisty-player
+                    id="solve-player"
+                    puzzle="3x3x3"
+                    alg=""
+                    background="none"
+                    control-panel="none"
+                    hint-facelets="floating"
+                  ></twisty-player>
+                </div>
+              <div class="lp-controls">
+                <button id="solve-btn-prev-step" class="lp-btn" type="button">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"></path><path d="m18 17-5-5 5-5"></path></svg>
+                  <span class="lp-hide-sm" data-i18n="solve.prevStep">Prev step</span>
+                </button>
+                <button id="solve-btn-prev-move" class="lp-btn lp-icon" type="button" aria-label="Previous move" data-i18n-aria-label="solve.prevMove">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <button id="solve-btn-play" class="lp-btn lp-btn-primary lp-play" type="button">
+                  <svg class="ic-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"></path></svg>
+                  <svg class="ic-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4.5" height="16" rx="1"></rect><rect x="13.5" y="4" width="4.5" height="16" rx="1"></rect></svg>
+                  <span id="solve-play-label" data-i18n="solve.play">Play</span>
+                </button>
+                <button id="solve-btn-next-move" class="lp-btn lp-icon" type="button" aria-label="Next move" data-i18n-aria-label="solve.nextMove">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+                </button>
+                <button id="solve-btn-next-step" class="lp-btn" type="button">
+                  <span class="lp-hide-sm" data-i18n="solve.nextStep">Next step</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 17 5-5-5-5"></path><path d="m13 17 5-5-5-5"></path></svg>
+                </button>
+                <div id="solve-lp-switches" class="lp-switches" hidden>
+                  <button id="solve-opt-loop" class="lp-switch" type="button" aria-pressed="false">
+                    <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
+                    <span data-i18n="solve.repeat">Repeat this step</span>
+                  </button>
+                  <button id="solve-opt-highlight" class="lp-switch" type="button" aria-pressed="true">
+                    <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
+                    <span data-i18n="solve.highlightStep">Highlight this step's pieces</span>
+                  </button>
+                </div>
+              </div>
               </div>
               <div class="lp-now-info">
                 <div id="solve-now-case-box" class="lp-info" hidden>
@@ -311,37 +345,6 @@
                   <span class="lp-label" data-i18n="solve.tips">How to recognise and plan it</span>
                   <ul id="solve-now-tips" class="lp-tips"></ul>
                 </div>
-              </div>
-            </div>
-            <div class="lp-controls">
-              <button id="solve-btn-prev-step" class="lp-btn" type="button">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"></path><path d="m18 17-5-5 5-5"></path></svg>
-                <span class="lp-hide-sm" data-i18n="solve.prevStep">Prev step</span>
-              </button>
-              <button id="solve-btn-prev-move" class="lp-btn lp-icon" type="button" aria-label="Previous move" data-i18n-aria-label="solve.prevMove">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
-              </button>
-              <button id="solve-btn-play" class="lp-btn lp-btn-primary lp-play" type="button">
-                <svg class="ic-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"></path></svg>
-                <svg class="ic-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4.5" height="16" rx="1"></rect><rect x="13.5" y="4" width="4.5" height="16" rx="1"></rect></svg>
-                <span id="solve-play-label" data-i18n="solve.play">Play</span>
-              </button>
-              <button id="solve-btn-next-move" class="lp-btn lp-icon" type="button" aria-label="Next move" data-i18n-aria-label="solve.nextMove">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
-              </button>
-              <button id="solve-btn-next-step" class="lp-btn" type="button">
-                <span class="lp-hide-sm" data-i18n="solve.nextStep">Next step</span>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 17 5-5-5-5"></path><path d="m13 17 5-5-5-5"></path></svg>
-              </button>
-              <div id="solve-lp-switches" class="lp-switches" hidden>
-                <button id="solve-opt-loop" class="lp-switch" type="button" aria-pressed="false">
-                  <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
-                  <span data-i18n="solve.repeat">Repeat this step</span>
-                </button>
-                <button id="solve-opt-highlight" class="lp-switch" type="button" aria-pressed="true">
-                  <span class="lp-track" aria-hidden="true"><span class="lp-knob"></span></span>
-                  <span data-i18n="solve.highlightStep">Highlight this step's pieces</span>
-                </button>
               </div>
             </div>
           </section>

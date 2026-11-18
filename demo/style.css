@@ -382,13 +382,15 @@ body.focus header { opacity: 0.12; }
 .lp-now { flex: 999 1 560px; min-width: 0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 16px; }
 .lp-now-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .lp-now-head .stage-tag { font-size: 13px; padding: 3px 10px; }
-.lp-now-head h2 { font-size: 22px; line-height: 1.25; }
+/* One line, so the cube and its controls below keep their place as step titles change length. */
+.lp-now-head h2 { flex: 1 1 0; min-width: 0; font-size: 22px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lp-mode { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
 .lp-mode button { min-height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .lp-mode button[aria-pressed='true'] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .lp-now-pos { margin-left: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
-.lp-now-body { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
-.lp-viewer { flex: 1 1 340px; min-width: 0; height: 380px; border-radius: 12px; background: var(--tint); overflow: hidden; }
+.lp-now-body { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.lp-stage { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
+.lp-viewer { min-width: 0; height: 380px; border-radius: 12px; background: var(--tint); overflow: hidden; }
 .lp-viewer twisty-player { width: 100%; height: 100%; margin: 0; }
 .lp-now-info { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .lp-info { display: flex; flex-direction: column; gap: 4px; }
@@ -405,11 +407,14 @@ body.focus header { opacity: 0.12; }
 .lp-tok.done { border-color: transparent; background: transparent; color: var(--muted); }
 .lp-tok.current { border-color: var(--accent); background: var(--accent); color: #fff; }
 
-.lp-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 16px; }
+.lp-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lp-controls > .lp-btn { flex: 1; padding: 0 8px; min-width: 0; }
+.lp-controls > .lp-play { flex: 2; }
+@container (max-width: 460px) { .lp-hide-sm { display: none; } }
 .lp-play { min-width: 112px; padding: 0 18px; }
 .lp-play .ic-pause, .lp-play.playing .ic-play { display: none; }
 .lp-play.playing .ic-pause { display: block; }
-.lp-switches { display: flex; gap: 20px; flex-wrap: wrap; margin-left: auto; }
+.lp-switches { display: flex; gap: 4px 20px; flex-wrap: wrap; width: 100%; }
 .lp-switch { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--text); font-size: 14px; border-radius: 6px; }
 .lp-track { display: inline-flex; align-items: center; width: 36px; height: 22px; border-radius: 999px; padding: 2px; background: #8b8b92; justify-content: flex-start; flex: none; }
 .lp-knob { width: 18px; height: 18px; border-radius: 50%; background: #fff; }
@@ -446,12 +451,12 @@ body.focus header { opacity: 0.12; }
   .lp-now-head h2 { font-size: 18px; }
   .lp-now-pos { margin-left: 0; width: 100%; }
   .lp-now-body { gap: 12px; }
-  .lp-viewer { flex-basis: 100%; height: 260px; }
+  .lp-stage { flex-basis: 100%; gap: 12px; }
+  .lp-viewer { height: 260px; }
   .lp-tok { font-size: 17px; }
-  .lp-controls > .lp-btn { flex: 1; padding: 0; min-width: 0; }
-  .lp-controls > .lp-play { flex: 2; }
+  .lp-controls > .lp-btn { padding: 0; }
   .lp-hide-sm { display: none; }
-  .lp-switches { margin-left: 0; gap: 4px 16px; }
+  .lp-switches { gap: 4px 16px; }
 }
 
 /* --- guided tour (tour.ts) */
