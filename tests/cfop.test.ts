@@ -17,6 +17,7 @@ import { crossDistance, solveCross, solveXCross } from '../src/solve/cfop/cross'
 import { LEFT_HAND, RIGHT_HAND, backTurns, countRegrips, effort, planGrip } from '../src/solve/cfop/grip';
 import { crossSolved, f2lTable, slotSolved, SLOTS } from '../src/solve/cfop/f2l';
 import { F2L_CASES } from '../src/solve/cfop/algs/f2l';
+import { metricCost, turnCost } from '../src/solve/cfop/moveCost';
 import { buildTable, matchLL, stageDone } from '../src/solve/cfop/ll';
 import { SIDE_ROWS, headlightSides } from '../src/solve/cfop/llTips';
 
@@ -350,6 +351,35 @@ describe('CFOP solver', () => {
     expect(pseudo).toBeGreaterThan(0);
     expect(uPairs).toBeGreaterThan(0);
     expect((performance.now() - t) / 60).toBeLessThan(200);
+  });
+
+  it('advanced F2L: "fastest" is quicker to turn, "fewest" has fewer moves; both solve F2L', () => {
+    const totals = { advanced: { moves: 0, time: 0 }, fewest: { moves: 0, time: 0 } };
+    let seed = 7;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let n = 0; n < 30; n++) {
+      const state = applyMoves(solved, randomMoves(25, rand));
+      for (const f2l of ['advanced', 'fewest'] as const) {
+        const plan = solveCfop(state, { crossColors: ['W'], f2l, oll: 'full', pll: 'full' });
+        let st = state;
+        for (const step of plan.steps.filter((s) => s.stage !== 'oll' && s.stage !== 'pll')) st = applyMoves(st, step.alg);
+        expect(f2lDone(toColorArray(st))).toBe(true);
+        for (const s of plan.steps.filter((s) => s.stage === 'f2l')) {
+          totals[f2l].moves += s.moves;
+          totals[f2l].time += turnCost(parseAlg(s.alg));
+        }
+      }
+    }
+    expect(totals.advanced.time).toBeLessThan(totals.fewest.time);
+    expect(totals.fewest.moves).toBeLessThanOrEqual(totals.advanced.moves);
+  });
+
+  it('move costs: R and U are the quickest, f and B are slow, ties go to fewer moves', () => {
+    expect(turnCost(parseAlg("R U R' U'"))).toBe(4);
+    expect(turnCost(parseAlg("f R f'"))).toBeGreaterThanOrEqual(turnCost(parseAlg("R U R'")) + 2);
+    expect(turnCost(parseAlg('B2'))).toBe(2.6);
+    expect(metricCost('time', parseAlg("R U R'"))).toBeLessThan(metricCost('time', parseAlg("R U R' U U'")));
+    expect(metricCost('moves', parseAlg("f R f'"))).toBe(3);
   });
 
   it('advanced cross: cross and at least one pair together in under 11 moves, never longer overall', () => {

@@ -15,6 +15,7 @@ import { type AlgEntry, EO, OCLL, OLL } from './algs/oll';
 import { crossDistance, solveCross, solveXCross } from './cross';
 import { SLOTS, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { pairCost, solveF2LAdvanced } from './f2lAdvanced';
+import { type F2LMetric, turnCost } from './moveCost';
 import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
 import { type LLKind, llTips } from './llTips';
@@ -40,7 +41,8 @@ export interface CfopOptions {
   crossColors: Color[];
   /** Advanced: the cross and at least one F2L pair together (XCross) when that takes under 11 moves. */
   cross?: 'standard' | 'advanced';
-  f2l?: 'standard' | 'advanced';
+  /** Advanced: the quickest to turn (weighted moves, see moveCost.ts). Fewest: advanced, by move count. */
+  f2l?: 'standard' | 'advanced' | 'fewest';
   oll: 'full' | '2look';
   pll: 'full' | '2look';
 }
@@ -152,19 +154,26 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     pairs.push(colors);
     steps.push({ stage: 'f2l', title: t('cfop.pairTitle', { n: pairs.length, pair: pairName(colors) }), caseName: t(xcross ? 'cfop.withXcross' : 'cfop.afterCross'), alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
   }
-  if (opts.f2l === 'advanced') {
-    const plan = solveF2LAdvanced(st, colorWord(cross));
+  if (opts.f2l === 'advanced' || opts.f2l === 'fewest') {
+    const metric: F2LMetric = opts.f2l === 'fewest' ? 'moves' : 'time';
+    const plan = solveF2LAdvanced(st, colorWord(cross), metric);
     const pieces: Color[][] = [];
     const sides = (c: Color[]) => colorNames(c.filter((x) => x !== cross));
     const mixed = plan.some((p) => p.pseudo || p.uTurn);
     const total = plan.reduce((a, p) => a + p.moves, 0);
+    const time = turnCost(plan.flatMap((p) => p.alg));
     plan.forEach((p, k) => {
       // Why this pair now: what each pair left would cost (not with pseudo-slotting or u turns, where pairs are mixed).
-      const tips = k === 0 ? [t('tip.advOrder', { total: movesText(total) })] : [];
+      const tips =
+        k === 0
+          ? [metric === 'time' ? t('tip.advOrderTime', { total: movesText(total), time: time.toFixed(1) }) : t('tip.advOrder', { total: movesText(total) })]
+          : [];
+      if (metric === 'time') tips.push(t('tip.advTime', { time: p.time.toFixed(1) }));
       if (!mixed) {
-        const options: PairOption[] = openSlots(st).map((slot) => ({ slot, moves: slot === p.slot ? p.moves : pairCost(st, slot) ?? 0, turns: 0 }));
+        const others = openSlots(st).map((slot) => ({ slot, ...(slot === p.slot ? p : (pairCost(st, slot, metric) ?? { moves: 0, cost: 0 })) }));
+        const options: PairOption[] = others.map(({ slot, moves }) => ({ slot, moves, turns: 0 }));
         tips.push(...(options.length > 1 ? [t('tip.advPick')] : []), ...orderTips(st, options, p.slot));
-        if (options.some((o) => o.moves < p.moves)) tips.push(t('tip.advNotCheapest'));
+        if (others.some((o) => o.cost < p.cost)) tips.push(t('tip.advNotCheapest'));
       }
       else if (k > 0) tips.push(t('tip.advMixed'));
       if (p.uTurn) tips.push(t('tip.advU'));
@@ -356,11 +365,12 @@ export const CFOP: MethodDef = {
     {
       key: 'f2l',
       label: 'F2L',
-      help: 'Standard: the usual F2L algorithms (most-voted on SpeedCubeDB), one case at a time, with the cube turned so the pair goes in at the front-right or the front-left. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) and u turns (a corner paired with the edge of another slot inside u … u\') when they are shorter: the fewest moves found.',
+      help: 'Standard: the usual F2L algorithms (most-voted on SpeedCubeDB), one case at a time, with the cube turned so the pair goes in at the front-right or the front-left. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) and u turns (a corner paired with the edge of another slot inside u … u\') when they are shorter: Fastest: the plan quickest to turn, each move weighted by its finger trick (R and U count 1, f and B about 2). Fewest moves: the fewest moves found.',
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },
-        { value: 'advanced', label: 'Advanced' },
+        { value: 'advanced', label: 'Advanced (fastest)' },
+        { value: 'fewest', label: 'Advanced (fewest moves)' },
       ],
     },
     {
@@ -390,7 +400,7 @@ export const CFOP: MethodDef = {
     return solveCfop(state, {
       crossColors: colors.length ? colors : ['W'],
       cross: s.cross === 'advanced' ? 'advanced' : 'standard',
-      f2l: s.f2l === 'advanced' ? 'advanced' : 'standard',
+      f2l: s.f2l === 'advanced' || s.f2l === 'fewest' ? s.f2l : 'standard',
       oll: s.oll === 'full' ? 'full' : '2look',
       pll: s.pll === 'full' ? 'full' : '2look',
     });

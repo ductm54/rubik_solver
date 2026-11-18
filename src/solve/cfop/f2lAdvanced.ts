@@ -1,5 +1,5 @@
 /**
- * Advanced F2L: fewer moves. No cube rotations and no B turns, a pair can go into any slot from
+ * Advanced F2L: the quickest to turn (see moveCost.ts) or the fewest moves. No cube rotations and no B turns, a pair can go into any slot from
  * where it is, pieces stuck in another open slot are taken out as part of the same algorithm,
  * every pair order is tried, and pseudo-slotting (pairs made with the bottom layer turned) and
  * u turns (a corner with another slot's edge, inside "u … u'") are used when they are shorter.
@@ -11,6 +11,7 @@
 import { type Color, type Move, countMoves, formatAlg, invertAlg, movePerm, parseAlg, simplifyAlg, type Perm, applyMovesToArray } from '../../core/cube';
 import { CORNERS, EDGES, type Stickers, faceOf, homeColor, locate, pieceSolved } from '../pieces';
 import { t } from '../../i18n';
+import { type F2LMetric, metricCost, turnCost } from './moveCost';
 import { SLOTS, SLOT_PIECES, type Slot, slotSolved } from './f2l';
 
 /**
@@ -23,7 +24,7 @@ const PLAIN = ['R', 'L', 'F', 'U'];
 const WIDE = ['r', 'l', 'f', 'S'];
 const U_LAYER = new Set([...CORNERS, ...EDGES].filter((c) => c.some((i) => faceOf(i) === 'U')).flat());
 
-function findTriggers(): Record<Slot, string[]> {
+function findTriggers(metric: F2LMetric): Record<Slot, string[]> {
   const turns = [...PLAIN, ...WIDE].flatMap((b) => [b, `${b}'`, `${b}2`]);
   const inv = (t: string) => (t.endsWith("'") ? t[0] : t.endsWith('2') ? t : `${t}'`);
   const cands: string[] = [];
@@ -35,9 +36,11 @@ function findTriggers(): Record<Slot, string[]> {
       if (!a.endsWith('2') && !x.endsWith('2')) cands.push(`${a} ${x} ${inv(a)} ${inv(x)}`);
     }
   }
-  // Fewest wide/slice turns first, then shortest: the search keeps the first of equal options.
+  // Of triggers that do the same thing only the first is kept: by move count, fewest wide/slice
+  // turns first, then shortest; by time, the quickest to turn.
   const wide = (c: string) => c.split(' ').filter((t) => WIDE.includes(t[0])).length;
-  cands.sort((p, q) => wide(p) - wide(q) || p.length - q.length);
+  const time = (c: string) => metricCost('time', parseAlg(c));
+  cands.sort((p, q) => (metric === 'time' ? time(p) - time(q) : 0) || wide(p) - wide(q) || p.length - q.length);
   const out = Object.fromEntries(SLOTS.map((s) => [s, [] as string[]])) as Record<Slot, string[]>;
   const seen = new Set<string>();
   for (const c of cands) {
@@ -52,7 +55,6 @@ function findTriggers(): Record<Slot, string[]> {
   }
   return out;
 }
-const SLOT_TRIGGERS = findTriggers();
 const AUFS = ['U', "U'", 'U2'];
 
 interface Trig {
@@ -68,18 +70,27 @@ const toTrig = (alg: string): Trig => {
   }
   return { moves, perm };
 };
-const TRIGS: Record<Slot, Trig[]> = Object.fromEntries(SLOTS.map((s) => [s, SLOT_TRIGGERS[s].map(toTrig)])) as Record<Slot, Trig[]>;
+const trigCache = new Map<F2LMetric, Record<Slot, Trig[]>>();
+function trigs(metric: F2LMetric): Record<Slot, Trig[]> {
+  let out = trigCache.get(metric);
+  if (!out) {
+    const found = findTriggers(metric);
+    out = Object.fromEntries(SLOTS.map((s) => [s, found[s].map(toTrig)])) as Record<Slot, Trig[]>;
+    trigCache.set(metric, out);
+  }
+  return out;
+}
 const AUF_TRIGS = AUFS.map(toTrig);
 
 type Table = Map<string, Move[]>;
 const tables = new Map<string, Table>();
 
-/** Shortest trigger sequences for the pair of `target`, using triggers of the `open` slots. */
-function table(target: Slot, open: Slot[]): Table {
-  const id = `${target}:${[...open].sort().join('')}`;
+/** Cheapest trigger sequences for the pair of `target`, using triggers of the `open` slots. */
+function table(target: Slot, open: Slot[], metric: F2LMetric): Table {
+  const id = `${metric}:${target}:${[...open].sort().join('')}`;
   const cached = tables.get(id);
   if (cached) return cached;
-  const trigs = [...AUF_TRIGS, ...open.flatMap((s) => TRIGS[s])];
+  const options = [...AUF_TRIGS, ...open.flatMap((s) => trigs(metric)[s])];
   const start = SLOT_PIECES[target].flat(); // corner facelets then edge facelets
   const best = new Map<string, { cost: number; path: Move[]; locs: number[] }>();
   best.set(start.join(','), { cost: 0, path: [], locs: start });
@@ -91,12 +102,12 @@ function table(target: Slot, open: Slot[]): Table {
     if (cur === null) break;
     done.add(cur);
     const { path, locs } = best.get(cur)!;
-    for (const t of trigs) {
+    for (const t of options) {
       const nl = locs.map((i) => t.perm[i]);
       const k = nl.join(',');
       if (done.has(k)) continue;
       const p = simplifyAlg([...path, ...t.moves]);
-      const cost = countMoves(p);
+      const cost = metricCost(metric, p);
       const old = best.get(k);
       if (!old || cost < old.cost) best.set(k, { cost, path: p, locs: nl });
     }
@@ -111,6 +122,10 @@ export interface AdvancedPair {
   slot: Slot;
   alg: Move[];
   moves: number;
+  /** Execution time in fast moves (R or U = 1), see moveCost.ts. */
+  time: number;
+  /** What the search minimised for this pair (see metricCost). */
+  cost: number;
   description: string;
   /** Colours of the corner and the edge that go in together (cross colour first on the corner). */
   corner: Color[];
@@ -149,22 +164,22 @@ export function describePieces(st: Stickers, slot: Slot, offset: number, crossWo
   return t('f2l.adv', { corner: where(cHome, slot), cross: crossWord, facing, edge: where(edgeHome(slot, k), slotOfEdge(edgeHome(slot, k))) });
 }
 
-/** Moves the pair of `slot` would take right now (no pseudo-slotting), or null if the table has no entry. */
-export function pairCost(st: Stickers, slot: Slot): number | null {
-  const alg = pairInto(st, slot, 0, SLOTS.filter((s) => !slotSolved(st, s)));
-  return alg && countMoves(alg);
+/**
+ * What the pair of `slot` would take right now (no pseudo-slotting or u turns): its moves and its
+ * search cost, or null if the table has no entry.
+ */
+export function pairCost(st: Stickers, slot: Slot, metric: F2LMetric = 'time'): { moves: number; cost: number } | null {
+  const key = [...locate(st, SLOT_PIECES[slot][0]), ...locate(st, SLOT_PIECES[slot][1])].join(',');
+  const alg = table(slot, SLOTS.filter((s) => !slotSolved(st, s)), metric).get(key);
+  return alg ? { moves: countMoves(alg), cost: metricCost(metric, alg) } : null;
 }
 
-/** One pair's best solution into `slot`, or null if the table has no entry. */
-function pairInto(st: Stickers, slot: Slot, offset: number, open: Slot[]): Move[] | null {
-  const key = [...locate(st, cornerHome(slot, offset)), ...locate(st, SLOT_PIECES[slot][1])].join(',');
-  return table(slot, open).get(key) ?? null;
-}
-
-const makePair = (st: Stickers, slot: Slot, offset: number, k: number, alg: Move[], description: string): AdvancedPair => ({
+const makePair = (st: Stickers, slot: Slot, offset: number, k: number, alg: Move[], description: string, metric: F2LMetric): AdvancedPair => ({
   slot,
   alg,
   moves: countMoves(alg),
+  time: turnCost(alg),
+  cost: metricCost(metric, alg),
   description,
   corner: cornerHome(slot, offset).map((i) => homeColor(st, i)),
   edge: edgeHome(slot, k).map((i) => homeColor(st, i)),
@@ -189,8 +204,8 @@ const U_FRAMES = ['', 'u', 'u2', "u'"].map((m) => ({ setup: toTrig(m), undo: toT
 const edgeHome = (slot: Slot, k: number) => SLOT_PIECES[slot][1].map((i) => U_FRAMES[k].undo.perm[i]);
 const slotOfEdge = (home: number[]) => SLOTS.find((x) => home.every((i) => SLOT_PIECES[x][1].includes(i)))!;
 
-/** The pairs left at one bottom-layer offset, fewest total moves, trying every order and u-frame. */
-function solveAt(st: Stickers, offset: number, crossWord: string, limit: number): Plan | null {
+/** The pairs left at one bottom-layer offset, cheapest in total, trying every order and u-frame. */
+function solveAt(st: Stickers, offset: number, crossWord: string, limit: number, metric: F2LMetric): Plan | null {
   // `corners`: slots whose corner is still to go in; `edges`: slots whose edge is still to go in.
   const search = (s: Stickers, corners: Slot[], edges: Slot[], limit: number): Plan | null => {
     if (!corners.length) return { total: 0, pairs: [] };
@@ -202,18 +217,18 @@ function solveAt(st: Stickers, offset: number, crossWord: string, limit: number)
       for (const slot of open) {
         const eHome = edgeHome(slot, k);
         const key = [...locate(s, cornerHome(slot, offset)), ...locate(s, eHome)].map((i) => setup.perm[i]).join(',');
-        const inner = table(slot, open).get(key);
+        const inner = table(slot, open, metric).get(key);
         // Already in place with u: nothing to show as a step, the plain frame handles it.
         if (!inner || (k && !inner.length)) continue;
         const alg = simplifyAlg([...setup.moves, ...inner, ...undo.moves]);
-        const moves = countMoves(alg);
+        const cost = metricCost(metric, alg);
         const room = best ? best.total : limit;
-        if (moves >= room) continue;
+        if (cost >= room) continue;
         const edge = slotOfEdge(eHome);
-        const rest = search(applyMovesToArray(s, alg), corners.filter((x) => x !== slot), edges.filter((x) => x !== edge), room - moves);
+        const rest = search(applyMovesToArray(s, alg), corners.filter((x) => x !== slot), edges.filter((x) => x !== edge), room - cost);
         if (!rest) continue;
-        const pair = makePair(s, slot, offset, k, alg, describePieces(s, slot, offset, crossWord, k));
-        best = { total: moves + rest.total, pairs: [pair, ...rest.pairs] };
+        const pair = makePair(s, slot, offset, k, alg, describePieces(s, slot, offset, crossWord, k), metric);
+        best = { total: cost + rest.total, pairs: [pair, ...rest.pairs] };
       }
     }
     return best;
@@ -223,32 +238,33 @@ function solveAt(st: Stickers, offset: number, crossWord: string, limit: number)
 }
 
 /**
- * All four pairs (or the ones left) with the fewest total moves, trying every order, with and
- * without pseudo-slotting. Returns the pairs in solving order. With pseudo-slotting the first
- * pair's algorithm starts with the D turn and the last one ends with the turn back; it is only
- * used when it saves moves even with those two turns counted, and only when no pair is solved yet.
+ * All four pairs (or the ones left) with the least total cost (execution time, or moves), trying
+ * every order, with and without pseudo-slotting. Returns the pairs in solving order. With
+ * pseudo-slotting the first pair's algorithm starts with the D turn and the last one ends with the
+ * turn back; it is only used when it is cheaper even with those two turns counted, and only when
+ * no pair is solved yet.
  */
-export function solveF2LAdvanced(st: Stickers, crossWord: string): AdvancedPair[] {
-  let best = solveAt(st, 0, crossWord, Infinity);
+export function solveF2LAdvanced(st: Stickers, crossWord: string, metric: F2LMetric = 'time'): AdvancedPair[] {
+  let best = solveAt(st, 0, crossWord, Infinity, metric);
   if (!best) throw new Error('Advanced F2L: no case matched (internal error)');
   if (SLOTS.some((s) => slotSolved(st, s))) return best.pairs;
   for (let offset = 1; offset < 4; offset++) {
     const { setup, undo } = OFFSETS[offset];
     const turned = applyMovesToArray(st, setup);
-    const plan = solveAt(turned, offset, crossWord, best.total - 2);
+    const turns = metricCost(metric, setup) + metricCost(metric, undo.moves);
+    const plan = solveAt(turned, offset, crossWord, best.total - turns, metric);
     if (!plan) continue;
     // Pseudo pairs that are in place as soon as the bottom layer is turned come first.
     const ready = SLOTS.filter((s) => placed(turned, s, offset)).map((s) =>
-      makePair(turned, s, offset, 0, [], t('f2l.advReady')),
+      makePair(turned, s, offset, 0, [], t('f2l.advReady'), metric),
     );
     const pairs = [...ready, ...plan.pairs.map((p) => ({ ...p }))];
     const first = pairs[0];
     const last = pairs[pairs.length - 1];
-    first.alg = [...setup, ...first.alg];
-    first.moves += 1;
-    last.alg = [...last.alg, ...undo.moves];
-    last.moves += 1;
-    best = { total: plan.total + 2, pairs };
+    const redo = (p: AdvancedPair, alg: Move[]) => Object.assign(p, { alg, moves: countMoves(alg), time: turnCost(alg), cost: metricCost(metric, alg) });
+    redo(first, [...setup, ...first.alg]);
+    redo(last, [...last.alg, ...undo.moves]);
+    best = { total: plan.total + turns, pairs };
   }
   return best.pairs;
 }
