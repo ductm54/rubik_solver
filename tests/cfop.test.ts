@@ -352,7 +352,8 @@ describe('CFOP solver', () => {
     expect(pseudo).toBeGreaterThan(0);
     expect(uPairs).toBeGreaterThan(0);
     expect((performance.now() - t) / 60).toBeLessThan(200);
-  });
+    // Many full solves: the per-solve speed is checked above, so allow slow CI machines time.
+  }, 30_000);
 
   it('advanced F2L weighs moves by finger trick: quicker to turn than the fewest-moves plan', () => {
     const totals = { time: { moves: 0, time: 0 }, moves: { moves: 0, time: 0 } };
@@ -375,7 +376,8 @@ describe('CFOP solver', () => {
     }
     expect(totals.time.time).toBeLessThan(totals.moves.time);
     expect(totals.moves.moves).toBeLessThanOrEqual(totals.time.moves);
-  });
+    // Many full solves: allow slow CI machines time.
+  }, 30_000);
 
   it('move costs: R is the quickest, double turns and f are slower, ties go to fewer moves', () => {
     expect(turnCost(parseAlg("R U R' U'"))).toBe(4.2);
