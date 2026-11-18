@@ -158,7 +158,7 @@ describe('Beginner method', () => {
   });
 
   describe('faster last layer', () => {
-    const ALL = { corners: 'faster', topCross: 'faster', topEdges: 'faster', topCorners: 'faster' } as const;
+    const ALL = { corners: 'faster', topCross: 'faster', topEdges: 'faster', topCorners: 'faster', cornerTwist: 'faster' } as const;
 
     it('solves random cubes with every Faster setting, using each shortcut', () => {
       const rand = rng(31);
@@ -217,8 +217,23 @@ describe('Beginner method', () => {
       expect(seen).toBeGreaterThan(0);
     });
 
-    it('are three settings, Standard by default', () => {
-      for (const k of ['topCross', 'topEdges', 'topCorners']) {
+    it('corner twist on its own: never four R\' D\' R D, never more moves', () => {
+      const rand = rng(43);
+      let seen = 0;
+      for (let n = 0; n < 40; n++) {
+        const cube = applyMoves(solved, randomMoves(25, rand));
+        const std = solveBeginner(cube, 'W');
+        const fast = solveBeginner(cube, 'W', { cornerTwist: 'faster' });
+        // The saved moves can make another hold the shortest, so compare totals, not steps.
+        for (const st of fast.steps) expect(st.alg.includes("R' D' R D R' D' R D R' D' R D R' D' R D")).toBe(false);
+        seen += fast.steps.filter((st) => st.alg.includes("D' R' D R D' R' D R")).length;
+        expect(fast.moves).toBeLessThanOrEqual(std.moves);
+      }
+      expect(seen).toBeGreaterThan(0);
+    });
+
+    it('are four settings, Standard by default', () => {
+      for (const k of ['topCross', 'topEdges', 'topCorners', 'cornerTwist']) {
         expect(BEGINNER.defaults[k]).toBe('standard');
         expect(BEGINNER.settings.find((d) => d.key === k)!.options.map((o) => o.value)).toEqual(['standard', 'faster']);
       }

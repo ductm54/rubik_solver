@@ -33,6 +33,8 @@ const CORNER_TWIST = "R' D' R D";
 const YELLOW_CROSS_WIDE = "f R U R' U' f'";
 /** Faster top corners: the cycle the other way round, starting with the left hand. */
 const CORNER_CYCLE_BACK = "L' U R U' L U R' U'";
+/** Faster corner twist: R' D' R D backwards. Twice does what R' D' R D four times does. */
+const CORNER_TWIST_BACK = "D' R' D R";
 /** Faster corners: the cross colour on top, one set less (R U2 R' U' and one 4-moves). */
 const CORNER_UP_FAST = "R U2 R' U' R U R' U'";
 const CORNER_UP_FAST_LEFT = "L' U2 L U L' U' L U";
@@ -472,6 +474,19 @@ function solveFrom(start: Stickers, hold: string, cross: Color, opts: BeginnerOp
       if (++reps > 4) throw new Error('Corner twist (internal error)');
     }
     corner++;
+    if (reps === 4 && opts.cornerTwist === 'faster') {
+      b.push(
+        'top',
+        {
+          title: t('beg.twistTitle', { n: corner }),
+          caseName: t('beg.twistCase', { alg: CORNER_TWIST_BACK, times: times(2) }),
+          hint: t(u ? 'beg.twistHintBack' : 'beg.twistHintBackHere', { alg: CORNER_TWIST_BACK, four: CORNER_TWIST, top: word(top) }),
+        },
+        [u, repeat(CORNER_TWIST_BACK, 2)],
+        'all',
+      );
+      continue;
+    }
     b.push(
       'top',
       {
@@ -499,6 +514,8 @@ export interface BeginnerOptions {
   topEdges?: 'standard' | 'faster';
   /** 'faster': corners going the other way round: the left-hand cycle once instead of twice. */
   topCorners?: 'standard' | 'faster';
+  /** 'faster': a corner that needs R' D' R D four times gets D' R' D R twice. */
+  cornerTwist?: 'standard' | 'faster';
 }
 
 export function solveBeginner(state: CubeState, cross: Color, opts: BeginnerOptions = {}): SolvePlan {
@@ -542,6 +559,7 @@ export const BEGINNER: MethodDef = {
         ['topCross', 'Top cross', "Standard: F R U R' U' F', an L held at the back and left, then the line. Faster: an L held at the front and right goes straight to the cross with f R U R' U' f' (f = the front two layers)."],
         ['topEdges', 'Top edges', "Standard: two opposite edges matching first become neighbours, then a second look. Faster: the algorithm, U2, the algorithm again, with no need to look or turn the cube."],
         ['topCorners', 'Top corners', "Standard: U R U' L' U R' U' L, twice when the corners go the other way round. Faster: then the left-hand cycle L' U R U' L U R' U' once."],
+        ['cornerTwist', 'Corner twist', "Standard: R' D' R D until the corner is twisted right, 2 or 4 times. Faster: a corner that needs 4 gets the backwards version D' R' D R twice instead: the same turns, half the work."],
       ] as const
     ).map(([key, label, help]) => ({
       key,
@@ -554,7 +572,7 @@ export const BEGINNER: MethodDef = {
       ],
     })),
   ],
-  defaults: { crossColor: 'W', corners: 'standard', topCross: 'standard', topEdges: 'standard', topCorners: 'standard' },
+  defaults: { crossColor: 'W', corners: 'standard', topCross: 'standard', topEdges: 'standard', topCorners: 'standard', cornerTwist: 'standard' },
   solve(state: CubeState, s: SettingValues) {
     const c = (Array.isArray(s.crossColor) ? s.crossColor[0] : s.crossColor) as Color;
     const pick = (k: string) => (s[k] === 'faster' ? 'faster' : 'standard');
@@ -563,6 +581,7 @@ export const BEGINNER: MethodDef = {
       topCross: pick('topCross'),
       topEdges: pick('topEdges'),
       topCorners: pick('topCorners'),
+      cornerTwist: pick('cornerTwist'),
     });
   },
 };

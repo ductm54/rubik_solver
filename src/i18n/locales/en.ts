@@ -245,6 +245,10 @@ const en = {
   'set.beginner.topCorners.help': "Standard: U R U' L' U R' U' L, twice when the corners go the other way round. Faster: then the left-hand cycle L' U R U' L U R' U' once.",
   'set.beginner.topCorners.standard': 'Standard',
   'set.beginner.topCorners.faster': 'Faster',
+  'set.beginner.cornerTwist.label': 'Corner twist',
+  'set.beginner.cornerTwist.help': "Standard: R' D' R D until the corner is twisted right, 2 or 4 times. Faster: a corner that needs 4 gets the backwards version D' R' D R twice instead: the same turns, half the work.",
+  'set.beginner.cornerTwist.standard': 'Standard',
+  'set.beginner.cornerTwist.faster': 'Faster',
 
   // ---------------------------------------------------------------- timer page
   'timer.docTitle': 'Cube Timer',
@@ -612,6 +616,8 @@ const en = {
   'beg.twistTitle': 'Twist corner {n}',
   'beg.twistCase': '{alg} {times}',
   'beg.twistHint': 'Turn only U (not the cube) so a twisted corner is at the top front-right. Repeat {alg} until {top} is on top: here {times}. The bottom looks scrambled for a while: it comes back when the last corner is done.',
+  'beg.twistHintBack': "Turn only U (not the cube) so a twisted corner is at the top front-right. This one needs {four} four times: do it backwards, {alg}, twice instead, the same turns in half the work. The bottom looks scrambled for a while: it comes back when the last corner is done.",
+  'beg.twistHintBackHere': "A twisted corner is at the top front-right. It needs {four} four times: do it backwards, {alg}, twice instead, the same turns in half the work. The bottom looks scrambled for a while: it comes back when the last corner is done.",
   'beg.twistHintHere': 'A twisted corner is at the top front-right. Repeat {alg} until {top} is on top: here {times}. The bottom looks scrambled for a while: it comes back when the last corner is done.',
   'beg.aufTitle': 'Line up the top layer',
   'beg.aufHint': 'Turn U so the top layer matches the rest: solved.',
