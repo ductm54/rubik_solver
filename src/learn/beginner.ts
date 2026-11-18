@@ -1,10 +1,12 @@
 /**
- * The beginner method (layer by layer) as a course: the same seven steps and algorithms the
- * Solve tab's beginner solver uses, each with a few example cases to play in the 3D viewer.
+ * The beginner method (layer by layer) as a course, following J Perm's beginner guide
+ * (jperm.net/3x3): seven steps built almost entirely from one "4-moves" trick, R U R' U', and
+ * its left-hand mirror. Each step has a few example cases to play in the 3D viewer.
  *
- * The cube is held the way the solver holds it: white on the bottom, yellow on top. In the
- * viewer (cubing.js, white top and green front by default) that is an `x2` rotation, so every
- * demo's setup starts with it and the moves are read in that hold.
+ * Most steps hold the cube with white on the bottom and yellow on top. In the viewer (cubing.js,
+ * white top and green front by default) that is an `x2` rotation, so a demo's setup starts with
+ * its lesson's `hold` and the moves are read in that hold. The cross is built with white on top,
+ * and the last step turns the cube over again: those two lessons use the viewer's own hold.
  *
  * A case is given by where it should end: `end` is an algorithm from the solved cube (in the
  * held frame) to the state after the case's moves, default the solved cube. The viewer works
@@ -32,6 +34,8 @@ export interface LessonCase {
 
 export interface Lesson {
   id: string;
+  /** How the cube is held, from the viewer's default (white top, green front). Default `HOLD`. */
+  hold?: string;
   /** Stage colour on the page, shared with the Solve tab's step tags. */
   stage: 'inspection' | 'cross' | 'corners' | 'middle' | 'top';
   /** Number of `learn.<id>.how<n>` lines. */
@@ -58,13 +62,23 @@ export const FULL_MASK = mask({ kind: 'pll', cross: 'W' });
 
 const times = (alg: string, n: number) => Array(n).fill(alg).join(' ');
 
+/** The right-hand 4-moves. */
 export const SEXY = "R U R' U'";
-export const MIDDLE_RIGHT = "U R U' R' U' F' U F";
-export const MIDDLE_LEFT = "U' L' U L U F U' F'";
+/** The left-hand 4-moves: the mirror image. */
+export const LEFT_SEXY = "L' U' L U";
+/** U, right 4-moves, turn to face the right side, left 4-moves (F' U' F U from the front). */
+export const MIDDLE_RIGHT = "U R U R' U' F' U' F U";
+/** U', left 4-moves, turn to face the left side, right 4-moves (F U F' U' from the front). */
+export const MIDDLE_LEFT = "U' L' U' L U F U F' U'";
+/** White on top: flips the front edge in place, keeping the other top edges. */
+export const CROSS_FLIP = "F U' R U";
+/** White on top: drops the front-right middle edge to the bottom, to the front. */
+export const CROSS_DROP = "R' D' R";
 export const YELLOW_CROSS = "F R U R' U' F'";
 export const YELLOW_EDGES_ALG = "R U R' U R U2 R' U";
 export const CORNER_CYCLE = "U R U' L' U R' U' L";
-export const CORNER_TWIST = "R' D' R D";
+/** Cube turned over (yellow on the bottom): twist the front-right bottom corner. */
+export const CORNER_TWIST = SEXY;
 
 export const BEGINNER: Lesson[] = [
   {
@@ -76,25 +90,27 @@ export const BEGINNER: Lesson[] = [
   },
   {
     id: 'cross',
+    hold: '',
     stage: 'cross',
     how: 4,
-    textAlg: "U' R' F R",
+    algs: { flip: CROSS_FLIP, drop: CROSS_DROP },
     cases: [
-      { id: 'top', alg: 'F2' },
-      { id: 'flipped', alg: "U' R' F R" },
-      { id: 'middle', alg: "F'" },
+      { id: 'bottom', alg: "D' F2", show: "D' · F2" },
+      { id: 'flipped', alg: CROSS_FLIP },
+      { id: 'middle', alg: `${CROSS_DROP} F2`, show: `${CROSS_DROP} · F2` },
     ],
     mask: bright(CROSS_EDGES),
   },
   {
     id: 'corners',
     stage: 'corners',
-    how: 4,
-    algs: { sexy: SEXY },
+    how: 5,
+    algs: { right: SEXY, left: LEFT_SEXY },
     cases: [
       { id: 'right', alg: SEXY, show: `(${SEXY}) ×1` },
       { id: 'up', alg: times(SEXY, 3), show: `(${SEXY}) ×3` },
-      { id: 'front', alg: times(SEXY, 5), show: `(${SEXY}) ×5` },
+      { id: 'front', alg: `y ${LEFT_SEXY}`, show: `y · (${LEFT_SEXY}) ×1` },
+      { id: 'left', alg: LEFT_SEXY, show: `(${LEFT_SEXY}) ×1` },
     ],
     mask: bright(CROSS_EDGES, WHITE_CORNERS),
   },
@@ -146,14 +162,15 @@ export const BEGINNER: Lesson[] = [
   },
   {
     id: 'twist',
+    hold: '',
     stage: 'top',
     how: 4,
     algs: { main: CORNER_TWIST },
     cases: [
       {
         id: 'two',
-        alg: `${times(CORNER_TWIST, 2)} U ${times(CORNER_TWIST, 4)} U'`,
-        show: `(${CORNER_TWIST}) ×2 · U · (${CORNER_TWIST}) ×4 · U'`,
+        alg: `${times(CORNER_TWIST, 2)} D ${times(CORNER_TWIST, 4)} D'`,
+        show: `(${CORNER_TWIST}) ×2 · D · (${CORNER_TWIST}) ×4 · D'`,
       },
     ],
     mask: FULL_MASK,
@@ -162,3 +179,6 @@ export const BEGINNER: Lesson[] = [
 
 /** The moves the notation pad offers. */
 export const NOTATION_MOVES = ['U', "U'", 'D', "D'", 'R', "R'", 'L', "L'", 'F', "F'", 'B', "B'", 'U2', 'y'];
+
+/** The hold a lesson's demos start from. */
+export const holdOf = (lesson: Lesson) => lesson.hold ?? HOLD;
