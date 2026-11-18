@@ -512,6 +512,13 @@ describe('regrips', () => {
     for (const alg of ["R U R' U'", "R' F R F'", "L' U' L U", "R U R' U' R' F R2 U' R' U' R U R' F'", "R B' R'", "D R' D' R", 'R2 U R2']) expect(regrips(alg), alg).toBe(0);
   });
 
+  it('wide r and l move the thumb like R and L; u and f are reached like U and F', () => {
+    for (const alg of ["r U R' U'", "r U r'", "l' U' L U", "u R U R' u'", "f R U R' U' f'", "R' f R f'"]) expect(regrips(alg), alg).toBe(0);
+    // The wrist is already turned as far as it goes.
+    expect(regrips('R r R')).toBe(1);
+    expect(regrips("r' R' r'")).toBe(1);
+  });
+
   it('the first grip is free, the next ones are not', () => {
     // One B or F2 alone: take the grip for it during inspection.
     expect(planGrip(parseAlg('B'))).toEqual({ regrips: 0, start: { left: 'front', right: 'top' }, at: [] });

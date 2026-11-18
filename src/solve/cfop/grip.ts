@@ -21,14 +21,16 @@ const THUMBS: Thumb[] = ['bottom', 'front', 'top']; // in the order a wrist turn
 
 /**
  * The turns the RIGHT hand does with a finger, without regripping, by where its thumb is.
- *  - front (home): U with the index finger, D turns with the ring finger, F' with the thumb.
+ *  - front (home): U with the index finger, D turns with the ring finger, F' with the thumb; u, u2
+ *    and f' the same way over two layers.
  *  - top (after R): the fingers are at the back, so B turns; U either way with the index finger.
- *  - bottom (after R'): the index finger is over the front, so F and F2; U as a push.
+ *  - bottom (after R'): the index finger is over the front, so F and F2 (and f, f2); U as a push.
+ * Wide r and l move the thumb like R and L. M, S, E and the other wide turns are not modelled.
  */
 export const RIGHT_HAND: Record<Thumb, string> = {
-  front: "U U2 D D' D2 F'",
+  front: "U U2 D D' D2 F' u u2 f'",
   top: "U U' U2 B B' B2",
-  bottom: 'U F F2',
+  bottom: 'U F F2 f f2',
 };
 
 /** The left hand: by default the mirror image of the right (U ↔ U', F ↔ F', ...). */
@@ -53,7 +55,15 @@ const WRIST: Record<string, { hand: 0 | 1; by: number }> = {
   "L'": { hand: 0, by: 1 },
   L: { hand: 0, by: -1 },
   L2: { hand: 0, by: 2 },
+  r: { hand: 1, by: 1 },
+  "r'": { hand: 1, by: -1 },
+  r2: { hand: 1, by: 2 },
+  "l'": { hand: 0, by: 1 },
+  l: { hand: 0, by: -1 },
+  l2: { hand: 0, by: 2 },
 };
+/** Turns whose finger is modelled (the others never need a regrip). */
+const MODELLED = new Set([...'URFDLB', 'u', 'f']);
 
 const name = (m: Move) => m.base + ['', '', '2', "'"][m.amount];
 
@@ -74,7 +84,7 @@ function after(turn: string): Int8Array {
       const to = wrist.by === 2 ? 2 - from : from + wrist.by;
       thumbs[wrist.hand] = to;
       out[g] = to < 0 || to > 2 || to === from ? -1 : thumbs[0] * 3 + thumbs[1];
-    } else if (!'URFDLB'.includes(turn[0])) out[g] = g; // rotations, wide and slice turns: not modelled
+    } else if (!MODELLED.has(turn[0])) out[g] = g; // rotations, slices and the other wide turns: not modelled
     else out[g] = reach[0][thumbs[0]].has(turn) || reach[1][thumbs[1]].has(turn) ? g : -1;
   }
   afterCache.set(turn, out);

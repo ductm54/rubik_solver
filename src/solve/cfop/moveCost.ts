@@ -7,6 +7,7 @@
  * R/L, U/U' and F/F'.
  */
 import { type Move, countMoves, formatMove } from '../../core/cube';
+import { REGRIP_COST, countRegrips } from './grip';
 
 // prettier-ignore
 export const MOVE_COST: Record<string, number> = {
@@ -28,14 +29,17 @@ export const moveCost = (m: Move): number => ('xyz'.includes(m.base) ? 0 : (MOVE
 export const turnCost = (moves: readonly Move[]): number => Math.round(moves.reduce((a, m) => a + moveCost(m) * 10, 0)) / 10;
 
 /**
- * What advanced F2L minimises: execution time (weighted moves; the solver always uses this) or the
- * plain move count (kept to compare against, see the tests).
+ * What advanced F2L minimises: execution time (weighted moves plus REGRIP_COST for each regrip,
+ * see grip.ts; the solver always uses this) or the plain move count (kept to compare against).
  */
 export type F2LMetric = 'time' | 'moves';
 
+/** Execution time including regrips, in fast moves: each sequence starts from the grip it suits best. */
+export const execCost = (moves: readonly Move[]): number => turnCost(moves) + REGRIP_COST * countRegrips(moves);
+
 /**
  * The search's cost of a sequence, in whole tenths so sums compare exactly: execution time with
- * the move count to break ties, or the move count alone.
+ * regrips, the move count breaking ties; or the move count alone.
  */
 export const metricCost = (metric: F2LMetric, moves: readonly Move[]): number =>
-  metric === 'time' ? Math.round(turnCost(moves) * 10) * 100 + countMoves(moves) : countMoves(moves);
+  metric === 'time' ? Math.round(execCost(moves) * 10) * 100 + countMoves(moves) : countMoves(moves);
