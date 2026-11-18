@@ -66,7 +66,11 @@ const word = colorWord;
 const names = colorNames;
 const times = (n: number) => t('solve.times', { count: n });
 const repeat = (alg: string, n: number) => Array(n).fill(alg).join(' ');
-const len = (parts: string[]) => countMoves(simplifyAlg(parseAlg(parts.join(' '))));
+/**
+ * Moves in a step as it is shown: each part is simplified on its own (see Builder.push), so moves
+ * do not cancel across parts. Counting them merged would favour steps that look short but are not.
+ */
+const len = (parts: string[]) => parts.reduce((a, p) => a + countMoves(simplifyAlg(parseAlg(p))), 0);
 const sameSet = (a: Color[], b: Color[]) => a.length === b.length && a.every((c) => b.includes(c));
 const homeColors = (st: Stickers, pos: string) => [...pos].map((f) => centerColor(st, f as never));
 
@@ -100,7 +104,8 @@ function cheapest(st: Stickers, cands: Cand[], ok: (after: Stickers) => boolean)
   return best;
 }
 
-function solveFrom(start: Stickers, hold: string, cross: Color, fast: Set<Layer>): SolveStep[] {
+/** The steps for one way of holding the cube (solveGuide tries each and keeps the shortest). */
+export function solveFrom(start: Stickers, hold: string, cross: Color, fast: Set<Layer>): SolveStep[] {
   const scheme = Object.fromEntries([...'URFDLB'].map((f, i) => [f, start[i * 9 + 4]]));
   const b = new Builder(start, scheme, cross);
   const held = applyMovesToArray(start, hold);
@@ -169,63 +174,76 @@ function solveFrom(start: Stickers, hold: string, cross: Color, fast: Set<Layer>
 
   // 2. Turn over, then the corners.
   b.push('corners', { title: t('gd.turnOver'), hint: t('gd.turnOverHint', { cross: word(cross), top: word(last) }) }, 'x2', crossEdges);
-  const shownCorners = corners.filter((c) => done(b.st, c));
-  while (shownCorners.length < 4) {
-    let pick: { cand: Cand; corner: Color[] } | null = null;
-    const middleDone = middle.filter((m) => done(b.st, m));
-    for (const corner of corners.filter((c) => !shownCorners.includes(c))) {
-      const cands: Cand[] = [];
-      const firsts: Cand[] = [{ parts: [], kind: '' }];
-      for (const y of Y) {
-        firsts.push({ parts: [y, SEXY], kind: 'out' });
-        if (fast.has('corners')) firsts.push({ parts: [y, LEFT_SEXY], kind: 'outLeft' });
-      }
-      for (const f of firsts) {
-        const st = applyMovesToArray(b.st, f.parts.join(' '));
-        const yr = turnTo(st, corner, 'DFR')!;
-        const yl = turnTo(st, corner, 'DLF')!;
-        for (const u of U_TURNS) {
-          for (const n of [1, 3, 5]) {
-            cands.push({ parts: [...f.parts, yr, u, repeat(SEXY, n)], kind: `${f.kind}|right`, data: { n } });
-            cands.push({ parts: [...f.parts, yl, u, repeat(LEFT_SEXY, n)], kind: `${f.kind}|left`, data: { n } });
-          }
-          if (fast.has('corners')) {
-            cands.push({ parts: [...f.parts, yr, u, CORNER_UP_FAST], kind: `${f.kind}|upRight` });
-            cands.push({ parts: [...f.parts, yl, u, CORNER_UP_FAST_LEFT], kind: `${f.kind}|upLeft` });
-            cands.push({ parts: [...f.parts, yr, u, KEEP_EDGE_RIGHT], kind: `${f.kind}|keepRight` });
-            cands.push({ parts: [...f.parts, yl, u, KEEP_EDGE_LEFT], kind: `${f.kind}|keepLeft` });
+  // The faster tricks give the solver more ways to place each corner, but it places one corner at a
+  // time, so more choice can still end up longer. Plan the corners both ways and keep the shorter
+  // (each middle edge still to place counts its ~9 moves), so the tricks never cost moves.
+  const cornersWith = (tricks: boolean) => {
+    const bb = new Builder(b.st, scheme, cross);
+    const shownCorners = corners.filter((c) => done(bb.st, c));
+    while (shownCorners.length < 4) {
+      let pick: { cand: Cand; corner: Color[] } | null = null;
+      const middleDone = middle.filter((m) => done(bb.st, m));
+      for (const corner of corners.filter((c) => !shownCorners.includes(c))) {
+        const cands: Cand[] = [];
+        const firsts: Cand[] = [{ parts: [], kind: '' }];
+        for (const y of Y) {
+          firsts.push({ parts: [y, SEXY], kind: 'out' });
+          if (tricks) firsts.push({ parts: [y, LEFT_SEXY], kind: 'outLeft' });
+        }
+        for (const f of firsts) {
+          const st = applyMovesToArray(bb.st, f.parts.join(' '));
+          const yr = turnTo(st, corner, 'DFR')!;
+          const yl = turnTo(st, corner, 'DLF')!;
+          for (const u of U_TURNS) {
+            for (const n of [1, 3, 5]) {
+              cands.push({ parts: [...f.parts, yr, u, repeat(SEXY, n)], kind: `${f.kind}|right`, data: { n } });
+              cands.push({ parts: [...f.parts, yl, u, repeat(LEFT_SEXY, n)], kind: `${f.kind}|left`, data: { n } });
+            }
+            if (tricks) {
+              cands.push({ parts: [...f.parts, yr, u, CORNER_UP_FAST], kind: `${f.kind}|upRight` });
+              cands.push({ parts: [...f.parts, yl, u, CORNER_UP_FAST_LEFT], kind: `${f.kind}|upLeft` });
+              cands.push({ parts: [...f.parts, yr, u, KEEP_EDGE_RIGHT], kind: `${f.kind}|keepRight` });
+              cands.push({ parts: [...f.parts, yl, u, KEEP_EDGE_LEFT], kind: `${f.kind}|keepLeft` });
+            }
           }
         }
+        const keep = [...crossEdges, ...shownCorners];
+        // With the faster corners, a middle edge already in place is worth keeping (about 9 moves to put back).
+        const lost = (after: Stickers) => middleDone.filter((m) => !done(after, m)).length;
+        if (tricks) for (const c of cands) c.penalty = 9 * lost(applyMovesToArray(bb.st, c.parts.join(' ')));
+        const c = cheapest(bb.st, cands, (after) => done(after, corner) && allDone(after, keep));
+        const cost = (x: Cand) => len(x.parts) + (x.penalty ?? 0);
+        if (c && (!pick || cost(c) < cost(pick.cand))) pick = { cand: c, corner };
       }
-      const keep = [...crossEdges, ...shownCorners];
-      // With the faster corners, a middle edge already in place is worth keeping (about 9 moves to put back).
-      const lost = (after: Stickers) => middleDone.filter((m) => !done(after, m)).length;
-      if (fast.has('corners')) for (const c of cands) c.penalty = 9 * lost(applyMovesToArray(b.st, c.parts.join(' ')));
-      const c = cheapest(b.st, cands, (after) => done(after, corner) && allDone(after, keep));
-      const cost = (x: Cand) => len(x.parts) + (x.penalty ?? 0);
-      if (c && (!pick || cost(c) < cost(pick.cand))) pick = { cand: c, corner };
+      if (!pick) throw new Error('First layer did not finish (internal error)');
+      const { cand, corner } = pick;
+      shownCorners.push(corner);
+      const [first, then] = cand.kind.split('|');
+      const n = Number(cand.data?.n ?? 1);
+      const hint =
+        (first ? t(first === 'out' ? 'gd.cornerOut' : 'gd.cornerOutLeft', { cross: word(cross) }) + ' ' : '') +
+        t(`gd.corner.${then}`, { slot: names(corner.slice(1)), times: times(n), cross: word(cross) });
+      const faster = first === 'outLeft' || ['upRight', 'upLeft', 'keepRight', 'keepLeft'].includes(then);
+      bb.push(
+        'corners',
+        {
+          title: t('gd.cornerTitle', { n: shownCorners.length, colors: names(corner) }),
+          caseName: faster ? t('gd.faster') : n > 1 ? `${cap(times(n))}` : undefined,
+          hint,
+        },
+        cand.parts,
+        [...crossEdges, ...shownCorners, ...middle.filter((m) => done(applyMovesToArray(bb.st, cand.parts.join(' ')), m))],
+      );
+      for (const c of corners) if (!shownCorners.includes(c) && done(bb.st, c)) shownCorners.push(c);
     }
-    if (!pick) throw new Error('First layer did not finish (internal error)');
-    const { cand, corner } = pick;
-    shownCorners.push(corner);
-    const [first, then] = cand.kind.split('|');
-    const n = Number(cand.data?.n ?? 1);
-    const hint =
-      (first ? t(first === 'out' ? 'gd.cornerOut' : 'gd.cornerOutLeft', { cross: word(cross) }) + ' ' : '') +
-      t(`gd.corner.${then}`, { slot: names(corner.slice(1)), times: times(n), cross: word(cross) });
-    const faster = first === 'outLeft' || ['upRight', 'upLeft', 'keepRight', 'keepLeft'].includes(then);
-    b.push(
-      'corners',
-      {
-        title: t('gd.cornerTitle', { n: shownCorners.length, colors: names(corner) }),
-        caseName: faster ? t('gd.faster') : n > 1 ? `${cap(times(n))}` : undefined,
-        hint,
-      },
-      cand.parts,
-      [...crossEdges, ...shownCorners, ...middle.filter((m) => done(applyMovesToArray(b.st, cand.parts.join(' ')), m))],
-    );
-    for (const c of corners) if (!shownCorners.includes(c) && done(b.st, c)) shownCorners.push(c);
-  }
+    const middleLeft = middle.filter((m) => !done(bb.st, m)).length;
+    return { bb, cost: bb.steps.reduce((a, s) => a + s.moves, 0) + 9 * middleLeft };
+  };
+  const plain = cornersWith(false);
+  const tricked = fast.has('corners') ? cornersWith(true) : null;
+  const chosen = tricked && tricked.cost <= plain.cost ? tricked.bb : plain.bb;
+  b.steps.push(...chosen.steps);
+  b.st = chosen.st;
 
   // 3. Middle edges.
   const middleIn = (st: Stickers) => middle.filter((m) => done(st, m));

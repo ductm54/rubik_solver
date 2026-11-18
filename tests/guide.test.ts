@@ -1,7 +1,7 @@
 /** The beginner guide solver: the Learn tab's method, with its faster tricks layer by layer. */
 import { describe, expect, it } from 'vitest';
 import { type Color, applyMoves, applyMovesToArray, parseAlg, randomMoves, solvedState, toColorArray } from '../src/core/cube';
-import { GUIDE, LAYERS, type Layer, solveGuide } from '../src/solve/beginner/guide';
+import { GUIDE, LAYERS, type Layer, solveFrom, solveGuide } from '../src/solve/beginner/guide';
 import { getMethod } from '../src/solve/methods';
 import { centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 import { EN } from '../src/i18n/locales/en';
@@ -102,6 +102,23 @@ describe('Beginner guide', () => {
     const fast = solveGuide(cube, 'W', ['middle']);
     expect(fast.steps.some((s) => s.stage === 'middle' && s.caseName === EN['gd.middle.flip'])).toBe(true);
   });
+
+  it('the corner tricks never cost moves: step moves as shown, plus ~9 per middle edge left', () => {
+    const middleLeft = (st: Color[]) => ['FR', 'FL', 'BR', 'BL'].filter((p) => !pieceSolved(st, cubie(p))).length;
+    const score = (st: Color[], fast: Layer[]) => {
+      let moves = 0;
+      for (const s of solveFrom(st, '', 'W', new Set(fast))) {
+        if (s.stage === 'middle' || s.stage === 'top') break;
+        st = applyMovesToArray(st, parseAlg(s.alg));
+        if (s.stage === 'corners') moves += s.moves;
+      }
+      return moves + 9 * middleLeft(st);
+    };
+    for (const cube of scrambles(40, 31)) {
+      const st = toColorArray(cube);
+      expect(score(st, ['corners'])).toBeLessThanOrEqual(score(st, []));
+    }
+  }, 60000);
 
   it('is in the method registry, with an empty set of tricks by default, and handles a solved cube', () => {
     expect(getMethod('guide')).toBe(GUIDE);
