@@ -60,6 +60,21 @@ describe('Beginner method', () => {
     }
   });
 
+  it('puts first-layer corners in with either hand, whichever is shorter', () => {
+    const rand = rng(5);
+    let left = 0;
+    let right = 0;
+    for (let n = 0; n < 20; n++) {
+      const plan = solveBeginner(applyMoves(solved, randomMoves(25, rand)), 'W');
+      for (const s of plan.steps.filter((s) => s.stage === 'corners' && s.moves)) {
+        if (s.alg.includes("L' U' L U")) left++;
+        if (s.alg.includes("R U R' U'")) right++;
+      }
+    }
+    expect(left).toBeGreaterThan(0);
+    expect(right).toBeGreaterThan(0);
+  });
+
   it('works through the method registry and handles a solved cube', () => {
     expect(getMethod('beginner')).toBe(BEGINNER);
     const plan = BEGINNER.solve(solved, BEGINNER.defaults);

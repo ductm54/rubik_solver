@@ -498,6 +498,8 @@ const vi: Translation = {
   'beg.cornerElsewhere': "Góc đang ở một khe dưới khác: lấy nó ra trước (R U R')",
   'beg.cornerTwisted': 'Góc đã ở đúng khe nhưng bị xoắn',
   'beg.cornerHint': "Xoay khối để khe {slot} ở trước-phải, phía dưới. Xoay U đến khi góc nằm ngay trên khe (trên, trước-phải), rồi lặp R U R' U' đến khi góc vào đúng: ở đây {times}.",
+  'beg.cornerHintLeft': "Xoay khối để khe {slot} ở trước-trái, phía dưới. Xoay U đến khi góc nằm ngay trên khe (trên, trước-trái), rồi lặp 4 bước tay trái L' U' L U đến khi góc vào đúng: ở đây {times}.",
+  'beg.cornerLeftHand': "Tay trái: L' U' L U",
   'beg.middleTitle': 'Cạnh tầng giữa · {colors}',
   'beg.goesRight': 'Đi sang phải',
   'beg.goesLeft': 'Đi sang trái',

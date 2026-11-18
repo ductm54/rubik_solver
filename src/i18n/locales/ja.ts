@@ -501,6 +501,8 @@ const ja: Translation = {
   'beg.cornerElsewhere': "コーナーが別の下段スロットにあります：先に取り出します（R U R'）",
   'beg.cornerTwisted': 'コーナーは自分のスロットにあるがねじれている',
   'beg.cornerHint': "キューブを持ち替えて{slot}スロットを右前下にします。U を回してコーナーをその真上（上段の右前）に置き、揃うまで R U R' U' を繰り返します：ここでは {times}。",
+  'beg.cornerHintLeft': "キューブを持ち替えて{slot}スロットを左前下にします。U を回してコーナーをその真上（上段の左前）に置き、揃うまで左手の L' U' L U を繰り返します：ここでは {times}。",
+  'beg.cornerLeftHand': "左手：L' U' L U",
   'beg.middleTitle': '2 段目エッジ · {colors}',
   'beg.goesRight': '右へ入れる',
   'beg.goesLeft': '左へ入れる',

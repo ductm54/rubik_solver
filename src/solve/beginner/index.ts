@@ -1,7 +1,7 @@
 /**
  * Beginner method (layer by layer), the way it is usually taught (and as on the Learn tab):
  *   1. cross, one edge at a time, with the cross colour on top; then the cube is turned over
- *   2. first-layer corners: corner above its slot, repeat R U R' U'
+ *   2. first-layer corners: corner above its slot, repeat R U R' U' (front-right) or L' U' L U (front-left)
  *   3. middle-layer edges: line the edge up with its center, then the right or left algorithm
  *   4. yellow cross: F R U R' U' F' (dot → L → line → cross)
  *   5. yellow edges in place: R U R' U R U2 R' U
@@ -22,6 +22,7 @@ const Y = ['', 'y', 'y2', "y'"];
 const U_TURNS = ['', 'U', 'U2', "U'"];
 
 const SEXY = "R U R' U'";
+const LEFT_SEXY = "L' U' L U";
 const MIDDLE_RIGHT = "U R U' R' U' F' U F";
 const MIDDLE_LEFT = "U' L' U L U F U' F'";
 const YELLOW_CROSS = "F R U R' U' F'";
@@ -46,6 +47,16 @@ const FLIP = 'z2';
 const FLIP_FACE: Record<string, string> = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B', x: 'x', y: 'y', z: 'z' };
 export const unflip = (moves: Move[]): Move[] =>
   moves.map((m) => ({ base: FLIP_FACE[m.base], amount: 'xy'.includes(m.base) ? ((4 - m.amount) as 1 | 2 | 3) : m.amount }));
+
+/** A position's name as `whereIs` writes it. */
+const pos = (name: string) => positionName(cubie(name));
+/** Turn a bottom slot to the front-right, and back. */
+const TO_FRONT_RIGHT: Record<string, [string, string]> = {
+  [pos('DFR')]: ['', ''],
+  [pos('DFL')]: ["y'", 'y'],
+  [pos('DBL')]: ['y2', 'y2'],
+  [pos('DBR')]: ['y', "y'"],
+};
 
 const word = colorWord;
 const names = colorNames;
@@ -181,44 +192,50 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
       mask: stickeringMask(scheme, { kind: 'pieces', cross, pieces: [...crossEdges, ...shownCorners.slice(0, k + 1)] }),
     });
   while (shownCorners.length < 4) {
-    // Plan each unsolved corner and take the shortest.
-    let best: { alg: string; colors: Color[]; caseName?: string; reps: number; moves: number } | null = null;
-    for (const y of Y) {
-      let alg = y;
-      let st = applyMovesToArray(b.st, alg);
-      if (solvedAt(st, 'DFR')) continue;
-      const colors = homeColors(st, 'DFR');
-      let caseName: string | undefined;
-      const at = whereIs(st, 'DFR');
-      if (at[0] === 'D' && at !== 'DFR') {
-        // Stuck in another bottom slot: turn that slot to the front-right, take it out, turn back.
-        const [there, back] = ({ DFL: ["y'", 'y'], DBL: ['y2', 'y2'], DBR: ['y', "y'"] } as Record<string, string[]>)[at];
-        alg += ` ${there} R U R' ${back}`;
-        caseName = t('beg.cornerElsewhere');
-        st = applyMovesToArray(b.st, alg);
+    // Plan each unsolved corner with the right hand (slot at the front-right, R U R' U') and with
+    // the left hand (slot at the front-left, L' U' L U), as on the Learn tab; take the shortest.
+    let best: { alg: string; colors: Color[]; caseName?: string; reps: number; moves: number; left: boolean } | null = null;
+    for (const left of [false, true])
+      for (const y of Y) {
+        const slot = left ? 'DFL' : 'DFR';
+        const above = pos(left ? 'UFL' : 'UFR');
+        const four = left ? LEFT_SEXY : SEXY;
+        let alg = y;
+        let st = applyMovesToArray(b.st, alg);
+        if (solvedAt(st, slot)) continue;
+        const colors = homeColors(st, slot);
+        let caseName: string | undefined;
+        const at = whereIs(st, slot);
+        if (at[0] === 'D' && at !== pos(slot)) {
+          // Stuck in another bottom slot: turn that slot to the front-right, take it out, turn back.
+          const [there, back] = TO_FRONT_RIGHT[at];
+          alg += ` ${there} R U R' ${back}`;
+          caseName = t('beg.cornerElsewhere');
+          st = applyMovesToArray(b.st, alg);
+        }
+        if (whereIs(st, slot) !== pos(slot)) {
+          const u = U_TURNS.find((t) => whereIs(applyMovesToArray(st, t), slot) === above)!;
+          alg += ` ${u}`;
+          st = applyMovesToArray(st, u);
+        } else caseName ??= t('beg.cornerTwisted');
+        let reps = 0;
+        while (!solvedAt(st, slot)) {
+          st = applyMovesToArray(st, four);
+          if (++reps > 6) throw new Error('First layer: corner not solved (internal error)');
+        }
+        alg += ` ${repeat(four, reps)}`;
+        const moves = countMoves(simplifyAlg(parseAlg(alg)));
+        // The right hand on a tie: it is the one learnt first.
+        if (!best || moves < best.moves) best = { alg, colors, caseName, reps, moves, left };
       }
-      if (whereIs(st, 'DFR') !== 'DFR') {
-        const u = U_TURNS.find((t) => whereIs(applyMovesToArray(st, t), 'DFR') === 'UFR')!;
-        alg += ` ${u}`;
-        st = applyMovesToArray(st, u);
-      } else caseName ??= t('beg.cornerTwisted');
-      let reps = 0;
-      while (!solvedAt(st, 'DFR')) {
-        st = applyMovesToArray(st, SEXY);
-        if (++reps > 6) throw new Error('First layer: corner not solved (internal error)');
-      }
-      alg += ` ${repeat(SEXY, reps)}`;
-      const moves = countMoves(simplifyAlg(parseAlg(alg)));
-      if (!best || moves < best.moves) best = { alg, colors, caseName, reps, moves };
-    }
-    const { alg, colors, caseName, reps } = best!;
+    const { alg, colors, caseName, reps, left } = best!;
     shownCorners.push(colors);
     b.push(
       'corners',
       {
         title: t('beg.cornerTitle', { n: shownCorners.length, colors: names(colors) }),
-        caseName,
-        hint: t('beg.cornerHint', { slot: names(colors.slice(1)), times: times(reps) }),
+        caseName: caseName ?? (left ? t('beg.cornerLeftHand') : undefined),
+        hint: t(left ? 'beg.cornerHintLeft' : 'beg.cornerHint', { slot: names(colors.slice(1)), times: times(reps) }),
       },
       alg,
       [...crossEdges, ...shownCorners],

@@ -510,6 +510,8 @@ const pt: Translation = {
   'beg.cornerElsewhere': "A quina está em outro slot de baixo: tire-a primeiro (R U R')",
   'beg.cornerTwisted': 'A quina está no seu slot, mas girada',
   'beg.cornerHint': "Gire o cubo para o slot {slot} ficar na frente à direita, embaixo. Gire U até a quina ficar logo acima dele (em cima, frente-direita) e repita R U R' U' até resolvê-la: aqui {times}.",
+  'beg.cornerHintLeft': "Gire o cubo para o slot {slot} ficar na frente à esquerda, embaixo. Gire U até a quina ficar logo acima dele (em cima, frente-esquerda) e repita os 4 movimentos da esquerda L' U' L U até resolvê-la: aqui {times}.",
+  'beg.cornerLeftHand': "Mão esquerda: L' U' L U",
   'beg.middleTitle': 'Meio da 2ª camada · {colors}',
   'beg.goesRight': 'Vai para a direita',
   'beg.goesLeft': 'Vai para a esquerda',

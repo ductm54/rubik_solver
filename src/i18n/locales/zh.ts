@@ -506,6 +506,8 @@ const zh: Translation = {
   'beg.cornerElsewhere': "角块在另一个底层槽中：先把它取出来（R U R'）",
   'beg.cornerTwisted': '角块在自己的槽中，但方向不对',
   'beg.cornerHint': "转动魔方，让{slot}槽位于右前下方。转 U 直到角块正好在它上方（顶层右前），然后重复 R U R' U' 直到它还原：这里需要{times}。",
+  'beg.cornerHintLeft': "转动魔方，让{slot}槽位于左前下方。转 U 直到角块正好在它上方（顶层左前），然后重复左手的 L' U' L U 直到它还原：这里需要{times}。",
+  'beg.cornerLeftHand': "左手：L' U' L U",
   'beg.middleTitle': '中层棱块 · {colors}',
   'beg.goesRight': '向右放',
   'beg.goesLeft': '向左放',

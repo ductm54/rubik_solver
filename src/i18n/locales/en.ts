@@ -548,6 +548,8 @@ const en = {
   'beg.cornerElsewhere': "The corner is in another bottom slot: take it out first (R U R')",
   'beg.cornerTwisted': 'The corner is in its slot but twisted',
   'beg.cornerHint': "Turn the cube so the {slot} slot is at the front-right, bottom. Turn U until the corner is right above it (top front-right), then repeat R U R' U' until it is solved: here {times}.",
+  'beg.cornerHintLeft': "Turn the cube so the {slot} slot is at the front-left, bottom. Turn U until the corner is right above it (top front-left), then repeat the left 4-moves L' U' L U until it is solved: here {times}.",
+  'beg.cornerLeftHand': "Left hand: L' U' L U",
   'beg.middleTitle': 'Middle edge · {colors}',
   'beg.goesRight': 'Goes to the right',
   'beg.goesLeft': 'Goes to the left',

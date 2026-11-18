@@ -509,6 +509,8 @@ const de: Translation = {
   'beg.cornerElsewhere': "Die Ecke steckt in einem anderen unteren Slot: zuerst herausholen (R U R')",
   'beg.cornerTwisted': 'Die Ecke ist in ihrem Slot, aber verdreht',
   'beg.cornerHint': "Dreh den Würfel, sodass der Slot {slot} vorne rechts unten ist. Dreh U, bis die Ecke genau darüber ist (oben vorne rechts), und wiederhole dann R U R' U', bis sie gelöst ist: hier {times}.",
+  'beg.cornerHintLeft': "Dreh den Würfel, sodass der Slot {slot} vorne links unten ist. Dreh U, bis die Ecke genau darüber ist (oben vorne links), und wiederhole dann die linken 4 Züge L' U' L U, bis sie gelöst ist: hier {times}.",
+  'beg.cornerLeftHand': "Linke Hand: L' U' L U",
   'beg.middleTitle': 'Mittelkante · {colors}',
   'beg.goesRight': 'Geht nach rechts',
   'beg.goesLeft': 'Geht nach links',

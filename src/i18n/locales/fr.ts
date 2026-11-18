@@ -510,6 +510,8 @@ const fr: Translation = {
   'beg.cornerElsewhere': "Le coin est dans un autre emplacement du bas : sortez-le d'abord (R U R')",
   'beg.cornerTwisted': 'Le coin est dans son emplacement mais tourné',
   'beg.cornerHint': "Tournez le cube pour que l'emplacement {slot} soit à l'avant droit, en bas. Tournez U jusqu'à ce que le coin soit juste au-dessus (en haut, avant droit), puis répétez R U R' U' jusqu'à ce qu'il soit résolu : ici {times}.",
+  'beg.cornerHintLeft': "Tournez le cube pour que l'emplacement {slot} soit à l'avant gauche, en bas. Tournez U jusqu'à ce que le coin soit juste au-dessus (en haut, avant gauche), puis répétez les 4 mouvements gauches L' U' L U jusqu'à ce qu'il soit résolu : ici {times}.",
+  'beg.cornerLeftHand': "Main gauche : L' U' L U",
   'beg.middleTitle': 'Arête du milieu · {colors}',
   'beg.goesRight': 'Va à droite',
   'beg.goesLeft': 'Va à gauche',
