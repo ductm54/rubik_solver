@@ -377,10 +377,11 @@ describe('CFOP solver', () => {
     expect(totals.moves.moves).toBeLessThanOrEqual(totals.time.moves);
   });
 
-  it('move costs: R and U are the quickest, f and B are slow, ties go to fewer moves', () => {
-    expect(turnCost(parseAlg("R U R' U'"))).toBe(4);
-    expect(turnCost(parseAlg("f R f'"))).toBeGreaterThanOrEqual(turnCost(parseAlg("R U R'")) + 2);
-    expect(turnCost(parseAlg('B2'))).toBe(2.6);
+  it('move costs: R is the quickest, double turns and f are slower, ties go to fewer moves', () => {
+    expect(turnCost(parseAlg("R U R' U'"))).toBe(4.2);
+    expect(turnCost(parseAlg("f R f'"))).toBeGreaterThan(turnCost(parseAlg("R U R'")) + 1);
+    expect(turnCost(parseAlg('U2'))).toBeGreaterThan(turnCost(parseAlg('U')) * 1.5);
+    expect(turnCost(parseAlg('b2 E2'))).toBe(6);
     expect(metricCost('time', parseAlg("R U R'"))).toBeLessThan(metricCost('time', parseAlg("R U R' U U'")));
     expect(metricCost('moves', parseAlg("f R f'"))).toBe(3);
   });
