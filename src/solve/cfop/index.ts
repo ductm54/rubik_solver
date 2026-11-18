@@ -15,6 +15,7 @@ import { type AlgEntry, EO, OCLL, OLL } from './algs/oll';
 import { crossDistance, solveCross, solveXCross } from './cross';
 import { SLOTS, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { pairCost, solveF2LAdvanced } from './f2lAdvanced';
+import { execCost } from './moveCost';
 import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
 import { type LLKind, llTips } from './llTips';
@@ -40,6 +41,7 @@ export interface CfopOptions {
   crossColors: Color[];
   /** Advanced: the cross and at least one F2L pair together (XCross) when that takes under 11 moves. */
   cross?: 'standard' | 'advanced';
+  /** Advanced: no cube turns, the plan quickest to turn (moves weighted by finger trick, see moveCost.ts). */
   f2l?: 'standard' | 'advanced';
   oll: 'full' | '2look';
   pll: 'full' | '2look';
@@ -54,6 +56,8 @@ interface Attempt {
   color: Color;
   /** How awkward the cross (or XCross) is with the cube held this way, in extra moves: regrips and B turns. */
   effort: number;
+  /** Advanced F2L: its execution time (weighted moves and regrips) minus its move count, so holds compare by time. */
+  f2lExtra: number;
 }
 
 const thumb = (th: Thumb) => t(`thumb.${th}`);
@@ -156,32 +160,37 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     const plan = solveF2LAdvanced(st, colorWord(cross));
     const pieces: Color[][] = [];
     const sides = (c: Color[]) => colorNames(c.filter((x) => x !== cross));
-    const pseudo = plan.some((p) => p.pseudo);
+    const mixed = plan.some((p) => p.pseudo || p.uTurn);
     const total = plan.reduce((a, p) => a + p.moves, 0);
     plan.forEach((p, k) => {
-      // Why this pair now: what each pair left would cost (not with pseudo-slotting, where pairs are mixed).
+      // Why this pair now: what each pair left would cost (not with pseudo-slotting or u turns, where pairs are mixed).
       const tips = k === 0 ? [t('tip.advOrder', { total: movesText(total) })] : [];
-      if (!pseudo) {
-        const options: PairOption[] = openSlots(st).map((slot) => ({ slot, moves: slot === p.slot ? p.moves : pairCost(st, slot) ?? 0, turns: 0 }));
+      if (!mixed) {
+        const others = openSlots(st).map((slot) => ({ slot, ...(slot === p.slot ? p : (pairCost(st, slot) ?? { moves: 0, cost: 0 })) }));
+        const options: PairOption[] = others.map(({ slot, moves }) => ({ slot, moves, turns: 0 }));
         tips.push(...(options.length > 1 ? [t('tip.advPick')] : []), ...orderTips(st, options, p.slot));
-        if (options.some((o) => o.moves < p.moves)) tips.push(t('tip.advNotCheapest'));
+        if (others.some((o) => o.cost < p.cost)) tips.push(t('tip.advNotCheapest'));
       }
+      else if (k > 0) tips.push(t('tip.advMixed'));
+      if (p.uTurn) tips.push(t('tip.advU'));
       pieces.push(p.corner, p.edge);
       const turns = [
-        k === 0 ? t('cfop.pseudoFirst', { move: p.alg[0].base === 'D' ? formatAlg([p.alg[0]]) : 'D' }) : '',
+        k === 0 ? t('cfop.pseudoFirst', { move: p.alg[0]?.base === 'D' ? formatAlg([p.alg[0]]) : 'D' }) : '',
         k === plan.length - 1 ? t('cfop.pseudoLast') : '',
       ].filter(Boolean);
       push(
         {
           stage: 'f2l',
-          title: p.pseudo
+          title: p.pseudo || p.uTurn
             ? t('cfop.pseudoTitle', { n: pairs.length + k + 1, corner: sides(p.corner), edge: sides(p.edge) })
             : t('cfop.pairTitle', { n: pairs.length + k + 1, pair: sides(p.corner) }),
-          caseName: t(p.pseudo ? 'cfop.pseudoInto' : 'cfop.into', { slot: slotName(p.slot) }),
-          hint:
+          caseName: t(p.pseudo ? 'cfop.pseudoInto' : p.uTurn ? 'cfop.uInto' : 'cfop.into', { slot: slotName(p.slot) }),
+          hint: [
             p.pseudo && turns.length
               ? t('cfop.advHintPseudo', { desc: p.description, turns: turns.join(t('cfop.turnsSep')) })
               : t('cfop.advHint', { desc: p.description }),
+            ...(p.uTurn ? [t('cfop.uNote')] : []),
+          ].join(' '),
           tips,
         },
         p.alg,
@@ -266,7 +275,8 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     llStep('pll', t('cfop.pllCorners'), tb.cpll, { kind: 'cpll', cross }, t('cfop.cpllSkip'), 'cpll');
     llStep('pll', t('cfop.pllEdges'), tb.epll, { kind: 'pll', cross }, t('cfop.epllSkip'), 'epll');
   }
-  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back };
+  const f2lExtra = opts.f2l === 'advanced' ? steps.filter((s) => s.stage === 'f2l').reduce((a, s) => a + execCost(parseAlg(s.alg)) - s.moves, 0) : 0;
+  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back, f2lExtra };
 }
 
 /** Colours of a slot: [cross colour, front-ish side, right-ish side]. */
@@ -303,7 +313,7 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
   if (!v.ok) throw new Error(v.errors.join('\n'));
   const start = toColorArray(state);
   // Every way of holding an allowed colour on the bottom; an awkward cross counts as extra moves.
-  const cost = (a: Attempt) => a.moves + a.effort;
+  const cost = (a: Attempt) => a.moves + a.effort + a.f2lExtra;
   let best: Attempt | null = null;
   for (const hold of HOLDS) {
     const st = applyMovesToArray(start, hold);
@@ -352,7 +362,7 @@ export const CFOP: MethodDef = {
     {
       key: 'f2l',
       label: 'F2L',
-      help: 'Standard: the usual F2L algorithms (most-voted on SpeedCubeDB), one case at a time, with the cube turned so the pair goes in at the front-right or the front-left. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) when it is shorter: the fewest moves found.',
+      help: 'Standard: the usual F2L algorithms (most-voted on SpeedCubeDB), one case at a time, with the cube turned so the pair goes in at the front-right or the front-left. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) and u turns (a corner paired with the edge of another slot inside u … u\') when they help, choosing the plan quickest to turn.',
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },

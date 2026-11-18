@@ -17,6 +17,8 @@ import { crossDistance, solveCross, solveXCross } from '../src/solve/cfop/cross'
 import { LEFT_HAND, RIGHT_HAND, backTurns, countRegrips, effort, planGrip } from '../src/solve/cfop/grip';
 import { crossSolved, f2lTable, slotSolved, SLOTS } from '../src/solve/cfop/f2l';
 import { F2L_CASES } from '../src/solve/cfop/algs/f2l';
+import { metricCost, turnCost } from '../src/solve/cfop/moveCost';
+import { solveF2LAdvanced } from '../src/solve/cfop/f2lAdvanced';
 import { buildTable, matchLL, stageDone } from '../src/solve/cfop/ll';
 import { SIDE_ROWS, headlightSides } from '../src/solve/cfop/llTips';
 
@@ -312,8 +314,9 @@ describe('CFOP solver', () => {
     expect(plan.steps.every((s) => s.mask?.startsWith('EDGES:'))).toBe(true);
   });
 
-  it('advanced F2L: no rotations or B turns, solves the cube, fewer moves than standard, uses pseudo-slotting', () => {
+  it('advanced F2L: no rotations or B turns, solves the cube, fewer moves than standard, uses pseudo-slotting and u turns', () => {
     let pseudo = 0;
+    let uPairs = 0;
     let std = 0;
     let adv = 0;
     const t = performance.now();
@@ -333,14 +336,58 @@ describe('CFOP solver', () => {
         pseudo++;
         expect(f2l[0].alg).toMatch(/^D/);
         expect(f2l[3].alg).toMatch(/D[2']?$/);
+        // Only when two pairs go in at once: one step needs nothing but the bottom-layer turn.
+        expect(f2l.some((s) => !parseAlg(s.alg).some((m) => m.base !== 'D'))).toBe(true);
       } else expect(f2l.every((s) => !s.alg.includes('D'))).toBe(true);
+      // u pairs: the top two layers are turned and turned back within the step (a quarter turn net 0).
+      for (const s of f2l.filter((s) => /\bu/.test(s.alg))) {
+        uPairs++;
+        const net = parseAlg(s.alg).filter((m) => m.base === 'u').reduce((a, m) => a + m.amount, 0);
+        expect(((net % 4) + 4) % 4).toBe(0);
+        expect(s.hint).toContain(' u ');
+      }
       const sum = (p: typeof a) => p.steps.filter((s) => s.stage === 'f2l').reduce((x, s) => x + s.moves, 0);
       std += sum(b);
       adv += sum(a);
     }
     expect(adv).toBeLessThan(std);
     expect(pseudo).toBeGreaterThan(0);
+    expect(uPairs).toBeGreaterThan(0);
     expect((performance.now() - t) / 60).toBeLessThan(200);
+    // Many full solves: the per-solve speed is checked above, so allow slow CI machines time.
+  }, 30_000);
+
+  it('advanced F2L weighs moves by finger trick: quicker to turn than the fewest-moves plan', () => {
+    const totals = { time: { moves: 0, time: 0 }, moves: { moves: 0, time: 0 } };
+    let seed = 7;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let n = 0; n < 30; n++) {
+      const state = applyMoves(solved, randomMoves(25, rand));
+      // The cube after the cross (and the way it is held), as the advanced F2L sees it.
+      const plan = solveCfop(state, { crossColors: ['W'], f2l: 'advanced', oll: 'full', pll: 'full' });
+      let st = state;
+      for (const step of plan.steps.filter((s) => s.stage !== 'f2l' && s.stage !== 'oll' && s.stage !== 'pll')) st = applyMoves(st, step.alg);
+      const arr = toColorArray(st);
+      for (const metric of ['time', 'moves'] as const) {
+        const pairs = solveF2LAdvanced(arr, 'white', metric);
+        const alg = pairs.flatMap((p) => p.alg);
+        expect(f2lDone(applyMovesToArray(arr, alg))).toBe(true);
+        totals[metric].moves += pairs.reduce((a, p) => a + p.moves, 0);
+        totals[metric].time += turnCost(alg);
+      }
+    }
+    expect(totals.time.time).toBeLessThan(totals.moves.time);
+    expect(totals.moves.moves).toBeLessThanOrEqual(totals.time.moves);
+    // Many full solves: allow slow CI machines time.
+  }, 30_000);
+
+  it('move costs: R is the quickest, double turns and f are slower, ties go to fewer moves', () => {
+    expect(turnCost(parseAlg("R U R' U'"))).toBe(4.2);
+    expect(turnCost(parseAlg("f R f'"))).toBeGreaterThan(turnCost(parseAlg("R U R'")) + 1);
+    expect(turnCost(parseAlg('U2'))).toBeGreaterThan(turnCost(parseAlg('U')) * 1.5);
+    expect(turnCost(parseAlg('b2 E2'))).toBe(6);
+    expect(metricCost('time', parseAlg("R U R'"))).toBeLessThan(metricCost('time', parseAlg("R U R' U U'")));
+    expect(metricCost('moves', parseAlg("f R f'"))).toBe(3);
   });
 
   it('advanced cross: cross and at least one pair together in under 11 moves, never longer overall', () => {
@@ -467,6 +514,13 @@ describe('regrips', () => {
 
   it('usual finger tricks need no regrip', () => {
     for (const alg of ["R U R' U'", "R' F R F'", "L' U' L U", "R U R' U' R' F R2 U' R' U' R U R' F'", "R B' R'", "D R' D' R", 'R2 U R2']) expect(regrips(alg), alg).toBe(0);
+  });
+
+  it('wide r and l move the thumb like R and L; u and f are reached like U and F', () => {
+    for (const alg of ["r U R' U'", "r U r'", "l' U' L U", "u R U R' u'", "f R U R' U' f'", "R' f R f'"]) expect(regrips(alg), alg).toBe(0);
+    // The wrist is already turned as far as it goes.
+    expect(regrips('R r R')).toBe(1);
+    expect(regrips("r' R' r'")).toBe(1);
   });
 
   it('the first grip is free, the next ones are not', () => {
