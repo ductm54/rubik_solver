@@ -10,7 +10,7 @@ postMessage({ type: 'ready' });
 type Req = { lang?: string } & (
   | { id: number; state: CubeState; kind?: 'solve' }
   | { id: number; kind: 'random' }
-  | { id: number; kind: 'learn'; state: CubeState; method: string; settings: SettingValues; scramble?: string }
+  | { id: number; kind: 'plan'; state: CubeState; method: string; settings: SettingValues; scramble?: string }
 );
 
 // Requests are handled in order, each in its page's language (step texts and errors).
@@ -23,7 +23,7 @@ async function handle(req: Req) {
   try {
     await setLocale(req.lang ?? 'en');
     const t = performance.now();
-    if (req.kind === 'learn') {
+    if (req.kind === 'plan') {
       const scramble = req.scramble ?? generateScramble(req.state).scramble;
       const plan = getMethod(req.method).solve(req.state, req.settings);
       postMessage({ type: 'plan', id: req.id, scramble, plan, ms: performance.now() - t });

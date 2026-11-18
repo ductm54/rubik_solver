@@ -51,7 +51,7 @@ function clearOutput() {
   btnCopy.disabled = true;
   player.alg = '';
   $('btn-time').classList.add('hidden');
-  $('btn-learn').classList.add('hidden');
+  $('btn-solve').classList.add('hidden');
 }
 
 function onStateChange() {
@@ -167,8 +167,8 @@ worker.onmessage = (e) => {
   const btnTime = $<HTMLAnchorElement>('btn-time');
   btnTime.href = `#timer&${new URLSearchParams({ scramble: d.scramble, source })}`;
   btnTime.classList.toggle('hidden', !d.scramble);
-  const btnLearn = $<HTMLAnchorElement>('btn-learn');
-  btnLearn.href = `#learn&scramble=${encodeURIComponent(d.scramble)}`;
+  const btnLearn = $<HTMLAnchorElement>('btn-solve');
+  btnLearn.href = `#solve&scramble=${encodeURIComponent(d.scramble)}`;
   btnLearn.classList.toggle('hidden', !d.scramble);
 };
 

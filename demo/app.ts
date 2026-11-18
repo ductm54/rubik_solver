@@ -1,16 +1,17 @@
 /**
- * The app shell: Cube, Timer and Learn are views of one page, picked by the URL hash, so
+ * The app shell: Cube, Solve, Learn and Timer are views of one page, picked by the URL hash, so
  * switching between them never reloads. A view's code loads the first time it is opened.
  *
  *   #cube, #cube=<54 letters>, #scan     Cube (and its scanner)
  *   #timer, #timer&scramble=<moves>      Timer
- *   #learn, #learn&scramble=<moves>      Learn (also #learn&cube=<54 letters>)
+ *   #solve, #solve&scramble=<moves>      Solve (also #solve&cube=<54 letters>; old #learn&… links too)
+ *   #learn                                Learn: how to solve, method by method
  */
 import './i18n';
 import { t } from '../src/i18n';
+import { type Route, routeOf } from './route';
 import { initTour } from './tour';
 
-type Route = 'cube' | 'timer' | 'learn';
 /** What a view exports: `show` runs each time its tab is opened again, `hide` when it is left. */
 interface View {
   show(): void;
@@ -20,15 +21,11 @@ interface View {
 const loaders: Record<Route, () => Promise<View>> = {
   cube: () => import('./main'),
   timer: () => import('./timer'),
+  solve: () => import('./solve'),
   learn: () => import('./learn'),
 };
 const loaded: Partial<Record<Route, Promise<View>>> = {};
 let current: Route | null = null;
-
-function routeOf(hash: string): Route {
-  const head = hash.slice(1).split(/[&=?]/)[0];
-  return head === 'timer' || head === 'learn' ? head : 'cube';
-}
 
 async function go() {
   const next = routeOf(location.hash);

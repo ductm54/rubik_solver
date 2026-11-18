@@ -96,7 +96,7 @@ function setScramble(s: string, src: Solve['source']) {
   scramble = s;
   source = src;
   scrambleEl.textContent = s || t('timer.solvedCube');
-  ($('btn-learn') as HTMLAnchorElement).href = `#learn&scramble=${encodeURIComponent(s)}`;
+  ($('btn-solve') as HTMLAnchorElement).href = `#solve&scramble=${encodeURIComponent(s)}`;
   sourceEl.textContent = src === 'scan' ? t('timer.fromScan') : src === 'manual' ? t('timer.fromManual') : '';
   sourceEl.classList.toggle('hidden', src === 'random');
   renderPreview(applyMoves(solvedState(), s));
