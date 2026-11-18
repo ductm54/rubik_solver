@@ -336,6 +336,8 @@ describe('CFOP solver', () => {
         pseudo++;
         expect(f2l[0].alg).toMatch(/^D/);
         expect(f2l[3].alg).toMatch(/D[2']?$/);
+        // Only when two pairs go in at once: one step needs nothing but the bottom-layer turn.
+        expect(f2l.some((s) => !parseAlg(s.alg).some((m) => m.base !== 'D'))).toBe(true);
       } else expect(f2l.every((s) => !s.alg.includes('D'))).toBe(true);
       // u pairs: the top two layers are turned and turned back within the step (a quarter turn net 0).
       for (const s of f2l.filter((s) => /\bu/.test(s.alg))) {

@@ -206,10 +206,11 @@ const edgeHome = (slot: Slot, k: number) => SLOT_PIECES[slot][1].map((i) => U_FR
 const slotOfEdge = (home: number[]) => SLOTS.find((x) => home.every((i) => SLOT_PIECES[x][1].includes(i)))!;
 
 /** The pairs left at one bottom-layer offset, cheapest in total, trying every order and u-frame. */
-function solveAt(st: Stickers, offset: number, crossWord: string, limit: number, metric: F2LMetric): Plan | null {
+function solveAt(st: Stickers, offset: number, crossWord: string, limit: number, metric: F2LMetric, needTwo = false): Plan | null {
   // `corners`: slots whose corner is still to go in; `edges`: slots whose edge is still to go in.
-  const search = (s: Stickers, corners: Slot[], edges: Slot[], limit: number): Plan | null => {
-    if (!corners.length) return { total: 0, pairs: [] };
+  // `two`: some step already put two pairs in at once (the next pair then needs no moves).
+  const search = (s: Stickers, corners: Slot[], edges: Slot[], limit: number, two: boolean): Plan | null => {
+    if (!corners.length) return needTwo && !two ? null : { total: 0, pairs: [] };
     let best: Plan | null = null;
     for (let k = 0; k < U_FRAMES.length; k++) {
       const { setup, undo } = U_FRAMES[k];
@@ -226,7 +227,7 @@ function solveAt(st: Stickers, offset: number, crossWord: string, limit: number,
         const room = best ? best.total : limit;
         if (cost >= room) continue;
         const edge = slotOfEdge(eHome);
-        const rest = search(applyMovesToArray(s, alg), corners.filter((x) => x !== slot), edges.filter((x) => x !== edge), room - cost);
+        const rest = search(applyMovesToArray(s, alg), corners.filter((x) => x !== slot), edges.filter((x) => x !== edge), room - cost, two || !alg.length);
         if (!rest) continue;
         const pair = makePair(s, slot, offset, k, alg, describePieces(s, slot, offset, crossWord, k), metric);
         best = { total: cost + rest.total, pairs: [pair, ...rest.pairs] };
@@ -235,15 +236,18 @@ function solveAt(st: Stickers, offset: number, crossWord: string, limit: number,
     return best;
   };
   const open = SLOTS.filter((s) => !placed(st, s, offset));
-  return search(st, open, open, limit);
+  // A pair already in place (only possible here with the bottom layer turned) counts as two at once.
+  return search(st, open, open, limit, open.length < SLOTS.length);
 }
 
 /**
  * All four pairs (or the ones left) with the least total cost (execution time, or moves), trying
  * every order, with and without pseudo-slotting. Returns the pairs in solving order. With
  * pseudo-slotting the first pair's algorithm starts with the D turn and the last one ends with the
- * turn back; it is only used when it is cheaper even with those two turns counted, and only when
- * no pair is solved yet.
+ * turn back; it is only used when it is cheaper even with those two turns counted, only when no
+ * pair is solved yet, and only when the turned bottom layer lets two pairs go in at once: a pair
+ * is in place as soon as the bottom layer is turned, or one algorithm puts two pairs in. Turning
+ * the bottom layer just to save a move or two on separate pairs is not worth the confusion.
  */
 export function solveF2LAdvanced(st: Stickers, crossWord: string, metric: F2LMetric = 'time'): AdvancedPair[] {
   let best = solveAt(st, 0, crossWord, Infinity, metric);
@@ -253,7 +257,7 @@ export function solveF2LAdvanced(st: Stickers, crossWord: string, metric: F2LMet
     const { setup, undo } = OFFSETS[offset];
     const turned = applyMovesToArray(st, setup);
     const turns = metricCost(metric, setup) + metricCost(metric, undo.moves);
-    const plan = solveAt(turned, offset, crossWord, best.total - turns, metric);
+    const plan = solveAt(turned, offset, crossWord, best.total - turns, metric, true);
     if (!plan) continue;
     // Pseudo pairs that are in place as soon as the bottom layer is turned come first.
     const ready = SLOTS.filter((s) => placed(turned, s, offset)).map((s) =>
