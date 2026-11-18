@@ -185,7 +185,7 @@ describe('going faster', () => {
     expect(parseAlg(SPEEDUPS[1].cases[0].alg)).toHaveLength(8);
   });
 
-  for (const [id, face] of [['keepRight', 'R'], ['keepLeft', 'F'], ['keepUp', 'U']]) {
+  for (const [id, face] of [['keepRight', 'R'], ['keepFront', 'F'], ['keepUp', 'U']]) {
     test(`corners: white facing ${face}, the front-right middle edge already solved and kept`, () => {
       const s = start('fast.corners', id);
       expect(at(s, 'UFR', face)).toBe('W');

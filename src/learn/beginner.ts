@@ -210,10 +210,12 @@ export interface SpeedGroup {
 export const CROSS_SLIDE = "U' R U";
 /** White on top of the corner: the first U of the 4-moves made U2, then one more 4-moves. */
 export const CORNER_UP_FAST = `R U2 R' U' ${SEXY}`;
-/** White facing right, with the front-right middle edge already solved. */
-export const KEEP_EDGE_RIGHT = "U' R U2 R' U R U R'";
-/** The left-hand mirror: white facing left, with the front-left middle edge already solved. */
-export const KEEP_EDGE_LEFT = "U L' U2 L U' L' U' L";
+/** The front-right middle edge already solved, the corner above its slot: white facing right. */
+export const KEEP_EDGE_RIGHT = "U R U R' U2 R U R'";
+/** The same with white facing the front: the mirror of the U turns. */
+export const KEEP_EDGE_FRONT = "U' R U' R' U2 R U' R'";
+/** The same with white on top. */
+export const KEEP_EDGE_UP = "R U R' U' R U R' U' R U R'";
 /** Swaps the two middle edges on the right side. */
 export const SWAP_RIGHT_EDGES = 'R2 U2 R2 U2 R2';
 /** Flips the front-right middle edge in its slot: R U2 R', U R U2 R', then U F' U' F puts the corner back with the left hand. */
@@ -246,13 +248,13 @@ export const SPEEDUPS: SpeedGroup[] = [
       { id: 'front', alg: LEFT_SEXY },
       { id: 'up', alg: CORNER_UP_FAST },
       { id: 'stuck', alg: LEFT_SEXY },
-      { id: 'keep', alg: times(SEXY, 3) },
+      { id: 'keep', alg: KEEP_EDGE_RIGHT },
     ],
     cases: [
       { id: 'up', alg: CORNER_UP_FAST, show: `R U2 R' U' · ${SEXY}` },
-      { id: 'keepRight', alg: KEEP_EDGE_RIGHT, show: "U' · R U2 R' U · R U R'" },
-      { id: 'keepLeft', alg: `y ${KEEP_EDGE_LEFT}`, show: "y · U · L' U2 L U' · L' U' L" },
-      { id: 'keepUp', alg: times(SEXY, 3), show: `(${SEXY}) ×3` },
+      { id: 'keepRight', alg: KEEP_EDGE_RIGHT, show: "U · R U R' · U2 · R U R'" },
+      { id: 'keepFront', alg: KEEP_EDGE_FRONT, show: "U' · R U' R' · U2 · R U' R'" },
+      { id: 'keepUp', alg: KEEP_EDGE_UP, show: "R U R' U' · R U R' U' · R U R'" },
     ],
     mask: bright(CROSS_EDGES, WHITE_CORNERS, MIDDLE_EDGES),
   },

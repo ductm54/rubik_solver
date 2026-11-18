@@ -29,6 +29,18 @@ const YELLOW_CROSS = "F R U R' U' F'";
 const YELLOW_EDGES = "R U R' U R U2 R' U";
 const CORNER_CYCLE = "U R U' L' U R' U' L";
 const CORNER_TWIST = "R' D' R D";
+/** Faster top cross: an L at the front and right goes straight to the cross (f = front two layers). */
+const YELLOW_CROSS_WIDE = "f R U R' U' f'";
+/** Faster top corners: the cycle the other way round, starting with the left hand. */
+const CORNER_CYCLE_BACK = "L' U R U' L U R' U'";
+/** Faster corner twist: R' D' R D backwards. Twice does what R' D' R D four times does. */
+const CORNER_TWIST_BACK = "D' R' D R";
+/** Faster corners: the cross colour on top, one set less (R U2 R' U' and one 4-moves). */
+const CORNER_UP_FAST = "R U2 R' U' R U R' U'";
+const CORNER_UP_FAST_LEFT = "L' U2 L U L' U' L U";
+/** Faster corners: put the corner in and keep the solved middle edge next to its slot. */
+const KEEP_EDGE = ["U R U R' U2 R U R'", "U' R U' R' U2 R U' R'", "R U R' U' R U R' U' R U R'"];
+const KEEP_EDGE_LEFT = ["U' L' U' L U2 L' U' L", "U L' U L U2 L' U L", "L' U' L U L' U' L U L' U' L"];
 
 const CROSS_HOMES = ['DF', 'DR', 'DB', 'DL'];
 const SLOTS = ['FR', 'FL', 'BL', 'BR'];
@@ -56,6 +68,14 @@ const TO_FRONT_RIGHT: Record<string, [string, string]> = {
   [pos('DFL')]: ["y'", 'y'],
   [pos('DBL')]: ['y2', 'y2'],
   [pos('DBR')]: ['y', "y'"],
+};
+
+/** Turn a bottom slot to the front-left, and back. */
+const TO_FRONT_LEFT: Record<string, [string, string]> = {
+  [pos('DFL')]: ['', ''],
+  [pos('DFR')]: ['y', "y'"],
+  [pos('DBR')]: ['y2', 'y2'],
+  [pos('DBL')]: ["y'", 'y'],
 };
 
 const word = colorWord;
@@ -97,7 +117,8 @@ class Builder {
   }
 }
 
-function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
+function solveFrom(start: Stickers, hold: string, cross: Color, opts: BeginnerOptions = {}): SolveStep[] {
+  const fast = opts.corners === 'faster';
   const scheme = Object.fromEntries([...'URFDLB'].map((f, i) => [f, start[i * 9 + 4]]));
   const b = new Builder(start, scheme, cross);
   const held = applyMovesToArray(start, hold);
@@ -194,54 +215,93 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   while (shownCorners.length < 4) {
     // Plan each unsolved corner with the right hand (slot at the front-right, R U R' U') and with
     // the left hand (slot at the front-left, L' U' L U), as on the Learn tab; take the shortest.
-    let best: { alg: string; colors: Color[]; caseName?: string; reps: number; moves: number; left: boolean; inSlot: boolean } | null = null;
+    // Faster: the shortcuts of the Learn tab's "Go faster" too (take a stuck corner out with
+    // either hand, one set less with the cross colour on top, keep a solved middle edge).
+    type Plan = { alg: string; colors: Color[]; caseName?: string; hint: string; moves: number; lost: number };
+    let best: Plan | null = null;
+    // The cross and the corners already in stay solved (in any cube turn: all bottom pieces).
+    const bottomSolved = (st: Stickers) => [...CROSS_HOMES, ...SLOTS.map((m) => `D${m}`)].filter((p) => solvedAt(st, p)).length;
+    const target = bottomSolved(b.st) + 1;
+    const keptAll = (st: Stickers) => bottomSolved(st) >= target;
+    const middleSolved = (st: Stickers) => SLOTS.filter((m) => solvedAt(st, m)).length;
+    const middleBefore = middleSolved(b.st);
     for (const left of [false, true])
       for (const y of Y) {
         const slot = left ? 'DFL' : 'DFR';
+        const edge = left ? 'FL' : 'FR';
         const above = pos(left ? 'UFL' : 'UFR');
         const four = left ? LEFT_SEXY : SEXY;
-        let alg = y;
-        let st = applyMovesToArray(b.st, alg);
-        if (solvedAt(st, slot)) continue;
-        const colors = homeColors(st, slot);
-        let caseName: string | undefined;
-        // Already in its own slot, only twisted: no U turn, the 4-moves straight away.
-        let inSlot = false;
-        const at = whereIs(st, slot);
+        const st0 = applyMovesToArray(b.st, y);
+        if (solvedAt(st0, slot)) continue;
+        const colors = homeColors(st0, slot);
+        const slotName = names(colors.slice(1));
+        const at = whereIs(st0, slot);
+        // Ways to get the corner out of another bottom slot, or none needed.
+        const outs: { alg: string; caseName?: string }[] = [];
         if (at[0] === 'D' && at !== pos(slot)) {
-          // Stuck in another bottom slot: turn that slot to the front-right, take it out, turn back.
           const [there, back] = TO_FRONT_RIGHT[at];
-          alg += ` ${there} R U R' ${back}`;
-          caseName = t('beg.cornerElsewhere');
-          st = applyMovesToArray(b.st, alg);
+          outs.push({ alg: `${there} R U R' ${back}`, caseName: t('beg.cornerElsewhere') });
+          if (fast) {
+            const [l, lb] = TO_FRONT_LEFT[at];
+            outs.push({ alg: `${l} L' U' L ${lb}`, caseName: t('beg.cornerElsewhereLeft') });
+          }
+        } else outs.push({ alg: '' });
+        for (const out of outs) {
+          let alg = `${y} ${out.alg}`;
+          let st = applyMovesToArray(b.st, alg);
+          let inSlot = false;
+          let caseName = out.caseName;
+          if (whereIs(st, slot) !== pos(slot)) {
+            const u = U_TURNS.find((t) => whereIs(applyMovesToArray(st, t), slot) === above)!;
+            alg += ` ${u}`;
+            st = applyMovesToArray(st, u);
+          } else if (!caseName) {
+            // Already in its own slot, only twisted: no U turn, the 4-moves straight away.
+            caseName = t('beg.cornerTwisted');
+            inSlot = true;
+          }
+          const tries: { ins: string; caseName?: string; hint: string }[] = [];
+          let reps = 0;
+          for (let x = st; !solvedAt(x, slot); ) {
+            x = applyMovesToArray(x, four);
+            if (++reps > 6) throw new Error('First layer: corner not solved (internal error)');
+          }
+          tries.push({
+            ins: repeat(four, reps),
+            caseName: caseName ?? (left ? t('beg.cornerLeftHand') : undefined),
+            hint: t(`beg.cornerHint${inSlot ? 'Twisted' : ''}${left ? 'Left' : ''}`, { slot: slotName, times: times(reps) }),
+          });
+          if (fast && !inSlot) {
+            const side = left ? 'Left' : '';
+            const up = left ? CORNER_UP_FAST_LEFT : CORNER_UP_FAST;
+            tries.push({ ins: up, caseName: caseName ?? t('beg.cornerFastUp', { cross: cap(word(cross)) }), hint: t(`beg.cornerHintFastUp${side}`, { slot: slotName, cross: word(cross), alg: up }) });
+            if (solvedAt(st, edge))
+              for (const k of left ? KEEP_EDGE_LEFT : KEEP_EDGE)
+                if (solvedAt(applyMovesToArray(st, k), edge)) tries.push({ ins: k, caseName: caseName ?? t('beg.cornerKeep'), hint: t(`beg.cornerHintKeep${side}`, { slot: slotName, alg: k }) });
+          }
+          for (const tr of tries) {
+            const end = applyMovesToArray(st, tr.ins);
+            if (!solvedAt(end, slot) || !keptAll(end)) continue;
+            const full = `${alg} ${tr.ins}`;
+            const plan: Plan = {
+              alg: full,
+              colors,
+              caseName: tr.caseName,
+              hint: tr.hint,
+              moves: countMoves(simplifyAlg(parseAlg(full))),
+              lost: fast ? Math.max(0, middleBefore - middleSolved(end)) : 0,
+            };
+            // Fewest solved middle edges knocked out (Faster only), then fewest moves; the right
+            // hand and the plain 4-moves on a tie: they are learnt first.
+            if (!best || plan.lost < best.lost || (plan.lost === best.lost && plan.moves < best.moves)) best = plan;
+          }
         }
-        if (whereIs(st, slot) !== pos(slot)) {
-          const u = U_TURNS.find((t) => whereIs(applyMovesToArray(st, t), slot) === above)!;
-          alg += ` ${u}`;
-          st = applyMovesToArray(st, u);
-        } else if (!caseName) {
-          caseName = t('beg.cornerTwisted');
-          inSlot = true;
-        }
-        let reps = 0;
-        while (!solvedAt(st, slot)) {
-          st = applyMovesToArray(st, four);
-          if (++reps > 6) throw new Error('First layer: corner not solved (internal error)');
-        }
-        alg += ` ${repeat(four, reps)}`;
-        const moves = countMoves(simplifyAlg(parseAlg(alg)));
-        // The right hand on a tie: it is the one learnt first.
-        if (!best || moves < best.moves) best = { alg, colors, caseName, reps, moves, left, inSlot };
       }
-    const { alg, colors, caseName, reps, left, inSlot } = best!;
+    const { alg, colors, caseName, hint } = best!;
     shownCorners.push(colors);
     b.push(
       'corners',
-      {
-        title: t('beg.cornerTitle', { n: shownCorners.length, colors: names(colors) }),
-        caseName: caseName ?? (left ? t('beg.cornerLeftHand') : undefined),
-        hint: t(`beg.cornerHint${inSlot ? 'Twisted' : ''}${left ? 'Left' : ''}`, { slot: names(colors.slice(1)), times: times(reps) }),
-      },
+      { title: t('beg.cornerTitle', { n: shownCorners.length, colors: names(colors) }), caseName, hint },
       alg,
       [...crossEdges, ...shownCorners],
     );
@@ -304,6 +364,19 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
       u = o[0] ? 'U' : '';
       caseName = t('beg.line');
       hint = t('beg.lineHint', { top: word(top), alg: YELLOW_CROSS });
+    } else if (n === 2 && opts.topCross === 'faster') {
+      // Faster: the L the other way (front and right) and f … f': the cross in one go.
+      u = U_TURNS.find((t) => {
+        const p = oriented(b.peek(t));
+        return p[0] && p[1]; // front and right
+      })!;
+      b.push(
+        'top',
+        { title: t('beg.topCross', { top: cap(word(top)) }), caseName: t('beg.LFast'), hint: t('beg.LHintFast', { top: word(top), alg: YELLOW_CROSS_WIDE }) },
+        [u, YELLOW_CROSS_WIDE],
+        'eo',
+      );
+      continue;
     } else if (n === 2) {
       u = U_TURNS.find((t) => {
         const p = oriented(b.peek(t));
@@ -327,6 +400,22 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
       if (u) b.push('top', { title: t('beg.topEdges'), caseName: t('beg.lineUp'), hint: t('beg.lineUpHint') }, u, topEdgesShown);
       break;
     }
+    // Faster: two opposite edges match: the algorithm, U2, the algorithm again, without looking.
+    const twice = `${YELLOW_EDGES} U2 ${YELLOW_EDGES}`;
+    const fixed = (alg: string) => {
+      const e = b.peek(alg);
+      return matched(applyMovesToArray(e, bestU(e))).every(Boolean);
+    };
+    const oppositeY = opts.topEdges === 'faster' && m.filter(Boolean).length === 2 && m[0] === m[2] ? Y.find((r) => fixed(`${u} ${r} ${twice}`)) : undefined;
+    if (oppositeY !== undefined) {
+      b.push(
+        'top',
+        { title: t('beg.topEdges'), caseName: t('beg.oppositeFast'), hint: t('beg.edgesHintOppositeFast', { alg: YELLOW_EDGES }) },
+        [`${u} ${oppositeY}`, twice],
+        topEdgesShown,
+      );
+      continue;
+    }
     // Hold so the alg fixes it in one go when it can.
     const y = Y.find((r) => matched(applyMovesToArray(b.peek(`${u} ${r} ${YELLOW_EDGES}`), bestU(b.peek(`${u} ${r} ${YELLOW_EDGES}`)))).every(Boolean));
     const adjacent = m.filter(Boolean).length === 2 && m[0] !== m[2];
@@ -349,6 +438,17 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
     const p = placed(b.st);
     const y = Y.find((r) => placed(b.peek(r))[0]);
     const one = p.some(Boolean);
+    const allPlaced = (alg: string) => placed(b.peek(alg)).every(Boolean);
+    // Faster: one corner in place but the others go the other way round: the left-hand cycle once.
+    if (one && opts.topCorners === 'faster' && !allPlaced(`${y} ${CORNER_CYCLE}`) && allPlaced(`${y} ${CORNER_CYCLE_BACK}`)) {
+      b.push(
+        'top',
+        { title: t('beg.cornersPlace'), caseName: t('beg.otherWay'), hint: t('beg.otherWayHint', { alg: CORNER_CYCLE_BACK }) },
+        [y!, CORNER_CYCLE_BACK],
+        'all',
+      );
+      continue;
+    }
     b.push(
       'top',
       {
@@ -374,6 +474,19 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
       if (++reps > 4) throw new Error('Corner twist (internal error)');
     }
     corner++;
+    if (reps === 4 && opts.cornerTwist === 'faster') {
+      b.push(
+        'top',
+        {
+          title: t('beg.twistTitle', { n: corner }),
+          caseName: t('beg.twistCase', { alg: CORNER_TWIST_BACK, times: times(2) }),
+          hint: t(u ? 'beg.twistHintBack' : 'beg.twistHintBackHere', { alg: CORNER_TWIST_BACK, four: CORNER_TWIST, top: word(top) }),
+        },
+        [u, repeat(CORNER_TWIST_BACK, 2)],
+        'all',
+      );
+      continue;
+    }
     b.push(
       'top',
       {
@@ -392,7 +505,20 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   return b.steps;
 }
 
-export function solveBeginner(state: CubeState, cross: Color): SolvePlan {
+export interface BeginnerOptions {
+  /** 'faster': the Learn tab's shortcuts for the first-layer corners. */
+  corners?: 'standard' | 'faster';
+  /** 'faster': an L at the front and right goes straight to the cross with f R U R' U' f'. */
+  topCross?: 'standard' | 'faster';
+  /** 'faster': two opposite edges: the algorithm, U2, the algorithm again. */
+  topEdges?: 'standard' | 'faster';
+  /** 'faster': corners going the other way round: the left-hand cycle once instead of twice. */
+  topCorners?: 'standard' | 'faster';
+  /** 'faster': a corner that needs R' D' R D four times gets D' R' D R twice. */
+  cornerTwist?: 'standard' | 'faster';
+}
+
+export function solveBeginner(state: CubeState, cross: Color, opts: BeginnerOptions = {}): SolvePlan {
   const v = validate(state);
   if (!v.ok) throw new Error(v.errors.join('\n'));
   const start = toColorArray(state);
@@ -400,7 +526,7 @@ export function solveBeginner(state: CubeState, cross: Color): SolvePlan {
   const total = (s: SolveStep[]) => s.reduce((a, x) => a + x.moves, 0);
   for (const hold of HOLDS) {
     if (centerColor(applyMovesToArray(start, hold), 'U') !== cross) continue;
-    const steps = solveFrom(start, hold, cross);
+    const steps = solveFrom(start, hold, cross, opts);
     if (!best || total(steps) < total(best)) best = steps;
   }
   return { method: 'Beginner', steps: best!, moves: total(best!), note: t('beg.note', { cross: word(cross) }) };
@@ -418,10 +544,44 @@ export const BEGINNER: MethodDef = {
       kind: 'choice',
       options: (['W', 'Y', 'G', 'B', 'R', 'O'] as Color[]).map((c) => ({ value: c, label: { W: 'White', Y: 'Yellow', G: 'Green', B: 'Blue', R: 'Red', O: 'Orange' }[c] })),
     },
+    {
+      key: 'corners',
+      label: 'First-layer corners',
+      help: "Standard: R U R' U' (or L' U' L U) repeated until the corner is in. Faster: the shortcuts from Learn → Go faster too: take a stuck corner out with either hand, R U2 R' U' and one 4-moves when the cross colour faces up, and short algorithms that keep a middle edge that is already solved.",
+      kind: 'choice',
+      options: [
+        { value: 'standard', label: 'Standard' },
+        { value: 'faster', label: 'Faster' },
+      ],
+    },
+    ...(
+      [
+        ['topCross', 'Top cross', "Standard: F R U R' U' F', an L held at the back and left, then the line. Faster: an L held at the front and right goes straight to the cross with f R U R' U' f' (f = the front two layers)."],
+        ['topEdges', 'Top edges', "Standard: two opposite edges matching first become neighbours, then a second look. Faster: the algorithm, U2, the algorithm again, with no need to look or turn the cube."],
+        ['topCorners', 'Top corners', "Standard: U R U' L' U R' U' L, twice when the corners go the other way round. Faster: then the left-hand cycle L' U R U' L U R' U' once."],
+        ['cornerTwist', 'Corner twist', "Standard: R' D' R D until the corner is twisted right, 2 or 4 times. Faster: a corner that needs 4 gets the backwards version D' R' D R twice instead: the same turns, half the work."],
+      ] as const
+    ).map(([key, label, help]) => ({
+      key,
+      label,
+      help,
+      kind: 'choice' as const,
+      options: [
+        { value: 'standard', label: 'Standard' },
+        { value: 'faster', label: 'Faster' },
+      ],
+    })),
   ],
-  defaults: { crossColor: 'W' },
+  defaults: { crossColor: 'W', corners: 'standard', topCross: 'standard', topEdges: 'standard', topCorners: 'standard', cornerTwist: 'standard' },
   solve(state: CubeState, s: SettingValues) {
     const c = (Array.isArray(s.crossColor) ? s.crossColor[0] : s.crossColor) as Color;
-    return solveBeginner(state, 'WYGBRO'.includes(c) && c ? c : 'W');
+    const pick = (k: string) => (s[k] === 'faster' ? 'faster' : 'standard');
+    return solveBeginner(state, 'WYGBRO'.includes(c) && c ? c : 'W', {
+      corners: pick('corners'),
+      topCross: pick('topCross'),
+      topEdges: pick('topEdges'),
+      topCorners: pick('topCorners'),
+      cornerTwist: pick('cornerTwist'),
+    });
   },
 };
