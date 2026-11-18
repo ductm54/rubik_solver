@@ -1,6 +1,6 @@
 /**
- * Beginner method (layer by layer), the way it is usually taught:
- *   1. cross, one edge at a time
+ * Beginner method (layer by layer), the way it is usually taught (and as on the Learn tab):
+ *   1. cross, one edge at a time, with the cross colour on top; then the cube is turned over
  *   2. first-layer corners: corner above its slot, repeat R U R' U'
  *   3. middle-layer edges: line the edge up with its center, then the right or left algorithm
  *   4. yellow cross: F R U R' U' F' (dot → L → line → cross)
@@ -33,6 +33,19 @@ const CROSS_HOMES = ['DF', 'DR', 'DB', 'DL'];
 const SLOTS = ['FR', 'FL', 'BL', 'BR'];
 const U_EDGES = ['UF', 'UR', 'UB', 'UL'];
 const U_CORNERS = ['UFR', 'URB', 'UBL', 'ULF'];
+
+/** The cube turned over after the cross: cross colour to the bottom (as on the Learn tab). */
+const TURN_OVER = 'x2';
+
+/**
+ * The cross is worked out with the cube seen turned over by z2 (cross on the bottom, so the
+ * CFOP cross search can be used) and the moves read back in the real hold: under z2, U ↔ D and
+ * R ↔ L; F and B stay; x and y turn the other way round, z stays.
+ */
+const FLIP = 'z2';
+const FLIP_FACE: Record<string, string> = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B', x: 'x', y: 'y', z: 'z' };
+export const unflip = (moves: Move[]): Move[] =>
+  moves.map((m) => ({ base: FLIP_FACE[m.base], amount: 'xy'.includes(m.base) ? ((4 - m.amount) as 1 | 2 | 3) : m.amount }));
 
 const word = colorWord;
 const names = colorNames;
@@ -77,8 +90,9 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   const scheme = Object.fromEntries([...'URFDLB'].map((f, i) => [f, start[i * 9 + 4]]));
   const b = new Builder(start, scheme, cross);
   const held = applyMovesToArray(start, hold);
-  const top = centerColor(held, 'U');
-  const sides = ['F', 'R', 'B', 'L'].map((f) => centerColor(held, f as never));
+  // The colour on top after the cube is turned over.
+  const top = centerColor(held, 'D');
+  const sides = ['F', 'R', 'B', 'L'].map((f) => centerColor(applyMovesToArray(held, TURN_OVER), f as never));
   const crossEdges = sides.map((s) => [cross, s]);
   const corners = sides.map((s, i) => [cross, s, sides[(i + 1) % 4]]);
   const middle = sides.map((s, i) => [s, sides[(i + 1) % 4]]);
@@ -89,57 +103,70 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   b.push(
     'inspection',
     {
-      title: t('solve.holdTitle', { cross: word(cross), front: word(centerColor(held, 'F')) }),
+      title: t('beg.holdTitle', { cross: word(cross), front: word(centerColor(held, 'F')) }),
       caseName: hold ? undefined : t('solve.alreadyHeld'),
-      hint: t('beg.holdHint', { top: cap(word(top)) }),
+      hint: t('beg.holdHint', { cross: cap(word(cross)) }),
     },
     hold,
     crossEdges,
   );
 
-  // 1. Cross, one edge at a time (the cheapest next edge first).
-  const done = crossEdgesDone(b.st);
-  const shown = done.map((k) => homeColors(b.st, CROSS_HOMES[k]));
+  // 1. Cross on top, one edge at a time (the cheapest next edge first), worked out in the
+  // flipped view (cross on the bottom) and read back in the real hold.
+  const flipped = () => applyMovesToArray(b.st, FLIP);
+  const done = crossEdgesDone(flipped());
+  const shown = done.map((k) => homeColors(flipped(), CROSS_HOMES[k]));
   if (done.length) {
     b.steps.push({
       stage: 'cross',
-      title: t('beg.crossDone', { edges: new Intl.ListFormat(getLocale(), { type: 'unit', style: 'short' }).format(done.map((k) => names(homeColors(b.st, CROSS_HOMES[k])))) }),
+      title: t('beg.crossDone', { edges: new Intl.ListFormat(getLocale(), { type: 'unit', style: 'short' }).format(shown.map(names)) }),
       alg: '',
       moves: 0,
       mask: stickeringMask(scheme, { kind: 'pieces', cross, pieces: shown }),
     });
   }
-  // Each edge is put in with its slot turned to the front (y), using U, R, F, D, L: no B turns.
+  // Each edge is put in with its spot turned to the front (y), using U, R, F, D, L: no B turns.
   const FRONT: Record<string, string> = { DF: '', DR: 'y', DB: 'y2', DL: "y'" };
-  while (crossEdgesDone(b.st).length < 4) {
+  while (crossEdgesDone(flipped()).length < 4) {
+    const fl = flipped();
     let best: { y: string; moves: Move[] } | null = null;
-    for (const k of [0, 1, 2, 3].filter((k) => !crossEdgesDone(b.st).includes(k))) {
+    for (const k of [0, 1, 2, 3].filter((k) => !crossEdgesDone(fl).includes(k))) {
       const y = FRONT[CROSS_HOMES[k]];
-      const st = b.peek(y);
+      const st = applyMovesToArray(fl, y);
       const moves = solveCrossEdge(st, crossEdgesDone(st), 0, true);
       if (!best || moves.length < best.moves.length) best = { y, moves };
     }
     const { y, moves } = best!;
-    const colors = homeColors(b.peek(y), 'DF');
+    const colors = homeColors(applyMovesToArray(fl, y), 'DF');
     shown.push(colors);
     const n = shown.length;
+    const realY = formatAlg(unflip(parseAlg(y)));
     b.push(
       'cross',
       {
         title: t('beg.crossTitle', { n, edge: names(colors) }),
         hint:
-          (y ? t('beg.turnToCenter', { rotation: y, color: word(colors[1]) }) : t('beg.centerInFront', { color: word(colors[1]) })) +
+          (realY ? t('beg.turnToCenter', { rotation: realY, color: word(colors[1]) }) : t('beg.centerInFront', { color: word(colors[1]) })) +
           t(n > 1 ? 'beg.bringKeep' : 'beg.bring', { edge: names(colors), cross: word(cross) }),
       },
-      [y, formatAlg(moves)],
+      [realY, formatAlg(unflip(moves))],
       [...shown],
     );
     // An edge that went in by itself on the way.
-    for (const k of crossEdgesDone(b.st)) {
-      const c = homeColors(b.st, CROSS_HOMES[k]);
+    for (const k of crossEdgesDone(flipped())) {
+      const c = homeColors(flipped(), CROSS_HOMES[k]);
       if (!shown.some((x) => x[1] === c[1])) shown.push(c);
     }
   }
+  if (centerColor(b.st, 'U') !== cross || crossEdgesDone(flipped()).length < 4) throw new Error('Cross on top did not finish (internal error)');
+
+  // Turn the cube over: the cross goes to the bottom for the rest of the solve.
+  b.push(
+    'cross',
+    { title: t('beg.turnOver'), hint: t('beg.turnOverHint', { cross: word(cross), top: word(top) }) },
+    TURN_OVER,
+    crossEdges,
+  );
 
   // 2. First-layer corners.
   const shownCorners: Color[][] = [];
@@ -350,7 +377,7 @@ export function solveBeginner(state: CubeState, cross: Color): SolvePlan {
   let best: SolveStep[] | null = null;
   const total = (s: SolveStep[]) => s.reduce((a, x) => a + x.moves, 0);
   for (const hold of HOLDS) {
-    if (centerColor(applyMovesToArray(start, hold), 'D') !== cross) continue;
+    if (centerColor(applyMovesToArray(start, hold), 'U') !== cross) continue;
     const steps = solveFrom(start, hold, cross);
     if (!best || total(steps) < total(best)) best = steps;
   }
@@ -360,12 +387,12 @@ export function solveBeginner(state: CubeState, cross: Color): SolvePlan {
 export const BEGINNER: MethodDef = {
   id: 'beginner',
   name: 'Beginner (layer by layer)',
-  description: 'Cross, first-layer corners, middle edges, then the top in four short steps with five easy algorithms.',
+  description: 'Cross on top, turn the cube over, first-layer corners, middle edges, then the top in four short steps with five easy algorithms.',
   settings: [
     {
       key: 'crossColor',
       label: 'Cross colour',
-      help: 'The colour you start with, on the bottom. Most guides use white.',
+      help: 'The colour you start the cross with, on top. Most guides use white.',
       kind: 'choice',
       options: (['W', 'Y', 'G', 'B', 'R', 'O'] as Color[]).map((c) => ({ value: c, label: { W: 'White', Y: 'Yellow', G: 'Green', B: 'Blue', R: 'Red', O: 'Orange' }[c] })),
     },

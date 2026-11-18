@@ -42,7 +42,8 @@ Done so far:
   execute: few or no regrips and B turns. It also says which grip to start with, and the cross
   step says where each regrip is.
 - **Beginner method** (layer by layer), picked in the Learn page's method list, with the cross colour
-  as its setting: the cross one edge at a time (its slot turned to the front, no B turns), first-layer corners (corner above its slot, repeat
+  as its setting: the cross one edge at a time with the cross colour on top, as on the Learn tab (its slot turned to the front, no B turns),
+  then the cube turned over (x2), first-layer corners (corner above its slot, repeat
   R U R' U'), middle edges (right / left algorithm), yellow cross (F R U R' U' F': dot → L → line),
   yellow edges (R U R' U R U2 R' U), corners in place (U R U' L' U R' U' L) and corner twists
   (R' D' R D at the front-right). Each step says which case it is and how many repeats it takes.
@@ -101,7 +102,7 @@ any branch, use "Run workflow" on the Scanner workflow in the Actions tab.
 | `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
 | `src/solve/cfop/llTips.ts` | How to recognise an OLL / PLL case fast, read from the cube before the step: OLL edge shape, corners done and top colour on the sides; PLL two-side read (front and right: bar, headlights with an opposite or neighbouring edge, block). The tests check that two sides tell all 21 PLLs apart at every angle |
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest, counting each regrip in the cross as 3 extra moves and each B turn after the first move as 5 |
-| `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; never a B turn: the cube is turned instead. The cross edge by edge: the slot turned to the front, then a distance table for each set of cross edges with U, R, F, D, L only (`solveCrossEdge` in `cfop/cross.ts`) |
+| `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; never a B turn: the cube is turned instead. The cross edge by edge with the cross colour on top (worked out in a z2 view, cross on the bottom, and read back with `unflip`), then the cube turned over with x2: the slot turned to the front, then a distance table for each set of cross edges with U, R, F, D, L only (`solveCrossEdge` in `cfop/cross.ts`) |
 | `src/i18n/` | `t(key, params)` with plural forms; `locales/en.ts` holds every key, the other languages load on demand (one chunk each). Solver texts are made in the page's language: the worker gets it with each request |
 | `demo/i18n.ts` | Page language (`?lang=`, saved choice, browser), `data-i18n` attributes in the HTML, the language picker |
 | `demo/index.html`, `demo/app.ts`, `demo/route.ts` | The one page and its shell: Cube, Solve, Learn and Timer are views picked by the URL hash (`#cube`, `#solve`, `#learn`, `#timer`; an old `#learn&scramble=…` link still opens Solve), so switching never reloads; each view's code loads on first use and is told when it is shown or hidden (camera off, playback and timing stopped) |

@@ -228,7 +228,7 @@ const en = {
   'set.cfop.pll.2look': '2-look',
   'set.cfop.pll.full': 'Full (21)',
   'set.beginner.crossColor.label': 'Cross colour',
-  'set.beginner.crossColor.help': 'The colour you start with, on the bottom. Most guides use white.',
+  'set.beginner.crossColor.help': 'The colour you start the cross with, on top. Most guides use white.',
 
   // ---------------------------------------------------------------- timer page
   'timer.docTitle': 'Cube Timer',
@@ -533,14 +533,17 @@ const en = {
   'tip.epllU': "U-perm: hold the solved side at the back. If the front edge has the colour of the right side's corners it is Ua; if it has the left side's colour, Ub.",
 
   // ---------------------------------------------------------------- solver: beginner
-  'beg.note': 'Layer by layer, {cross} cross on the bottom.',
-  'beg.holdHint': '{top} is on top. Keep the cube held this way: the steps say when to turn it.',
+  'beg.note': 'Layer by layer, {cross} cross on top first, then on the bottom.',
+  'beg.holdHint': '{cross} is on top for the cross, like on the Learn tab. Keep the cube held this way: the steps say when to turn it.',
+  'beg.holdTitle': 'Hold {cross} on top, {front} in front',
   'beg.crossDone': 'Cross · {edges} already in place',
   'beg.crossTitle': 'Cross {n}/4 · {edge} edge',
   'beg.turnToCenter': 'Turn the cube ({rotation}) so the {color} center is in front. ',
   'beg.centerInFront': 'The {color} center is in front. ',
-  'beg.bring': 'Bring the {edge} edge to the bottom front, {cross} facing down.',
-  'beg.bringKeep': 'Bring the {edge} edge to the bottom front, {cross} facing down, without moving the cross edges already in place.',
+  'beg.bring': 'Bring the {edge} edge to the top front, {cross} facing up.',
+  'beg.bringKeep': 'Bring the {edge} edge to the top front, {cross} facing up, without moving the cross edges already in place.',
+  'beg.turnOver': 'Turn the cube over',
+  'beg.turnOverHint': 'The {cross} cross goes to the bottom and {top} comes on top, for the rest of the solve.',
   'beg.cornerTitle': 'Corner {n}/4 · {colors}',
   'beg.cornerElsewhere': "The corner is in another bottom slot: take it out first (R U R')",
   'beg.cornerTwisted': 'The corner is in its slot but twisted',

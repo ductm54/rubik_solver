@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyMoves, applyMovesToArray, parseAlg, randomMoves, solvedState, statesEqual, toColorArray, type Color } from '../src/core/cube';
-import { BEGINNER, solveBeginner } from '../src/solve/beginner';
+import { BEGINNER, solveBeginner, unflip } from '../src/solve/beginner';
 import { getMethod } from '../src/solve/methods';
 import { centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 
@@ -23,7 +23,15 @@ describe('Beginner method', () => {
       const plan = solveBeginner(cube, cross);
       let st = toColorArray(cube);
       const last = new Map<string, Color[]>();
-      for (const s of plan.steps) {
+      // The cross is built with the cross colour on top, then the cube is turned over (x2).
+      const over = plan.steps.map((s) => s.stage).lastIndexOf('cross');
+      expect(over).toBeGreaterThan(0);
+      expect(plan.steps[over].alg).toBe('x2');
+      for (const [i, s] of plan.steps.entries()) {
+        if (i === over) {
+          expect(centerColor(st, 'U')).toBe(cross);
+          expect(['UF', 'UR', 'UB', 'UL'].every((e) => pieceSolved(st, cubie(e)))).toBe(true);
+        }
         st = applyMovesToArray(st, parseAlg(s.alg));
         expect(s.moves).toBe(parseAlg(s.alg).filter((m) => !'xyz'.includes(m.base)).length);
         last.set(s.stage, st);
@@ -40,6 +48,15 @@ describe('Beginner method', () => {
       expect(['FR', 'FL', 'BL', 'BR', 'DFR', 'DLF', 'DBL', 'DRB'].every((p) => pieceSolved(l2, cubie(p)))).toBe(true);
       // Beginners turn the cube instead of turning B: no B turn anywhere.
       for (const s of plan.steps) expect(parseAlg(s.alg).some((m) => m.base === 'B')).toBe(false);
+    }
+  });
+
+  it('reads moves worked out in the z2 view back in the real hold', () => {
+    const rand = rng(11);
+    for (let n = 0; n < 20; n++) {
+      const st = toColorArray(applyMoves(solved, randomMoves(20, rand)));
+      const alg = parseAlg("R U' F2 D L' x y' z2 B");
+      expect(applyMovesToArray(st, unflip(alg))).toEqual(applyMovesToArray(applyMovesToArray(applyMovesToArray(st, 'z2'), alg), 'z2'));
     }
   });
 
