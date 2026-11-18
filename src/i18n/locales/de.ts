@@ -315,6 +315,7 @@ const de: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · Ecke {corner} + Kante {edge}',
   'cfop.withXcross': 'Zusammen mit dem Kreuz gelöst (XCross)',
   'cfop.afterCross': 'Nach dem Kreuz schon gelöst',
+  'cfop.withPair': 'Zusammen mit Paar {n} eingesetzt',
   'cfop.pseudoFirst': 'die untere Ebene wird zuerst gedreht ({move}), sodass jede Ecke mit der Kante eines anderen Slots eingesetzt wird',
   'cfop.pseudoLast': 'der letzte Zug richtet die untere Ebene wieder aus',
   'cfop.pseudoInto': 'Pseudo-Paar in den Slot {slot}',

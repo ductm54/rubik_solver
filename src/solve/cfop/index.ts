@@ -204,6 +204,14 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     first = false;
     const colors = slotColors(st, best.slot);
     pairs.push(colors);
+    const moves = [...best.rotation, ...best.extraction, ...best.alg];
+    // The pairs solved after this step, by colour (slot names change with the cube turn). Taking a
+    // stuck piece out of another slot can, now and then, drop that slot's own pair in as well.
+    const after = applyMovesToArray(st, moves);
+    const solvedAfter = SLOTS.filter((s) => slotSolved(after, s)).map((s) => slotColors(after, s));
+    const key = (c: Color[]) => [...c].sort().join('');
+    const bonus = solvedAfter.filter((c) => !pairs.some((p) => key(p) === key(c)));
+    if (!pairs.every((p) => solvedAfter.some((c) => key(c) === key(p)))) throw new Error('F2L pair not solved (internal error)');
     const fl = best.side === 'FL';
     push(
       {
@@ -218,9 +226,15 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
           : t(fl ? 'cfop.slotAtFL' : 'cfop.slotAtFR', { desc: best.description }),
         tips,
       },
-      [...best.rotation, ...best.extraction, ...best.alg],
-      { kind: 'f2l', cross, pairs: [...pairs] },
+      moves,
+      { kind: 'f2l', cross, pairs: [...pairs, ...bonus] },
     );
+    // A pair that went in along with this one: its own step, with no moves (like a pair solved by the cross).
+    const n = pairs.length;
+    for (const c of bonus) {
+      pairs.push(c);
+      steps.push({ stage: 'f2l', title: t('cfop.pairTitle', { n: pairs.length, pair: pairName(c) }), caseName: t('cfop.withPair', { n }), alg: '', moves: 0, mask: stickeringMask(scheme, { kind: 'f2l', cross, pairs: [...pairs] }) });
+    }
     if (SLOTS.filter((s) => slotSolved(st, s)).length !== pairs.length) throw new Error('F2L pair not solved (internal error)');
   }
   }

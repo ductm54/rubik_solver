@@ -309,6 +309,7 @@ const zh: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · {corner}角块 + {edge}棱块',
   'cfop.withXcross': '与十字一起完成（XCross）',
   'cfop.afterCross': '十字完成后已经还原',
+  'cfop.withPair': '与第 {n} 组一起完成',
   'cfop.pseudoFirst': '先转动底层（{move}），这样每个角块都和另一个槽的棱块一起入槽',
   'cfop.pseudoLast': '最后一步把底层重新对齐',
   'cfop.pseudoInto': '伪配对放入{slot}槽',

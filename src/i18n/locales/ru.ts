@@ -321,6 +321,7 @@ const ru: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · угол {corner} + ребро {edge}',
   'cfop.withXcross': 'Собрана вместе с крестом (XCross)',
   'cfop.afterCross': 'Уже собрана после креста',
+  'cfop.withPair': 'Встала вместе с парой {n}',
   'cfop.pseudoFirst': 'сначала поворачивается нижний слой ({move}), поэтому каждый угол вставляется с ребром другого слота',
   'cfop.pseudoLast': 'последний поворот снова выравнивает нижний слой',
   'cfop.pseudoInto': 'Псевдопара в слот: {slot}',

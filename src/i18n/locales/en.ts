@@ -343,6 +343,7 @@ const en = {
   'cfop.pseudoTitle': 'F2L {n} · {corner} corner + {edge} edge',
   'cfop.withXcross': 'Solved together with the cross (XCross)',
   'cfop.afterCross': 'Already solved after the cross',
+  'cfop.withPair': 'Went in along with pair {n}',
   'cfop.pseudoFirst': 'the bottom layer is turned first ({move}), so each corner goes in with the edge of another slot',
   'cfop.pseudoLast': 'the last turn lines the bottom layer up again',
   'cfop.pseudoInto': 'Pseudo pair into the {slot} slot',

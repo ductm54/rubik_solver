@@ -194,6 +194,28 @@ describe('CFOP solver', () => {
   /** The moves of the cross (or XCross) step of a plan. */
   const crossOf = (plan: ReturnType<typeof solveCfop>) => parseAlg(plan.steps.find((s) => s.stage === 'cross')!.alg);
 
+  it('a pair that goes in along with another one (stuck piece taken out of its slot) gets its own step', () => {
+    // In one of the ways of holding these (white on the bottom, x2), taking a stuck piece out of the
+    // back-right slot (B U B') drops the back-right pair in with the front-left one. This used to throw.
+    for (const scramble of [
+      "F2 R D2 L2 D B R2 D' U2 R2 D' B' L' D2 L U2 L' B D L B2 F2 U2 L' B'",
+      "D2 L2 R2 F R2 L2 B' U2 D' B2 U L2 R' D L2 R F D2 F' L' U2 L B' L' D",
+    ]) {
+      for (const cross of ['standard', 'advanced'] as const) {
+        const state = applyMoves(solved, scramble);
+        const plan = solveCfop(state, { crossColors: ['W'], cross, f2l: 'standard', oll: '2look', pll: '2look' });
+        let st = state;
+        for (const step of plan.steps) st = applyMoves(st, step.alg);
+        const arr = toColorArray(st);
+        expect([0, 1, 2, 3, 4, 5].every((f) => arr.slice(f * 9, f * 9 + 9).every((c) => c === arr[f * 9 + 4]))).toBe(true);
+        const f2l = plan.steps.filter((s) => s.stage === 'f2l');
+        expect(f2l.length).toBe(4);
+        // Every F2L step adds exactly one solved pair to the stickering, in order.
+        f2l.forEach((s, k) => expect(s.title).toContain(`${k + 1}`));
+      }
+    }
+  });
+
   it('more cross colours never make the solve worse (moves, plus the regrips and B turns of the cross)', () => {
     const cost = (plan: ReturnType<typeof solveCfop>) => plan.moves + effort(crossOf(plan));
     for (let n = 0; n < 20; n++) {

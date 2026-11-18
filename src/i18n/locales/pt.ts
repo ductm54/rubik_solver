@@ -316,6 +316,7 @@ const pt: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · quina {corner} + meio {edge}',
   'cfop.withXcross': 'Resolvido junto com a cruz (XCross)',
   'cfop.afterCross': 'Já resolvido depois da cruz',
+  'cfop.withPair': 'Entrou junto com o par {n}',
   'cfop.pseudoFirst': 'a camada de baixo é girada primeiro ({move}), então cada quina entra com o meio de outro slot',
   'cfop.pseudoLast': 'o último giro realinha a camada de baixo',
   'cfop.pseudoInto': 'Pseudo-par no slot {slot}',

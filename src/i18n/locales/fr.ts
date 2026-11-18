@@ -316,6 +316,7 @@ const fr: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · coin {corner} + arête {edge}',
   'cfop.withXcross': 'Résolue avec la croix (XCross)',
   'cfop.afterCross': 'Déjà résolue après la croix',
+  'cfop.withPair': 'Insérée avec la paire {n}',
   'cfop.pseudoFirst': "la couche du bas est tournée d'abord ({move}), donc chaque coin entre avec l'arête d'un autre emplacement",
   'cfop.pseudoLast': 'le dernier tour réaligne la couche du bas',
   'cfop.pseudoInto': "Pseudo-paire dans l'emplacement {slot}",
