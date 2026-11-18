@@ -104,12 +104,12 @@ export const BEGINNER: Lesson[] = [
   {
     id: 'corners',
     stage: 'corners',
-    how: 4,
+    how: 5,
     algs: { right: SEXY, left: LEFT_SEXY },
     cases: [
       { id: 'right', alg: SEXY, show: `(${SEXY}) ×1` },
       { id: 'up', alg: times(SEXY, 3), show: `(${SEXY}) ×3` },
-      { id: 'front', alg: times(SEXY, 5), show: `(${SEXY}) ×5` },
+      { id: 'front', alg: `y ${LEFT_SEXY}`, show: `y · (${LEFT_SEXY}) ×1` },
       { id: 'left', alg: LEFT_SEXY, show: `(${LEFT_SEXY}) ×1` },
     ],
     mask: bright(CROSS_EDGES, WHITE_CORNERS),
