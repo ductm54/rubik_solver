@@ -20,8 +20,8 @@ Done so far:
 - **Learn tab**: a course on how to solve the cube ([demo](https://solve-rubik.pages.dev/#learn)), starting
   with the beginner method: notation, then the seven layer-by-layer steps, each with example cases
   played on a 3D cube. A "Go faster" part follows, with J Perm's shortcuts for each step (fewer
-  repeated 4-moves, a wide-turn yellow cross, left-hand corner cycle…) and habits: colour neutrality,
-  look-ahead, a speed cube.
+  repeated 4-moves, a wide-turn yellow cross, left-hand corner cycle…) and starting the cross on any
+  colour.
 
 - **Phase 4**: solve helper for learning CFOP ([demo](https://solve-rubik.pages.dev/#solve)).
   Enter, scan or scramble a cube and see the solve as steps: an optimal cross, 4 F2L pairs (each

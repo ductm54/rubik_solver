@@ -716,7 +716,7 @@ const en = {
   // Going faster: J Perm's shortcuts for the beginner method.
   'learn.fast': 'Go faster',
   'learn.fast.label': 'Faster',
-  'learn.fast.intro': 'Once you can solve the cube, you can get much faster without learning a new method. These shortcuts, from J Perm\'s video on speeding up the beginner method, cut out repeated 4-moves and wasted turns. Learn one at a time, then work on the habits at the end: they matter most.',
+  'learn.fast.intro': 'Once you can solve the cube, you can get much faster without learning a new method. These shortcuts, from J Perm\'s video on speeding up the beginner method, cut out repeated 4-moves and wasted turns. Learn one at a time.',
   'learn.fast.from': 'Speeds up: {step}',
 
   'learn.fast.cross.title': 'Faster cross',
@@ -766,13 +766,9 @@ const en = {
   'learn.fast.twist.two': 'Two twisted corners',
   'learn.fast.twist.two.desc': 'The front-right corner still takes two 4-moves; the front-left one takes two backwards 4-moves instead of four.',
 
-  'learn.fast.habits.title': 'Habits that make you fast',
+  'learn.fast.habits.title': 'One more habit',
   'learn.fast.habits.neutral': 'Start the cross on any colour',
   'learn.fast.habits.neutral.text': 'Before you start, look around the cube and make the cross on whichever colour already has the most pieces in place, not always white. The rest of the method works the same with any colour on the bottom.',
-  'learn.fast.habits.lookahead': 'Look ahead',
-  'learn.fast.habits.lookahead.text': 'The biggest speed-up of all: while you finish one piece, already look for the next one. Then you can go straight on without stopping to search. Turn slower if you have to: no pauses beats fast turns.',
-  'learn.fast.habits.cube': 'Use a speed cube',
-  'learn.fast.habits.cube.text': 'A stiff, old-style cube makes you turn with your whole wrist. A cheap magnetic speed cube (J Perm suggests budget ones such as the YuXin Kylin V2 M) turns easily with your fingers, so finger tricks and the 4-moves get much quicker.',
 };
 
 export type Messages = Record<keyof typeof en, string>;

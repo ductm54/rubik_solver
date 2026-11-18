@@ -184,7 +184,7 @@ export const NOTATION_MOVES = ['U', "U'", 'D', "D'", 'R', "R'", 'L', "L'", 'F', 
 export const holdOf = (lesson: { hold?: string }) => lesson.hold ?? HOLD;
 
 /**
- * Going faster with the same method: J Perm's shortcuts for each step, then a few habits. A
+ * Going faster with the same method: J Perm's shortcuts for each step, then starting the cross on any colour. A
  * group's text keys are `learn.<id>.title`, its tips `learn.<id>.<tip>` (the name) and
  * `learn.<id>.<tip>.text`; demos work like a lesson's cases (`learn.<id>.<case>` / `.desc`).
  */
@@ -297,7 +297,7 @@ export const SPEEDUPS: SpeedGroup[] = [
   {
     id: 'fast.habits',
     stage: 'inspection',
-    tips: [{ id: 'neutral' }, { id: 'lookahead' }, { id: 'cube' }],
+    tips: [{ id: 'neutral' }],
     cases: [],
     mask: FULL_MASK,
   },
