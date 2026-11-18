@@ -157,6 +157,74 @@ describe('Beginner method', () => {
     });
   });
 
+  describe('faster last layer', () => {
+    const ALL = { corners: 'faster', topCross: 'faster', topEdges: 'faster', topCorners: 'faster' } as const;
+
+    it('solves random cubes with every Faster setting, using each shortcut', () => {
+      const rand = rng(31);
+      const seen = new Set<string>();
+      for (let n = 0; n < 80; n++) {
+        const cube = applyMoves(solved, randomMoves(25, rand));
+        const cross = (['W', 'Y', 'G', 'B', 'R', 'O'] as Color[])[n % 6];
+        const plan = solveBeginner(cube, cross, ALL);
+        let st = toColorArray(cube);
+        for (const s of plan.steps) {
+          st = applyMovesToArray(st, parseAlg(s.alg));
+          expect(s.moves).toBe(parseAlg(s.alg).filter((m) => !'xyz'.includes(m.base)).length);
+          const fast = [EN['beg.LFast'], EN['beg.oppositeFast'], EN['beg.otherWay']].includes(s.caseName ?? '');
+          if (fast) expect(['FR', 'FL', 'BL', 'BR', 'DFR', 'DLF', 'DBL', 'DRB', 'DF', 'DR', 'DB', 'DL'].every((p) => pieceSolved(st, cubie(p)))).toBe(true);
+          if (s.caseName === EN['beg.LFast']) {
+            seen.add('cross');
+            expect(['UF', 'UR', 'UB', 'UL'].every((e) => st[cubie(e)[0]] === centerColor(st, 'U'))).toBe(true);
+          }
+          if (s.caseName === EN['beg.oppositeFast']) {
+            seen.add('edges');
+            expect(['UF', 'UR', 'UB', 'UL'].every((e) => [0, 1, 2, 3].some((k) => pieceSolved(applyMovesToArray(st, ['', 'U', 'U2', "U'"][k]), cubie(e))))).toBe(true);
+          }
+          if (s.caseName === EN['beg.otherWay']) {
+            seen.add('corners');
+            expect(['UFR', 'URB', 'UBL', 'ULF'].every((c) => cubie(c).map((i) => st[i]).sort().join('') === [...c].map((f) => centerColor(st, f as never)).sort().join(''))).toBe(true);
+          }
+        }
+        expect(allSolved(st)).toBe(true);
+      }
+      expect([...seen].sort()).toEqual(['corners', 'cross', 'edges']);
+    });
+
+    it('top cross and top corners on their own: fewer moves on average than Standard', () => {
+      const rand = rng(37);
+      for (const key of ['topCross', 'topCorners'] as const) {
+        let std = 0;
+        let fast = 0;
+        for (let n = 0; n < 40; n++) {
+          const cube = applyMoves(solved, randomMoves(25, rand));
+          // One solve can come out longer: a shortcut leaves a different (luckier or not) next case.
+          std += solveBeginner(cube, 'W').moves;
+          fast += solveBeginner(cube, 'W', { [key]: 'faster' }).moves;
+        }
+        expect(fast, key).toBeLessThan(std);
+      }
+    });
+
+    it('top edges on its own: two opposite edges never take two looks', () => {
+      const rand = rng(41);
+      let seen = 0;
+      for (let n = 0; n < 60; n++) {
+        const plan = solveBeginner(applyMoves(solved, randomMoves(25, rand)), 'W', { topEdges: 'faster' });
+        expect(plan.steps.some((s) => s.caseName === EN['beg.oppositeFirst'])).toBe(false);
+        seen += plan.steps.filter((s) => s.caseName === EN['beg.oppositeFast']).length;
+      }
+      expect(seen).toBeGreaterThan(0);
+    });
+
+    it('are three settings, Standard by default', () => {
+      for (const k of ['topCross', 'topEdges', 'topCorners']) {
+        expect(BEGINNER.defaults[k]).toBe('standard');
+        expect(BEGINNER.settings.find((d) => d.key === k)!.options.map((o) => o.value)).toEqual(['standard', 'faster']);
+      }
+    });
+  });
+
   it('works through the method registry and handles a solved cube', () => {
     expect(getMethod('beginner')).toBe(BEGINNER);
     const plan = BEGINNER.solve(solved, BEGINNER.defaults);

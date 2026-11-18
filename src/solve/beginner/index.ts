@@ -29,6 +29,10 @@ const YELLOW_CROSS = "F R U R' U' F'";
 const YELLOW_EDGES = "R U R' U R U2 R' U";
 const CORNER_CYCLE = "U R U' L' U R' U' L";
 const CORNER_TWIST = "R' D' R D";
+/** Faster top cross: an L at the front and right goes straight to the cross (f = front two layers). */
+const YELLOW_CROSS_WIDE = "f R U R' U' f'";
+/** Faster top corners: the cycle the other way round, starting with the left hand. */
+const CORNER_CYCLE_BACK = "L' U R U' L U R' U'";
 /** Faster corners: the cross colour on top, one set less (R U2 R' U' and one 4-moves). */
 const CORNER_UP_FAST = "R U2 R' U' R U R' U'";
 const CORNER_UP_FAST_LEFT = "L' U2 L U L' U' L U";
@@ -111,7 +115,8 @@ class Builder {
   }
 }
 
-function solveFrom(start: Stickers, hold: string, cross: Color, fast = false): SolveStep[] {
+function solveFrom(start: Stickers, hold: string, cross: Color, opts: BeginnerOptions = {}): SolveStep[] {
+  const fast = opts.corners === 'faster';
   const scheme = Object.fromEntries([...'URFDLB'].map((f, i) => [f, start[i * 9 + 4]]));
   const b = new Builder(start, scheme, cross);
   const held = applyMovesToArray(start, hold);
@@ -357,6 +362,19 @@ function solveFrom(start: Stickers, hold: string, cross: Color, fast = false): S
       u = o[0] ? 'U' : '';
       caseName = t('beg.line');
       hint = t('beg.lineHint', { top: word(top), alg: YELLOW_CROSS });
+    } else if (n === 2 && opts.topCross === 'faster') {
+      // Faster: the L the other way (front and right) and f … f': the cross in one go.
+      u = U_TURNS.find((t) => {
+        const p = oriented(b.peek(t));
+        return p[0] && p[1]; // front and right
+      })!;
+      b.push(
+        'top',
+        { title: t('beg.topCross', { top: cap(word(top)) }), caseName: t('beg.LFast'), hint: t('beg.LHintFast', { top: word(top), alg: YELLOW_CROSS_WIDE }) },
+        [u, YELLOW_CROSS_WIDE],
+        'eo',
+      );
+      continue;
     } else if (n === 2) {
       u = U_TURNS.find((t) => {
         const p = oriented(b.peek(t));
@@ -380,6 +398,22 @@ function solveFrom(start: Stickers, hold: string, cross: Color, fast = false): S
       if (u) b.push('top', { title: t('beg.topEdges'), caseName: t('beg.lineUp'), hint: t('beg.lineUpHint') }, u, topEdgesShown);
       break;
     }
+    // Faster: two opposite edges match: the algorithm, U2, the algorithm again, without looking.
+    const twice = `${YELLOW_EDGES} U2 ${YELLOW_EDGES}`;
+    const fixed = (alg: string) => {
+      const e = b.peek(alg);
+      return matched(applyMovesToArray(e, bestU(e))).every(Boolean);
+    };
+    const oppositeY = opts.topEdges === 'faster' && m.filter(Boolean).length === 2 && m[0] === m[2] ? Y.find((r) => fixed(`${u} ${r} ${twice}`)) : undefined;
+    if (oppositeY !== undefined) {
+      b.push(
+        'top',
+        { title: t('beg.topEdges'), caseName: t('beg.oppositeFast'), hint: t('beg.edgesHintOppositeFast', { alg: YELLOW_EDGES }) },
+        [`${u} ${oppositeY}`, twice],
+        topEdgesShown,
+      );
+      continue;
+    }
     // Hold so the alg fixes it in one go when it can.
     const y = Y.find((r) => matched(applyMovesToArray(b.peek(`${u} ${r} ${YELLOW_EDGES}`), bestU(b.peek(`${u} ${r} ${YELLOW_EDGES}`)))).every(Boolean));
     const adjacent = m.filter(Boolean).length === 2 && m[0] !== m[2];
@@ -402,6 +436,17 @@ function solveFrom(start: Stickers, hold: string, cross: Color, fast = false): S
     const p = placed(b.st);
     const y = Y.find((r) => placed(b.peek(r))[0]);
     const one = p.some(Boolean);
+    const allPlaced = (alg: string) => placed(b.peek(alg)).every(Boolean);
+    // Faster: one corner in place but the others go the other way round: the left-hand cycle once.
+    if (one && opts.topCorners === 'faster' && !allPlaced(`${y} ${CORNER_CYCLE}`) && allPlaced(`${y} ${CORNER_CYCLE_BACK}`)) {
+      b.push(
+        'top',
+        { title: t('beg.cornersPlace'), caseName: t('beg.otherWay'), hint: t('beg.otherWayHint', { alg: CORNER_CYCLE_BACK }) },
+        [y!, CORNER_CYCLE_BACK],
+        'all',
+      );
+      continue;
+    }
     b.push(
       'top',
       {
@@ -448,6 +493,12 @@ function solveFrom(start: Stickers, hold: string, cross: Color, fast = false): S
 export interface BeginnerOptions {
   /** 'faster': the Learn tab's shortcuts for the first-layer corners. */
   corners?: 'standard' | 'faster';
+  /** 'faster': an L at the front and right goes straight to the cross with f R U R' U' f'. */
+  topCross?: 'standard' | 'faster';
+  /** 'faster': two opposite edges: the algorithm, U2, the algorithm again. */
+  topEdges?: 'standard' | 'faster';
+  /** 'faster': corners going the other way round: the left-hand cycle once instead of twice. */
+  topCorners?: 'standard' | 'faster';
 }
 
 export function solveBeginner(state: CubeState, cross: Color, opts: BeginnerOptions = {}): SolvePlan {
@@ -458,7 +509,7 @@ export function solveBeginner(state: CubeState, cross: Color, opts: BeginnerOpti
   const total = (s: SolveStep[]) => s.reduce((a, x) => a + x.moves, 0);
   for (const hold of HOLDS) {
     if (centerColor(applyMovesToArray(start, hold), 'U') !== cross) continue;
-    const steps = solveFrom(start, hold, cross, opts.corners === 'faster');
+    const steps = solveFrom(start, hold, cross, opts);
     if (!best || total(steps) < total(best)) best = steps;
   }
   return { method: 'Beginner', steps: best!, moves: total(best!), note: t('beg.note', { cross: word(cross) }) };
@@ -486,10 +537,32 @@ export const BEGINNER: MethodDef = {
         { value: 'faster', label: 'Faster' },
       ],
     },
+    ...(
+      [
+        ['topCross', 'Top cross', "Standard: F R U R' U' F', an L held at the back and left, then the line. Faster: an L held at the front and right goes straight to the cross with f R U R' U' f' (f = the front two layers)."],
+        ['topEdges', 'Top edges', "Standard: two opposite edges matching first become neighbours, then a second look. Faster: the algorithm, U2, the algorithm again, with no need to look or turn the cube."],
+        ['topCorners', 'Top corners', "Standard: U R U' L' U R' U' L, twice when the corners go the other way round. Faster: then the left-hand cycle L' U R U' L U R' U' once."],
+      ] as const
+    ).map(([key, label, help]) => ({
+      key,
+      label,
+      help,
+      kind: 'choice' as const,
+      options: [
+        { value: 'standard', label: 'Standard' },
+        { value: 'faster', label: 'Faster' },
+      ],
+    })),
   ],
-  defaults: { crossColor: 'W', corners: 'standard' },
+  defaults: { crossColor: 'W', corners: 'standard', topCross: 'standard', topEdges: 'standard', topCorners: 'standard' },
   solve(state: CubeState, s: SettingValues) {
     const c = (Array.isArray(s.crossColor) ? s.crossColor[0] : s.crossColor) as Color;
-    return solveBeginner(state, 'WYGBRO'.includes(c) && c ? c : 'W', { corners: s.corners === 'faster' ? 'faster' : 'standard' });
+    const pick = (k: string) => (s[k] === 'faster' ? 'faster' : 'standard');
+    return solveBeginner(state, 'WYGBRO'.includes(c) && c ? c : 'W', {
+      corners: pick('corners'),
+      topCross: pick('topCross'),
+      topEdges: pick('topEdges'),
+      topCorners: pick('topCorners'),
+    });
   },
 };
