@@ -258,6 +258,24 @@ describe('CFOP solver', () => {
     }
   });
 
+  it('cross: the easiest order of turns of opposite faces (F B or B F) in the middle of a solution', () => {
+    // Found by random search: the shortest crosses here have an F and a B turn next to each other,
+    // and only the other order of them (R B' F rather than R F B') reaches the least effort.
+    const cases: [string, number][] = [
+      ["D R B2 R D2 L' U2 B D2 L2 U D2 L' U R F' L B' U F' B F' L B' U2", 8],
+      ["D' R' F L2 D R U2 R' B U D' R2 U L D2 B' D2 L D L D' L' B D' B'", 8],
+      ["F2 L F L' B D' B' F' B' D2 F2 L2 D B' U2 F' L U' R2 L F D U' R' F", 8],
+      ["R2 L2 F' D2 L2 D2 B' D' R2 B' U L U' F' U2 D2 U' D B' U B' L F' B R", 13],
+    ];
+    for (const [scramble, least] of cases) {
+      const st = toColorArray(applyMoves(solved, scramble));
+      const cross = solveCross(st);
+      expect(cross.length).toBe(crossDistance(st));
+      expect(crossSolved(applyMovesToArray(st, cross))).toBe(true);
+      expect(effort(cross)).toBe(least);
+    }
+  });
+
   it('step 0 holds the cube so that the cross and the XCross need few regrips and B turns', () => {
     let seed = 11;
     const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
