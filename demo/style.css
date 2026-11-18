@@ -501,13 +501,28 @@ body.focus header { opacity: 0.12; }
 .learn-main { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 1000px) {
   .learn-main { grid-template-columns: 260px minmax(0, 1fr); }
-  .learn-toc { position: sticky; top: 16px; }
+  .learn-toc { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
 }
 .learn-toc h2 { font-size: 15px; margin: 16px 0 8px; }
-.learn-methods { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.learn-methods .lp-label { flex-basis: 100%; }
-.learn-method { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); font-weight: 600; font-size: 14px; }
-.learn-more { font-size: 13px; }
+.learn-toc > h2:first-child { margin-top: 0; }
+.learn-path { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.learn-level > .learn-toc-list { margin: 2px 0 6px 14px; padding-left: 8px; border-left: 2px solid var(--border); }
+.learn-level-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; font-weight: 700; text-align: left; }
+button.learn-level-item { cursor: pointer; }
+button.learn-level-item:hover { background: var(--tint); }
+.learn-level-n { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); border: 1px solid var(--accent); color: var(--text); font-size: 13px; font-weight: 700; }
+.learn-level-soon .learn-level-item { color: var(--muted); font-weight: 600; }
+.learn-level-soon .learn-level-n { background: var(--soft); border-color: var(--border); color: var(--muted); }
+.learn-soon { margin-left: auto; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border); }
+.learn-level-card { border-top: 3px solid var(--accent); }
+.learn-level-card .learn-head { margin-bottom: 0; }
+.learn-level-tag { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); border: 1px solid var(--accent); }
+.learn-next-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+.learn-next-list li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.learn-next-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.learn-next-head .learn-level-n { background: var(--soft); border-color: var(--border); }
+.learn-next-algs { margin-left: auto; font-size: 13px; }
+.learn-next-list p { margin: 6px 0 0 36px; font-size: 14px; }
 .learn-toc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .learn-toc-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
 .learn-toc-item:hover { background: var(--tint); }

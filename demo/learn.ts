@@ -1,5 +1,6 @@
 /**
- * Learn view: how to solve the cube, method by method (the beginner method for now). Each step
+ * Learn view: how to solve the cube as a learning path, level by level (basics, the beginner
+ * method, a faster beginner method, then CFOP, still to come). Each step
  * has its text and a 3D viewer with example cases; viewers are made when their step first
  * scrolls near the screen, so the page opens fast.
  */
@@ -265,51 +266,118 @@ function speedGroup(g: SpeedGroup): HTMLElement {
   return sec;
 }
 
-function render() {
-  const methods = el('div', 'learn-methods');
-  methods.append(el('span', 'lp-label', t('learn.methods')));
-  const chip = el('span', 'learn-method', t('learn.beginner'));
-  chip.setAttribute('aria-current', 'true');
-  methods.append(chip, el('span', 'muted learn-more', t('solve.moreComing')));
+/** The CFOP levels after the beginner course, not written yet: id and how many algorithms. */
+const NEXT_LEVELS: [id: string, algs: number][] = [
+  ['cfop', 0],
+  ['cross', 0],
+  ['f2l', 0],
+  ['oll2', 10],
+  ['pll2', 6],
+  ['pll', 21],
+  ['oll', 57],
+  ['f2lAdv', 0],
+];
 
-  const list = el('ol', 'learn-toc-list');
-  BEGINNER.forEach((l, i) => {
-    const li = el('li');
-    const b = el('button', `learn-toc-item stage-${l.stage}`);
-    b.type = 'button';
-    b.append(el('span', 'learn-toc-n', String(i)), el('span', '', t(`learn.${l.id}.title`)));
-    b.onclick = () => document.getElementById(`learn-step-${l.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    li.append(b);
-    list.append(li);
-  });
-  const fast = el('ul', 'learn-toc-list learn-toc-fast');
-  for (const g of SPEEDUPS) {
-    const li = el('li');
-    const b = el('button', `learn-toc-item stage-${g.stage}`);
-    b.type = 'button';
-    b.append(el('span', 'learn-toc-n', '»'), el('span', '', t(`learn.${g.id}.title`)));
-    b.onclick = () => document.getElementById(`learn-${g.id.replace('.', '-')}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    li.append(b);
-    fast.append(li);
+const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+function tocItem(mark: string, label: string, target: string, stage = ''): HTMLLIElement {
+  const li = el('li');
+  const b = el('button', `learn-toc-item ${stage ? `stage-${stage}` : ''}`.trim());
+  b.type = 'button';
+  b.append(el('span', 'learn-toc-n', mark), el('span', '', label));
+  b.onclick = () => scrollTo(target);
+  li.append(b);
+  return li;
+}
+
+/** One level of the path in the contents: its number and name, with its steps under it. */
+function tocLevel(n: number, name: string, target: string, steps: HTMLLIElement[] = []): HTMLLIElement {
+  const li = el('li', 'learn-level');
+  const b = el('button', 'learn-level-item');
+  b.type = 'button';
+  b.append(el('span', 'learn-level-n', String(n)), el('span', '', name));
+  b.onclick = () => scrollTo(target);
+  li.append(b);
+  if (steps.length) {
+    const sub = el('ol', 'learn-toc-list');
+    sub.append(...steps);
+    li.append(sub);
   }
-  toc.append(methods, el('h2', '', t('learn.contents')), list, el('h2', '', t('learn.fast')), fast);
+  return li;
+}
 
-  const intro = el('section', 'card learn-lesson learn-intro-card');
-  intro.append(el('h2', '', t('learn.beginner')), el('p', '', t('learn.beginner.intro')));
-  root.append(intro);
-  BEGINNER.forEach((l, i) => root.append(lesson(l, i)));
+/** The card that opens a level of the path. */
+function levelCard(n: number, id: string, name: string, intro: string): HTMLElement {
+  const sec = el('section', 'card learn-lesson learn-intro-card learn-level-card');
+  sec.id = id;
+  const head = el('header', 'learn-head');
+  head.append(el('span', 'learn-level-tag', t('learn.levelN', { n })), el('h2', '', name));
+  sec.append(head, el('p', '', intro));
+  return sec;
+}
 
+function render() {
+  const [notation, ...steps] = BEGINNER;
+
+  // Contents: the learning path, level by level.
+  const path = el('ol', 'learn-path');
+  path.append(
+    tocLevel(0, t('learn.basics'), 'learn-level-basics', [
+      tocItem('0', t(`learn.${notation.id}.title`), `learn-step-${notation.id}`, notation.stage),
+    ]),
+    tocLevel(
+      1,
+      t('learn.beginner'),
+      'learn-level-beginner',
+      steps.map((l, i) => tocItem(String(i + 1), t(`learn.${l.id}.title`), `learn-step-${l.id}`, l.stage)),
+    ),
+    tocLevel(
+      2,
+      t('learn.fast'),
+      'learn-fast',
+      SPEEDUPS.map((g) => tocItem('»', t(`learn.${g.id}.title`), `learn-${g.id.replace('.', '-')}`, g.stage)),
+    ),
+  );
+  NEXT_LEVELS.forEach(([id], i) => {
+    const li = el('li', 'learn-level learn-level-soon');
+    const row = el('div', 'learn-level-item');
+    row.append(el('span', 'learn-level-n', String(i + 3)), el('span', '', t(`learn.next.${id}`)), el('span', 'learn-soon', t('learn.soon')));
+    li.append(row);
+    path.append(li);
+  });
+  toc.append(el('h2', '', t('learn.path')), path);
+
+  // Level 0: basics.
+  root.append(levelCard(0, 'learn-level-basics', t('learn.basics'), t('learn.basics.intro')));
+  root.append(lesson(notation, 0));
+
+  // Level 1: the beginner method.
+  root.append(levelCard(1, 'learn-level-beginner', t('learn.beginner'), t('learn.beginner.intro')));
+  steps.forEach((l, i) => root.append(lesson(l, i + 1)));
   const done = el('section', 'card learn-lesson learn-done');
   const cta = el('a', 'primary button-like', t('learn.done.cta'));
   cta.href = '#solve';
   done.append(el('h2', '', t('learn.done.title')), el('p', '', t('learn.done.body')), cta);
   root.append(done);
 
-  const fastIntro = el('section', 'card learn-lesson learn-intro-card');
-  fastIntro.id = 'learn-fast';
-  fastIntro.append(el('h2', '', t('learn.fast')), el('p', '', t('learn.fast.intro')));
-  root.append(fastIntro);
+  // Level 2: faster beginner.
+  root.append(levelCard(2, 'learn-fast', t('learn.fast'), t('learn.fast.intro')));
   for (const g of SPEEDUPS) root.append(speedGroup(g));
+
+  // Levels 3 and on: what comes next.
+  const next = el('section', 'card learn-lesson learn-intro-card learn-next');
+  next.id = 'learn-next';
+  const list = el('ol', 'learn-next-list');
+  NEXT_LEVELS.forEach(([id, algs], i) => {
+    const li = el('li');
+    const head = el('div', 'learn-next-head');
+    head.append(el('span', 'learn-level-n', String(i + 3)), el('strong', '', t(`learn.next.${id}`)));
+    if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
+    li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
+    list.append(li);
+  });
+  next.append(el('h2', '', t('learn.next.title')), el('p', '', t('learn.next.intro')), list);
+  root.append(next);
 }
 
 render();
