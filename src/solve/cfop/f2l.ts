@@ -106,12 +106,15 @@ export function describePair(st: Stickers, crossWord = 'cross colour', side: Sid
   return t('f2l.pair', { corner: cornerText, edge: edgeText });
 }
 
-/** Moves that lift the contents of a slot into the U layer. */
+/**
+ * Moves that lift the contents of a slot into the U layer. No B turns: the back face can't be
+ * seen and is awkward to push, so a back slot is emptied with R / L moves only (R' U R, L U L').
+ */
 const EXTRACT: Record<Slot, Move[][]> = {
   FR: ["R U R'", "R U' R'", "R U2 R'", "F' U F", "F' U' F", "F' U2 F"].map(parseAlg),
   FL: ["L' U L", "L' U' L", "L' U2 L", "F U F'", "F U' F'", "F U2 F'"].map(parseAlg),
-  BL: ["L U L'", "L U' L'", "L U2 L'", "B' U B", "B' U' B", "B' U2 B"].map(parseAlg),
-  BR: ["R' U R", "R' U' R", "R' U2 R", "B U B'", "B U' B'", "B U2 B'"].map(parseAlg),
+  BL: ["L U L'", "L U' L'", "L U2 L'"].map(parseAlg),
+  BR: ["R' U R", "R' U' R", "R' U2 R"].map(parseAlg),
 };
 
 /** The slot a piece (its facelets) is in, or null when it is in the U layer. */
