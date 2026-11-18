@@ -15,7 +15,6 @@ import { type AlgEntry, EO, OCLL, OLL } from './algs/oll';
 import { crossDistance, solveCross, solveXCross } from './cross';
 import { SLOTS, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { pairCost, solveF2LAdvanced } from './f2lAdvanced';
-import { turnCost } from './moveCost';
 import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
 import { type LLKind, llTips } from './llTips';
@@ -160,11 +159,9 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     const sides = (c: Color[]) => colorNames(c.filter((x) => x !== cross));
     const mixed = plan.some((p) => p.pseudo || p.uTurn);
     const total = plan.reduce((a, p) => a + p.moves, 0);
-    const time = turnCost(plan.flatMap((p) => p.alg));
     plan.forEach((p, k) => {
       // Why this pair now: what each pair left would cost (not with pseudo-slotting or u turns, where pairs are mixed).
-      const tips = k === 0 ? [t('tip.advOrder', { total: movesText(total), time: time.toFixed(1) })] : [];
-      tips.push(t('tip.advTime', { time: p.time.toFixed(1) }));
+      const tips = k === 0 ? [t('tip.advOrder', { total: movesText(total) })] : [];
       if (!mixed) {
         const others = openSlots(st).map((slot) => ({ slot, ...(slot === p.slot ? p : (pairCost(st, slot) ?? { moves: 0, cost: 0 })) }));
         const options: PairOption[] = others.map(({ slot, moves }) => ({ slot, moves, turns: 0 }));
@@ -361,7 +358,7 @@ export const CFOP: MethodDef = {
     {
       key: 'f2l',
       label: 'F2L',
-      help: 'Standard: the usual F2L algorithms (most-voted on SpeedCubeDB), one case at a time, with the cube turned so the pair goes in at the front-right or the front-left. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) and u turns (a corner paired with the edge of another slot inside u … u\') when they help, choosing the plan quickest to turn, each move weighted by its finger trick (R and U count 1, f and B about 2).',
+      help: 'Standard: the usual F2L algorithms (most-voted on SpeedCubeDB), one case at a time, with the cube turned so the pair goes in at the front-right or the front-left. Advanced: no cube turns, no B moves (f and S instead), any slot, best pair order, and pseudo-slotting (pairs made with the bottom layer turned) and u turns (a corner paired with the edge of another slot inside u … u\') when they help, choosing the plan quickest to turn.',
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },
