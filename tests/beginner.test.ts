@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyMoves, applyMovesToArray, parseAlg, randomMoves, solvedState, statesEqual, toColorArray, type Color } from '../src/core/cube';
-import { BEGINNER, solveBeginner } from '../src/solve/beginner';
+import { BEGINNER, solveBeginner, unflip } from '../src/solve/beginner';
 import { getMethod } from '../src/solve/methods';
+import { EN } from '../src/i18n/locales/en';
 import { centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 
 const solved = solvedState();
@@ -23,7 +24,15 @@ describe('Beginner method', () => {
       const plan = solveBeginner(cube, cross);
       let st = toColorArray(cube);
       const last = new Map<string, Color[]>();
-      for (const s of plan.steps) {
+      // The cross is built with the cross colour on top, then the cube is turned over (x2).
+      const over = plan.steps.map((s) => s.stage).lastIndexOf('cross');
+      expect(over).toBeGreaterThan(0);
+      expect(plan.steps[over].alg).toBe('x2');
+      for (const [i, s] of plan.steps.entries()) {
+        if (i === over) {
+          expect(centerColor(st, 'U')).toBe(cross);
+          expect(['UF', 'UR', 'UB', 'UL'].every((e) => pieceSolved(st, cubie(e)))).toBe(true);
+        }
         st = applyMovesToArray(st, parseAlg(s.alg));
         expect(s.moves).toBe(parseAlg(s.alg).filter((m) => !'xyz'.includes(m.base)).length);
         last.set(s.stage, st);
@@ -41,6 +50,45 @@ describe('Beginner method', () => {
       // Beginners turn the cube instead of turning B: no B turn anywhere.
       for (const s of plan.steps) expect(parseAlg(s.alg).some((m) => m.base === 'B')).toBe(false);
     }
+  });
+
+  it('reads moves worked out in the z2 view back in the real hold', () => {
+    const rand = rng(11);
+    for (let n = 0; n < 20; n++) {
+      const st = toColorArray(applyMoves(solved, randomMoves(20, rand)));
+      const alg = parseAlg("R U' F2 D L' x y' z2 B");
+      expect(applyMovesToArray(st, unflip(alg))).toEqual(applyMovesToArray(applyMovesToArray(applyMovesToArray(st, 'z2'), alg), 'z2'));
+    }
+  });
+
+  it('puts first-layer corners in with either hand, whichever is shorter', () => {
+    const rand = rng(5);
+    let left = 0;
+    let right = 0;
+    for (let n = 0; n < 20; n++) {
+      const plan = solveBeginner(applyMoves(solved, randomMoves(25, rand)), 'W');
+      for (const s of plan.steps.filter((s) => s.stage === 'corners' && s.moves)) {
+        if (s.alg.includes("L' U' L U")) left++;
+        if (s.alg.includes("R U R' U'")) right++;
+      }
+    }
+    expect(left).toBeGreaterThan(0);
+    expect(right).toBeGreaterThan(0);
+  });
+
+  it('a corner twisted in its own slot: no U turn, and the hint does not ask for one', () => {
+    const rand = rng(9);
+    let seen = 0;
+    for (let n = 0; n < 40; n++) {
+      const plan = solveBeginner(applyMoves(solved, randomMoves(25, rand)), 'W');
+      for (const s of plan.steps.filter((s) => s.stage === 'corners' && s.caseName === EN['beg.cornerTwisted'])) {
+        seen++;
+        // Only a cube turn (y) before the 4-moves: no U to set the corner up.
+        expect(s.alg.replace(/^y\S* /, '')).toMatch(/^(R U R' U'|L' U' L U)/);
+        expect(s.hint).toMatch(/^The corner is already in the .* slot, only twisted/);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 
   it('works through the method registry and handles a solved cube', () => {
