@@ -69,14 +69,30 @@ const faceOfMove = (m: number) => Math.floor(m / 3);
 /** No more solutions than this are compared (the first ones found). */
 const MAX_OPTIONS = 2000;
 
-/** F and B turn independently: when a solution opens with F then B, do the B first, where it is free. */
-const backFirst = (moves: Move[]) => (moves[0]?.base === 'F' && moves[1]?.base === 'B' ? [moves[1], moves[0], ...moves.slice(2)] : moves);
+const OPPOSITE: Record<string, string> = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
 
-/** The easiest to execute of some solutions (the first of equal ones). */
+/**
+ * Turns of opposite faces commute, so the searches below keep one order of them only (U D, R L,
+ * F B). But the order matters to the hands: R B' F is easier than R F B'. Every order of a
+ * solution's commuting pairs.
+ */
+function orderings(moves: Move[]): Move[][] {
+  let out: Move[][] = [[]];
+  for (let i = 0; i < moves.length; i++) {
+    const a = moves[i], b = moves[i + 1];
+    if (b && OPPOSITE[a.base] === b.base) {
+      out = out.flatMap((o) => [[...o, a, b], [...o, b, a]]);
+      i++;
+    } else out = out.map((o) => [...o, a]);
+  }
+  return out;
+}
+
+/** The easiest to execute of some solutions, in any order of their commuting turns (the first of equal ones). */
 function easiest(options: Move[][]): Move[] {
   let best = options[0];
   let bestCost = Infinity;
-  for (const o of options.map(backFirst)) {
+  for (const o of options.flatMap(orderings)) {
     const cost = effort(o);
     if (cost < bestCost) (best = o), (bestCost = cost);
   }
