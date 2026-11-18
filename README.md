@@ -19,7 +19,9 @@ Done so far:
 
 - **Learn tab**: a course on how to solve the cube ([demo](https://solve-rubik.pages.dev/#learn)), starting
   with the beginner method: notation, then the seven layer-by-layer steps, each with example cases
-  played on a 3D cube.
+  played on a 3D cube. A "Go faster" part follows, with J Perm's shortcuts for each step (fewer
+  repeated 4-moves, a wide-turn yellow cross, left-hand corner cycle…) and habits: colour neutrality,
+  look-ahead, a speed cube.
 
 - **Phase 4**: solve helper for learning CFOP ([demo](https://solve-rubik.pages.dev/#solve)).
   Enter, scan or scramble a cube and see the solve as steps: an optimal cross, 4 F2L pairs (each
@@ -105,7 +107,7 @@ any branch, use "Run workflow" on the Scanner workflow in the Actions tab.
 | `demo/index.html`, `demo/app.ts`, `demo/route.ts` | The one page and its shell: Cube, Solve, Learn and Timer are views picked by the URL hash (`#cube`, `#solve`, `#learn`, `#timer`; an old `#learn&scramble=…` link still opens Solve), so switching never reloads; each view's code loads on first use and is told when it is shown or hidden (camera off, playback and timing stopped) |
 | `demo/tour.ts` | Guided tour of the Cube, Solve and Timer tabs, opened from the Tour button in the header (it never opens by itself) |
 | `demo/solve.ts`, `demo/settings.ts` | Solve view: cube input, settings view, step list and viewer (`learn.html` redirects to `#solve`) |
-| `src/learn/beginner.ts`, `demo/learn.ts` | Learn view: how to solve, step by step. The beginner method (the same steps and algorithms as the beginner solver), each step with its goal, how-to, algorithms to learn and example cases to play in a 3D viewer (made when the step scrolls near); `tests/learn.test.ts` checks every example starts as its text says |
+| `src/learn/beginner.ts`, `demo/learn.ts` | Learn view: how to solve, step by step. The beginner method (the same steps and algorithms as the beginner solver), each step with its goal, how-to, algorithms to learn and example cases to play in a 3D viewer (made when the step scrolls near), then the "Go faster" shortcuts (`SPEEDUPS`); `tests/learn.test.ts` checks every example starts as its text says |
 | `demo/timer.ts`, `demo/chart.ts` | Timer view: scramble + preview, timing pad, stats, history chart, solve table (`timer.html` redirects to `#timer`) |
 | `demo/scan.ts` | Scan panel of the Cube view (loaded when opened): free-hand detection, overlay, live reading, six captured-face slots; also upload of several photos (read one after another) or a video (played like the camera) |
 | `demo/main.ts` | Cube view: scan, edit (2D net, Solved / Random) or review a scanned cube, then Generate, scramble text and a `cubing.js` 3D viewer; the solver runs in a Web Worker |

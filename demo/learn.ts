@@ -5,7 +5,20 @@
  */
 import 'cubing/twisty';
 import { t } from '../src/i18n';
-import { BEGINNER, FULL_MASK, HOLD, holdOf, type Lesson, type LessonCase, NOTATION_MOVES } from '../src/learn/beginner';
+import {
+  BEGINNER,
+  FULL_MASK,
+  HOLD,
+  holdOf,
+  type Lesson,
+  type LessonCase,
+  NOTATION_MOVES,
+  SPEEDUPS,
+  type SpeedGroup,
+} from '../src/learn/beginner';
+
+/** What a case viewer needs: lessons and speed-up groups both have it. */
+type Demo = Pick<Lesson, 'id' | 'hold' | 'mask' | 'cases'>;
 
 /** The parts of cubing.js's TwistyPlayer used here. */
 type Player = HTMLElement & {
@@ -46,7 +59,7 @@ function makePlayer(): Player {
 }
 
 /** Show a case in a viewer, ready to play from its start. */
-function loadCase(p: Player, lesson: Lesson, c: LessonCase) {
+function loadCase(p: Player, lesson: Demo, c: LessonCase) {
   p.pause();
   p.experimentalSetupAnchor = 'end';
   p.experimentalSetupAlg = [holdOf(lesson), c.end ?? ''].join(' ').trim();
@@ -56,7 +69,7 @@ function loadCase(p: Player, lesson: Lesson, c: LessonCase) {
 }
 
 /** The example viewer with a button per case. */
-function caseDemo(lesson: Lesson): HTMLElement {
+function caseDemo(lesson: Demo): HTMLElement {
   const box = el('div', 'learn-demo');
   const picker = el('div', 'learn-cases');
   picker.setAttribute('role', 'group');
@@ -217,6 +230,41 @@ function lesson(l: Lesson, n: number): HTMLElement {
   return sec;
 }
 
+/** A card of shortcuts for one step (or general habits), with demos when there are moves to show. */
+function speedGroup(g: SpeedGroup): HTMLElement {
+  const sec = el('section', 'card learn-lesson learn-fast');
+  sec.id = `learn-${g.id.replace('.', '-')}`;
+  const head = el('header', 'learn-head');
+  head.append(el('span', `stage-tag stage-${g.stage}`, t('learn.fast.label')), el('h2', '', t(`learn.${g.id}.title`)));
+
+  const text = el('div', 'learn-text');
+  if (g.step) {
+    const i = BEGINNER.findIndex((l) => l.id === g.step);
+    const from = el('p', 'muted learn-fast-from');
+    const link = el('a', '', `${t('learn.stepN', { n: i })} · ${t(`learn.${g.step}.title`)}`);
+    link.href = `#learn`;
+    link.onclick = (e) => {
+      e.preventDefault();
+      document.getElementById(`learn-step-${g.step}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    const [before, after = ''] = t('learn.fast.from', { step: '\u0001' }).split('\u0001');
+    from.append(before, link, after);
+    text.append(from);
+  }
+  for (const tip of g.tips) {
+    text.append(el('h3', '', t(`learn.${g.id}.${tip.id}`)));
+    const p = el('p', 'learn-fast-text');
+    p.append(rich(`learn.${g.id}.${tip.id}.text`, tip.alg ?? ''));
+    text.append(p);
+  }
+
+  const body = el('div', g.cases.length ? 'learn-body' : 'learn-body learn-body-text');
+  body.append(text);
+  if (g.cases.length) body.append(caseDemo(g));
+  sec.append(head, body);
+  return sec;
+}
+
 function render() {
   const methods = el('div', 'learn-methods');
   methods.append(el('span', 'lp-label', t('learn.methods')));
@@ -234,7 +282,17 @@ function render() {
     li.append(b);
     list.append(li);
   });
-  toc.append(methods, el('h2', '', t('learn.contents')), list);
+  const fast = el('ul', 'learn-toc-list learn-toc-fast');
+  for (const g of SPEEDUPS) {
+    const li = el('li');
+    const b = el('button', `learn-toc-item stage-${g.stage}`);
+    b.type = 'button';
+    b.append(el('span', 'learn-toc-n', '»'), el('span', '', t(`learn.${g.id}.title`)));
+    b.onclick = () => document.getElementById(`learn-${g.id.replace('.', '-')}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    li.append(b);
+    fast.append(li);
+  }
+  toc.append(methods, el('h2', '', t('learn.contents')), list, el('h2', '', t('learn.fast')), fast);
 
   const intro = el('section', 'card learn-lesson learn-intro-card');
   intro.append(el('h2', '', t('learn.beginner')), el('p', '', t('learn.beginner.intro')));
@@ -246,6 +304,12 @@ function render() {
   cta.href = '#solve';
   done.append(el('h2', '', t('learn.done.title')), el('p', '', t('learn.done.body')), cta);
   root.append(done);
+
+  const fastIntro = el('section', 'card learn-lesson learn-intro-card');
+  fastIntro.id = 'learn-fast';
+  fastIntro.append(el('h2', '', t('learn.fast')), el('p', '', t('learn.fast.intro')));
+  root.append(fastIntro);
+  for (const g of SPEEDUPS) root.append(speedGroup(g));
 }
 
 render();

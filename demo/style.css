@@ -523,6 +523,10 @@ body.focus header { opacity: 0.12; }
 .learn-head .stage-tag { font-size: 13px; padding: 3px 10px; }
 .learn-body { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 760px) { .learn-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.learn-body.learn-body-text { grid-template-columns: minmax(0, 1fr); }
+.learn-fast-from { margin: 0; font-size: 14px; }
+.learn-fast-text { margin: 0; }
+.learn-fast .learn-text h3:first-of-type { margin-top: 12px; }
 .learn-text { min-width: 0; }
 .learn-goal { margin: 0; padding: 10px 12px; border-left: 3px solid var(--solid, var(--accent)); background: var(--tint); border-radius: 0 8px 8px 0; }
 .learn-lesson:has(.stage-cross) { --solid: #2a78d6; }

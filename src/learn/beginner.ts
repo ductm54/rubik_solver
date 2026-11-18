@@ -181,4 +181,124 @@ export const BEGINNER: Lesson[] = [
 export const NOTATION_MOVES = ['U', "U'", 'D', "D'", 'R', "R'", 'L', "L'", 'F', "F'", 'B', "B'", 'U2', 'y'];
 
 /** The hold a lesson's demos start from. */
-export const holdOf = (lesson: Lesson) => lesson.hold ?? HOLD;
+export const holdOf = (lesson: { hold?: string }) => lesson.hold ?? HOLD;
+
+/**
+ * Going faster with the same method: J Perm's shortcuts for each step, then a few habits. A
+ * group's text keys are `learn.<id>.title`, its tips `learn.<id>.<tip>` (the name) and
+ * `learn.<id>.<tip>.text`; demos work like a lesson's cases (`learn.<id>.<case>` / `.desc`).
+ */
+export interface SpeedTip {
+  id: string;
+  /** The moves an `{alg}` in the tip's text stands for. */
+  alg?: string;
+}
+
+export interface SpeedGroup {
+  id: string;
+  /** The beginner step these tips speed up, if any. */
+  step?: string;
+  stage: Lesson['stage'];
+  hold?: string;
+  tips: SpeedTip[];
+  cases: LessonCase[];
+  mask: string;
+}
+
+/** White on top: an edge at the front-right of the middle layer, white facing the front, that
+ * belongs at the front: turn its spot over to the right, slide it up, turn back. */
+export const CROSS_SLIDE = "U' R U";
+/** White on top of the corner: the first U of the 4-moves made U2, then one more 4-moves. */
+export const CORNER_UP_FAST = `R U2 R' U' ${SEXY}`;
+/** White facing right, with the front-right middle edge already solved. */
+export const KEEP_EDGE_RIGHT = "U' R U2 R' U R U R'";
+/** The left-hand mirror: white facing left, with the front-left middle edge already solved. */
+export const KEEP_EDGE_LEFT = "U L' U2 L U' L' U' L";
+/** Swaps the two middle edges on the right side. */
+export const SWAP_RIGHT_EDGES = 'R2 U2 R2 U2 R2';
+/** The yellow cross in one go from an L at the front and right: a double-layer front turn. */
+export const YELLOW_CROSS_WIDE = "f R U R' U' f'";
+/** The corner cycle the other way round, starting with the left hand. */
+export const CORNER_CYCLE_BACK = "L' U R U' L U R' U'";
+/** The 4-moves backwards: twice does what four right 4-moves do. */
+export const REVERSE_SEXY = "U R U' R'";
+
+export const SPEEDUPS: SpeedGroup[] = [
+  {
+    id: 'fast.cross',
+    step: 'cross',
+    hold: '',
+    stage: 'cross',
+    tips: [{ id: 'slide', alg: CROSS_SLIDE }],
+    cases: [
+      { id: 'slide', alg: CROSS_SLIDE, show: "U' · R · U" },
+      { id: 'direct', alg: "F'" },
+    ],
+    mask: bright(CROSS_EDGES),
+  },
+  {
+    id: 'fast.corners',
+    step: 'corners',
+    stage: 'corners',
+    tips: [
+      { id: 'front', alg: LEFT_SEXY },
+      { id: 'up', alg: CORNER_UP_FAST },
+      { id: 'stuck', alg: LEFT_SEXY },
+      { id: 'keep', alg: times(SEXY, 3) },
+    ],
+    cases: [
+      { id: 'up', alg: CORNER_UP_FAST, show: `R U2 R' U' · ${SEXY}` },
+      { id: 'keepRight', alg: KEEP_EDGE_RIGHT, show: "U' · R U2 R' U · R U R'" },
+      { id: 'keepLeft', alg: `y ${KEEP_EDGE_LEFT}`, show: "y · U · L' U2 L U' · L' U' L" },
+      { id: 'keepUp', alg: times(SEXY, 3), show: `(${SEXY}) ×3` },
+    ],
+    mask: bright(CROSS_EDGES, WHITE_CORNERS, MIDDLE_EDGES),
+  },
+  {
+    id: 'fast.middle',
+    step: 'middle',
+    stage: 'middle',
+    tips: [
+      { id: 'swap', alg: SWAP_RIGHT_EDGES },
+      { id: 'flipped', alg: "R U2 R'" },
+    ],
+    cases: [{ id: 'swap', alg: SWAP_RIGHT_EDGES }],
+    mask: bright(CROSS_EDGES, WHITE_CORNERS, MIDDLE_EDGES),
+  },
+  {
+    id: 'fast.top',
+    stage: 'top',
+    tips: [
+      { id: 'wide', alg: YELLOW_CROSS_WIDE },
+      { id: 'opposite', alg: 'U2' },
+      { id: 'corners', alg: CORNER_CYCLE_BACK },
+    ],
+    cases: [
+      { id: 'wide', alg: YELLOW_CROSS_WIDE, show: `f · ${SEXY} · f'` },
+      { id: 'corners', alg: CORNER_CYCLE_BACK },
+    ],
+    mask: FULL_MASK,
+  },
+  {
+    id: 'fast.twist',
+    step: 'twist',
+    hold: '',
+    stage: 'top',
+    tips: [{ id: 'reverse', alg: REVERSE_SEXY }],
+    cases: [
+      {
+        id: 'two',
+        alg: `${times(CORNER_TWIST, 2)} D ${times(REVERSE_SEXY, 2)} D'`,
+        show: `(${CORNER_TWIST}) ×2 · D · (${REVERSE_SEXY}) ×2 · D'`,
+      },
+    ],
+    mask: FULL_MASK,
+  },
+  {
+    id: 'fast.habits',
+    stage: 'inspection',
+    tips: [{ id: 'neutral' }, { id: 'lookahead' }, { id: 'cube' }],
+    cases: [],
+    mask: FULL_MASK,
+  },
+];
