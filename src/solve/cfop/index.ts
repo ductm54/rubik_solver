@@ -15,6 +15,7 @@ import { type AlgEntry, EO, OCLL, OLL } from './algs/oll';
 import { crossDistance, solveCross, solveXCross } from './cross';
 import { SLOTS, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { pairCost, solveF2LAdvanced } from './f2lAdvanced';
+import { execCost } from './moveCost';
 import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
 import { type LLKind, llTips } from './llTips';
@@ -55,6 +56,8 @@ interface Attempt {
   color: Color;
   /** How awkward the cross (or XCross) is with the cube held this way, in extra moves: regrips and B turns. */
   effort: number;
+  /** Advanced F2L: its execution time (weighted moves and regrips) minus its move count, so holds compare by time. */
+  f2lExtra: number;
 }
 
 const thumb = (th: Thumb) => t(`thumb.${th}`);
@@ -272,7 +275,8 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     llStep('pll', t('cfop.pllCorners'), tb.cpll, { kind: 'cpll', cross }, t('cfop.cpllSkip'), 'cpll');
     llStep('pll', t('cfop.pllEdges'), tb.epll, { kind: 'pll', cross }, t('cfop.epllSkip'), 'epll');
   }
-  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back };
+  const f2lExtra = opts.f2l === 'advanced' ? steps.filter((s) => s.stage === 'f2l').reduce((a, s) => a + execCost(parseAlg(s.alg)) - s.moves, 0) : 0;
+  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back, f2lExtra };
 }
 
 /** Colours of a slot: [cross colour, front-ish side, right-ish side]. */
@@ -309,7 +313,7 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
   if (!v.ok) throw new Error(v.errors.join('\n'));
   const start = toColorArray(state);
   // Every way of holding an allowed colour on the bottom; an awkward cross counts as extra moves.
-  const cost = (a: Attempt) => a.moves + a.effort;
+  const cost = (a: Attempt) => a.moves + a.effort + a.f2lExtra;
   let best: Attempt | null = null;
   for (const hold of HOLDS) {
     const st = applyMovesToArray(start, hold);
