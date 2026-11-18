@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyMoves, applyMovesToArray, parseAlg, randomMoves, solvedState, statesEqual, toColorArray, type Color } from '../src/core/cube';
 import { BEGINNER, solveBeginner, unflip } from '../src/solve/beginner';
 import { getMethod } from '../src/solve/methods';
+import { EN } from '../src/i18n/locales/en';
 import { centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 
 const solved = solvedState();
@@ -73,6 +74,21 @@ describe('Beginner method', () => {
     }
     expect(left).toBeGreaterThan(0);
     expect(right).toBeGreaterThan(0);
+  });
+
+  it('a corner twisted in its own slot: no U turn, and the hint does not ask for one', () => {
+    const rand = rng(9);
+    let seen = 0;
+    for (let n = 0; n < 40; n++) {
+      const plan = solveBeginner(applyMoves(solved, randomMoves(25, rand)), 'W');
+      for (const s of plan.steps.filter((s) => s.stage === 'corners' && s.caseName === EN['beg.cornerTwisted'])) {
+        seen++;
+        // Only a cube turn (y) before the 4-moves: no U to set the corner up.
+        expect(s.alg.replace(/^y\S* /, '')).toMatch(/^(R U R' U'|L' U' L U)/);
+        expect(s.hint).toMatch(/^The corner is already in the .* slot, only twisted/);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 
   it('works through the method registry and handles a solved cube', () => {

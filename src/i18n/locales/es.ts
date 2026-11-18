@@ -511,6 +511,8 @@ const es: Translation = {
   'beg.cornerTwisted': 'La esquina está en su hueco pero girada',
   'beg.cornerHint': "Gira el cubo para que el hueco {slot} quede delante a la derecha, abajo. Gira U hasta que la esquina quede justo encima (arriba delante a la derecha) y repite R U R' U' hasta resolverla: aquí {times}.",
   'beg.cornerHintLeft': "Gira el cubo para que el hueco {slot} quede delante a la izquierda, abajo. Gira U hasta que la esquina quede justo encima (arriba delante a la izquierda) y repite los 4 movimientos izquierdos L' U' L U hasta resolverla: aquí {times}.",
+  'beg.cornerHintTwisted': "La esquina ya está en el hueco {slot}, solo girada. Gira el cubo para que ese hueco quede delante a la derecha, abajo, y repite R U R' U' hasta resolverla: aquí {times}. No hace falta girar U.",
+  'beg.cornerHintTwistedLeft': "La esquina ya está en el hueco {slot}, solo girada. Gira el cubo para que ese hueco quede delante a la izquierda, abajo, y repite los 4 movimientos izquierdos L' U' L U hasta resolverla: aquí {times}. No hace falta girar U.",
   'beg.cornerLeftHand': "Mano izquierda: L' U' L U",
   'beg.middleTitle': 'Arista central · {colors}',
   'beg.goesRight': 'Va a la derecha',

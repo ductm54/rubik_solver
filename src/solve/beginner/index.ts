@@ -194,7 +194,7 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
   while (shownCorners.length < 4) {
     // Plan each unsolved corner with the right hand (slot at the front-right, R U R' U') and with
     // the left hand (slot at the front-left, L' U' L U), as on the Learn tab; take the shortest.
-    let best: { alg: string; colors: Color[]; caseName?: string; reps: number; moves: number; left: boolean } | null = null;
+    let best: { alg: string; colors: Color[]; caseName?: string; reps: number; moves: number; left: boolean; inSlot: boolean } | null = null;
     for (const left of [false, true])
       for (const y of Y) {
         const slot = left ? 'DFL' : 'DFR';
@@ -205,6 +205,8 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
         if (solvedAt(st, slot)) continue;
         const colors = homeColors(st, slot);
         let caseName: string | undefined;
+        // Already in its own slot, only twisted: no U turn, the 4-moves straight away.
+        let inSlot = false;
         const at = whereIs(st, slot);
         if (at[0] === 'D' && at !== pos(slot)) {
           // Stuck in another bottom slot: turn that slot to the front-right, take it out, turn back.
@@ -217,7 +219,10 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
           const u = U_TURNS.find((t) => whereIs(applyMovesToArray(st, t), slot) === above)!;
           alg += ` ${u}`;
           st = applyMovesToArray(st, u);
-        } else caseName ??= t('beg.cornerTwisted');
+        } else if (!caseName) {
+          caseName = t('beg.cornerTwisted');
+          inSlot = true;
+        }
         let reps = 0;
         while (!solvedAt(st, slot)) {
           st = applyMovesToArray(st, four);
@@ -226,16 +231,16 @@ function solveFrom(start: Stickers, hold: string, cross: Color): SolveStep[] {
         alg += ` ${repeat(four, reps)}`;
         const moves = countMoves(simplifyAlg(parseAlg(alg)));
         // The right hand on a tie: it is the one learnt first.
-        if (!best || moves < best.moves) best = { alg, colors, caseName, reps, moves, left };
+        if (!best || moves < best.moves) best = { alg, colors, caseName, reps, moves, left, inSlot };
       }
-    const { alg, colors, caseName, reps, left } = best!;
+    const { alg, colors, caseName, reps, left, inSlot } = best!;
     shownCorners.push(colors);
     b.push(
       'corners',
       {
         title: t('beg.cornerTitle', { n: shownCorners.length, colors: names(colors) }),
         caseName: caseName ?? (left ? t('beg.cornerLeftHand') : undefined),
-        hint: t(left ? 'beg.cornerHintLeft' : 'beg.cornerHint', { slot: names(colors.slice(1)), times: times(reps) }),
+        hint: t(`beg.cornerHint${inSlot ? 'Twisted' : ''}${left ? 'Left' : ''}`, { slot: names(colors.slice(1)), times: times(reps) }),
       },
       alg,
       [...crossEdges, ...shownCorners],
