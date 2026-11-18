@@ -31,7 +31,10 @@ export const moveCost = (m: Move): number => ('xyz'.includes(m.base) ? 0 : (MOVE
 /** Execution time of a sequence, in fast moves (R or U = 1). */
 export const turnCost = (moves: readonly Move[]): number => Math.round(moves.reduce((a, m) => a + moveCost(m) * 10, 0)) / 10;
 
-/** What advanced F2L minimises: execution time (weighted moves) or the plain move count. */
+/**
+ * What advanced F2L minimises: execution time (weighted moves; the solver always uses this) or the
+ * plain move count (kept to compare against, see the tests).
+ */
 export type F2LMetric = 'time' | 'moves';
 
 /**

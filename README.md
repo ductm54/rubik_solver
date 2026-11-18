@@ -29,7 +29,7 @@ Done so far:
   point, with the pieces that don't matter yet greyed out. **Solver settings**, remembered in the
   browser: cross colours (tick several and the solver picks the best for each cube), cross standard or advanced
   (XCross: the cross and at least one F2L pair together when that takes under 11 moves), F2L standard
-  (turn the cube, one case at a time at the front-right or front-left, with the usual algorithms) or advanced (no turns, no B moves, any slot, best pair order, pseudo-slotting and u turns; either the plan quickest to turn, with each move weighted by its finger trick, or the fewest moves), OLL 2-look
+  (turn the cube, one case at a time at the front-right or front-left, with the usual algorithms) or advanced (no turns, no B moves, any slot, best pair order, pseudo-slotting and u turns; the plan quickest to turn, with each move weighted by its finger trick), OLL 2-look
   or full 57, PLL 2-look or full 21. The settings view is built from each method's own setting list,
   ready for more methods. **Step 0** says how to hold the cube during inspection: which colour on
   the bottom and which in front, chosen so the solve is short and the cross (or XCross) is easy to

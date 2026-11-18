@@ -1,5 +1,6 @@
 /**
- * Advanced F2L: the quickest to turn (see moveCost.ts) or the fewest moves. No cube rotations and no B turns, a pair can go into any slot from
+ * Advanced F2L: the plan quickest to turn (moves weighted by finger trick, see moveCost.ts). No
+ * cube rotations and no B turns, a pair can go into any slot from
  * where it is, pieces stuck in another open slot are taken out as part of the same algorithm,
  * every pair order is tried, and pseudo-slotting (pairs made with the bottom layer turned) and
  * u turns (a corner with another slot's edge, inside "u … u'") are used when they are shorter.
