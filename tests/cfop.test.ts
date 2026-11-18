@@ -329,6 +329,28 @@ describe('CFOP solver', () => {
     expect(adv).toBeLessThan(std);
   });
 
+  it('cross, XCross and F2L steps say how to read the cube and why the pair is taken now', () => {
+    for (let n = 0; n < 60; n++) {
+      const state = applyMoves(solved, randomMoves(25));
+      for (const adv of [false, true]) {
+        const plan = solveCfop(state, { crossColors: ['W'], cross: adv ? 'advanced' : 'standard', f2l: adv ? 'advanced' : 'standard', oll: 'full', pll: 'full' });
+        const cross = plan.steps.find((s) => s.stage === 'cross')!;
+        // Every cross edge is sorted into one kind (the line about edges in the right order names some again).
+        const edges = cross.tips!.filter((x) => /^white-/.test(x) && !x.includes('right order')).join(' ');
+        for (const c of ['green', 'red', 'blue', 'orange']) expect(edges.split(`white-${c}`).length).toBe(2);
+        const f2l = plan.steps.filter((s) => s.stage === 'f2l' && s.alg);
+        for (const s of f2l) expect(s.tips!.length).toBeGreaterThan(0);
+        // Standard F2L: exactly one of the listed pairs is marked as the one taken.
+        if (!adv) for (const s of f2l) {
+          const options = s.tips!.filter((x) => / moves?/.test(x) && !x.startsWith('Rule'));
+          if (options.length) expect(options.filter((x) => x.endsWith('← this one')).length).toBe(1);
+        }
+        // No text is a missing translation key or has an unfilled placeholder.
+        for (const s of plan.steps) for (const x of s.tips ?? []) expect(x).not.toMatch(/tip\.|\{\w+\}/);
+      }
+    }
+  });
+
   it('handles a solved cube', () => {
     const plan = solveCfop(solved, { crossColors: ['W'], oll: '2look', pll: '2look' });
     let st = solved;

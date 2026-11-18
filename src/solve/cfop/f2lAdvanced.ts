@@ -134,7 +134,7 @@ const placed = (st: Stickers, slot: Slot, offset: number) =>
   pieceSolved(st, SLOT_PIECES[slot][1]) && locate(st, cornerHome(slot, offset)).every((l, k) => l === SLOT_PIECES[slot][0][k]);
 
 /** Where the pair's pieces are, in words. */
-function describe(st: Stickers, slot: Slot, offset: number, crossWord: string): string {
+export function describePieces(st: Stickers, slot: Slot, offset: number, crossWord: string): string {
   const cHome = cornerHome(slot, offset);
   const where = (home: number[]) => {
     const l = locate(st, home);
@@ -145,6 +145,12 @@ function describe(st: Stickers, slot: Slot, offset: number, crossWord: string): 
   const c = locate(st, cHome);
   const facing = t(faceOf(c[0]) === 'U' ? 'f2l.facingUp' : faceOf(c[0]) === 'D' ? 'f2l.facingDown' : 'f2l.facingSide');
   return t('f2l.adv', { corner: where(cHome), cross: crossWord, facing, edge: where(SLOT_PIECES[slot][1]) });
+}
+
+/** Moves the pair of `slot` would take right now (no pseudo-slotting), or null if the table has no entry. */
+export function pairCost(st: Stickers, slot: Slot): number | null {
+  const alg = pairInto(st, slot, 0, SLOTS.filter((s) => !slotSolved(st, s)));
+  return alg && countMoves(alg);
 }
 
 /** One pair's best solution into `slot`, or null if the table has no entry. */
@@ -181,7 +187,7 @@ function solveAt(st: Stickers, offset: number, crossWord: string, limit: number)
       if (moves >= room) continue;
       const rest = search(applyMovesToArray(s, alg), open.filter((x) => x !== slot), room - moves);
       if (!rest) continue;
-      const pair = makePair(s, slot, offset, alg, describe(s, slot, offset, crossWord));
+      const pair = makePair(s, slot, offset, alg, describePieces(s, slot, offset, crossWord));
       best = { total: moves + rest.total, pairs: [pair, ...rest.pairs] };
     }
     return best;

@@ -12,11 +12,12 @@ import { type Stickers, centerColor } from '../pieces';
 import type { MethodDef, SettingValues, SolvePlan, SolveStep } from '../types';
 import { CPLL, EPLL, PLL } from './algs/pll';
 import { type AlgEntry, EO, OCLL, OLL } from './algs/oll';
-import { solveCross, solveXCross } from './cross';
+import { crossDistance, solveCross, solveXCross } from './cross';
 import { SLOTS, type Slot, crossSolved, planPair, slotSolved } from './f2l';
-import { solveF2LAdvanced } from './f2lAdvanced';
+import { pairCost, solveF2LAdvanced } from './f2lAdvanced';
 import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
+import { type PairOption, crossTips, movesText, openSlots, orderTips, xcrossTips } from './tips';
 
 let tables: Record<string, LLTable> | null = null;
 function llTables() {
@@ -125,13 +126,19 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
         stage: 'cross',
         title: t('cfop.xcrossTitle', { count: done.length, cross: colorWord(cross), pairs: andList(done.map(pairName)) }),
         hint: t('cfop.xcrossHint', { count: done.length, cross: colorWord(cross), pairs: andList(done.map(pairName)) }) + regripHint,
+        tips: [...crossTips(held, 0), ...xcrossTips(held, SLOTS.filter((s) => slotSolved(after, s)), crossDistance(held), xcross.length)],
       },
       xcross,
       { kind: 'f2l', cross, pairs: done },
     );
   } else {
     push(
-      { stage: 'cross', title: t('cfop.crossTitle', { cross: colorWord(cross) }), hint: t('cfop.crossHint', { cross: colorWord(cross) }) + regripHint },
+      {
+        stage: 'cross',
+        title: t('cfop.crossTitle', { cross: colorWord(cross) }),
+        hint: t('cfop.crossHint', { cross: colorWord(cross) }) + regripHint,
+        tips: [...crossTips(held, crossMoves.length), ...(opts.cross === 'advanced' && crossMoves.length ? [t('tip.noXcross', { max: XCROSS_MAX })] : [])],
+      },
       crossMoves,
       { kind: 'cross', cross },
     );
@@ -148,7 +155,16 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     const plan = solveF2LAdvanced(st, colorWord(cross));
     const pieces: Color[][] = [];
     const sides = (c: Color[]) => colorNames(c.filter((x) => x !== cross));
+    const pseudo = plan.some((p) => p.pseudo);
+    const total = plan.reduce((a, p) => a + p.moves, 0);
     plan.forEach((p, k) => {
+      // Why this pair now: what each pair left would cost (not with pseudo-slotting, where pairs are mixed).
+      const tips = k === 0 ? [t('tip.advOrder', { total: movesText(total) })] : [];
+      if (!pseudo) {
+        const options: PairOption[] = openSlots(st).map((slot) => ({ slot, moves: slot === p.slot ? p.moves : pairCost(st, slot) ?? 0, turns: 0 }));
+        tips.push(...(options.length > 1 ? [t('tip.advPick')] : []), ...orderTips(st, options, p.slot));
+        if (options.some((o) => o.moves < p.moves)) tips.push(t('tip.advNotCheapest'));
+      }
       pieces.push(p.corner, p.edge);
       const turns = [
         k === 0 ? t('cfop.pseudoFirst', { move: p.alg[0].base === 'D' ? formatAlg([p.alg[0]]) : 'D' }) : '',
@@ -165,20 +181,26 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
             p.pseudo && turns.length
               ? t('cfop.advHintPseudo', { desc: p.description, turns: turns.join(t('cfop.turnsSep')) })
               : t('cfop.advHint', { desc: p.description }),
+          tips,
         },
         p.alg,
         { kind: 'f2l', cross, pairs: [...pairs], pieces: [...pieces] },
       );
     });
-  } else
+  } else {
+  let first = true;
   while (pairs.length < 4) {
     const done = SLOTS.filter((s) => slotSolved(st, s));
     let best: ReturnType<typeof planPair> = null;
+    const options: PairOption[] = [];
     for (const s of SLOTS.filter((s) => !done.includes(s))) {
       const p = planPair(st, s, colorWord(cross));
+      if (p) options.push({ slot: s, moves: p.moves, turns: p.cost - p.moves });
       if (p && (!best || p.cost < best.cost)) best = p;
     }
     if (!best) throw new Error('F2L: no case matched (internal error)');
+    const tips = [...(options.length > 1 ? [t('tip.f2lPick')] : []), ...orderTips(st, options, best.slot), ...(first ? [t('tip.f2lRule')] : [])];
+    first = false;
     const colors = slotColors(st, best.slot);
     pairs.push(colors);
     const fl = best.side === 'FL';
@@ -193,11 +215,13 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
         hint: best.rotation.length
           ? t(fl ? 'cfop.turnToSlotFL' : 'cfop.turnToSlot', { rotation: formatAlg(best.rotation), desc: best.description })
           : t(fl ? 'cfop.slotAtFL' : 'cfop.slotAtFR', { desc: best.description }),
+        tips,
       },
       [...best.rotation, ...best.extraction, ...best.alg],
       { kind: 'f2l', cross, pairs: [...pairs] },
     );
     if (SLOTS.filter((s) => slotSolved(st, s)).length !== pairs.length) throw new Error('F2L pair not solved (internal error)');
+  }
   }
   if (!crossSolved(st) || !SLOTS.every((s) => slotSolved(st, s))) throw new Error('F2L did not finish (internal error)');
 

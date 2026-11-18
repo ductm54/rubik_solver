@@ -1,11 +1,10 @@
 /**
- * Guided tour for first-time visitors: a dimmed overlay with holes cut around the parts of the
- * page it talks about, and a card that walks through Cube → Learn → Timer. It opens by itself
- * once (on the Cube page), and again from the "Tour" button in the header.
+ * Guided tour: a dimmed overlay with holes cut around the parts of the page it talks about, and
+ * a card that walks through Cube → Learn → Timer. It opens from the "Tour" button in the header,
+ * never by itself.
  */
 import { t } from '../src/i18n';
 
-const STORAGE_KEY = 'rubik-tour-seen';
 type Route = 'cube' | 'learn' | 'timer';
 
 interface Step {
@@ -437,25 +436,10 @@ function close() {
   root.remove();
   root = null;
   document.documentElement.classList.remove('tour-open');
-  try {
-    localStorage.setItem(STORAGE_KEY, '1');
-  } catch {
-    /* storage unavailable: the tour may show again next visit */
-  }
   opener?.focus?.({ preventScroll: true });
-}
-
-function seen(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) !== null;
-  } catch {
-    return true; // can't remember closing it: don't keep popping up
-  }
 }
 
 export function initTour() {
   const btn = document.getElementById('tour-btn');
   if (btn) btn.onclick = () => startTour();
-  // First visit to the front page (not a shared link to Learn or Timer): show it once.
-  if (!seen() && routeNow() === 'cube' && !/cube=|scan/.test(location.hash)) setTimeout(() => startTour(), 600);
 }

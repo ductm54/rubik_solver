@@ -114,7 +114,8 @@ const EXTRACT: Record<Slot, Move[][]> = {
   BR: ["R' U R", "R' U' R", "R' U2 R", "B U B'", "B U' B'", "B U2 B'"].map(parseAlg),
 };
 
-const slotOf = (facelets: number[]): Slot | null => {
+/** The slot a piece (its facelets) is in, or null when it is in the U layer. */
+export const slotOf = (facelets: number[]): Slot | null => {
   for (const s of SLOTS) if (facelets.every((i) => SLOT_PIECES[s].flat().includes(i))) return s;
   return null;
 };
