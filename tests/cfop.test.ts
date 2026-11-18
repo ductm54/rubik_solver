@@ -196,7 +196,7 @@ describe('CFOP solver', () => {
 
   it('a pair that goes in along with another one (stuck piece taken out of its slot) gets its own step', () => {
     // In one of the ways of holding these (white on the bottom, x2), taking a stuck piece out of the
-    // back-right slot (B U B') drops the back-right pair in with the front-left one. This used to throw.
+    // back-right slot used to drop the back-right pair in with the front-left one. This used to throw.
     for (const scramble of [
       "F2 R D2 L2 D B R2 D' U2 R2 D' B' L' D2 L U2 L' B D L B2 F2 U2 L' B'",
       "D2 L2 R2 F R2 L2 B' U2 D' B2 U L2 R' D L2 R F D2 F' L' U2 L B' L' D",
@@ -497,5 +497,20 @@ describe('regrips', () => {
       // More moves never take fewer regrips.
       expect(countRegrips(moves.slice(0, 6))).toBeLessThanOrEqual(plan.regrips);
     }
+  });
+
+});
+
+describe('F2L extraction', () => {
+  it('never takes a stuck piece out of a back slot with a B turn', () => {
+    // Was "y B U B' R U R'" for F2L 1; the back face is hard to see and push.
+    const scramble = "R2 D' F2 D2 U' R2 U F2 L2 U' L2 U' L' B2 U' F' D' L2 F L' U' F'";
+    const state = applyMoves(solved, scramble);
+    const plan = solveCfop(state, { crossColors: ['W'], cross: 'standard', f2l: 'standard', oll: '2look', pll: '2look' });
+    let st = state;
+    for (const step of plan.steps) st = applyMoves(st, step.alg);
+    const arr = toColorArray(st);
+    expect([0, 1, 2, 3, 4, 5].every((f) => arr.slice(f * 9, f * 9 + 9).every((c) => c === arr[f * 9 + 4]))).toBe(true);
+    for (const step of plan.steps.filter((s) => s.stage === 'f2l')) expect(parseAlg(step.alg).some((m) => m.base === 'B')).toBe(false);
   });
 });
