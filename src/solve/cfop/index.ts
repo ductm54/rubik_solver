@@ -17,6 +17,7 @@ import { SLOTS, type Slot, crossSolved, planPair, slotSolved } from './f2l';
 import { pairCost, solveF2LAdvanced } from './f2lAdvanced';
 import { BACK_TURN_COST, REGRIP_COST, type Thumb, backTurns, planGrip } from './grip';
 import { type LLTable, buildTable, matchLL } from './ll';
+import { type LLKind, llTips } from './llTips';
 import { type PairOption, crossTips, movesText, openSlots, orderTips, xcrossTips } from './tips';
 
 let tables: Record<string, LLTable> | null = null;
@@ -233,8 +234,9 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
       steps.push({ stage, title, caseName: skipText, alg: '', moves: 0, mask: stickeringMask(scheme, mask) });
       return;
     }
+    const name = m.entry ? caseName(kind, m.entry) : t('cfop.aufOnly');
     push(
-      { stage, title, caseName: m.entry ? caseName(kind, m.entry) : t('cfop.aufOnly'), hint: m.entry ? caseHint(kind, m.entry, top) : undefined },
+      { stage, title, caseName: name, hint: m.entry ? caseHint(kind, m.entry, top) : undefined, tips: m.entry ? llTips(st, kind as LLKind, top, name) : undefined },
       m.moves,
       mask,
     );

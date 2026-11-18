@@ -18,8 +18,10 @@ import { LEFT_HAND, RIGHT_HAND, backTurns, countRegrips, effort, planGrip } from
 import { crossSolved, f2lTable, slotSolved, SLOTS } from '../src/solve/cfop/f2l';
 import { F2L_CASES } from '../src/solve/cfop/algs/f2l';
 import { buildTable, matchLL, stageDone } from '../src/solve/cfop/ll';
+import { SIDE_ROWS, headlightSides } from '../src/solve/cfop/llTips';
 
 const solved = solvedState();
+const AUFS_ARR = ['', 'U', 'U2', "U'"];
 const solvedArr = toColorArray(solved);
 const eq = (a: string, b: string) => statesEqual(applyMoves(solved, a), applyMoves(solved, b));
 const f2lDone = (st: ReturnType<typeof toColorArray>) => crossSolved(st) && SLOTS.every((s) => slotSolved(st, s));
@@ -349,6 +351,55 @@ describe('CFOP solver', () => {
         for (const s of plan.steps) for (const x of s.tips ?? []) expect(x).not.toMatch(/tip\.|\{\w+\}/);
       }
     }
+  });
+
+  it('last-layer recognition: two sides tell every PLL apart, headlights give the group', () => {
+    const AUFS = ['', 'U', 'U2', "U'"];
+    const ring = 'FRBL';
+    // The front and right top rows, as colours relative to the first sticker (side colours are a ring).
+    const twoSides = (st: ReturnType<typeof toColorArray>) => {
+      const sideOf = (c: string) => ring[[22, 13, 49, 40].findIndex((i) => st[i] === c)];
+      const f = [...SIDE_ROWS.F, ...SIDE_ROWS.R].map((i) => ring.indexOf(sideOf(st[i])));
+      return f.map((x) => (x - f[0] + 4) % 4).join('');
+    };
+    const seen = new Map<string, string>();
+    const group: Record<string, number> = { H: 4, Ua: 4, Ub: 4, Z: 4, E: 0, Na: 0, Nb: 0, V: 0, Y: 0 };
+    for (const e of PLL) for (const pre of AUFS) for (const post of AUFS) {
+      const st = applyMovesToArray(solvedArr, invertAlg(parseAlg(`${pre} ${e.alg} ${post}`)));
+      const k = twoSides(st);
+      expect(seen.get(k) ?? e.id, `${e.id} looks like ${seen.get(k)}`).toBe(e.id);
+      seen.set(k, e.id);
+      expect(headlightSides(st).length).toBe(group[e.id] ?? 1);
+    }
+    expect(seen.has(twoSides(solvedArr))).toBe(false);
+  });
+
+  it('OLL and PLL steps say how to recognise the case', () => {
+    let sunes = 0;
+    for (let n = 0; n < 40; n++) {
+      const state = applyMoves(solved, randomMoves(25));
+      for (const ll of ['full', '2look'] as const) {
+        const plan = solveCfop(state, { crossColors: ['W'], oll: ll, pll: ll });
+        let st = toColorArray(state);
+        for (const s of plan.steps) {
+          if ((s.stage === 'oll' || s.stage === 'pll') && s.alg && s.caseName !== 'Only an AUF (U turn)') {
+            expect(s.tips?.length, s.title).toBeGreaterThan(0);
+            for (const x of s.tips!) expect(x).not.toMatch(/tip\.|\{\w+\}/);
+            if (s.stage === 'pll' && s.title !== 'PLL 1/2 · corners') expect(s.tips!.some((x) => x.includes(`it is the ${s.caseName}`))).toBe(true);
+            // Sune rule: the one top corner at front-left, the front-right corner shows the top colour on the front.
+            if (s.caseName === 'Sune' || s.caseName === 'Anti-Sune') {
+              const top = st[4];
+              const u = AUFS_ARR.map((a) => applyMovesToArray(st, parseAlg(a))).find((x) => x[6] === top)!;
+              expect(u[20] === top).toBe(s.caseName === 'Sune');
+              expect(u[9] === top).toBe(s.caseName === 'Anti-Sune');
+              sunes++;
+            }
+          }
+          st = applyMovesToArray(st, parseAlg(s.alg));
+        }
+      }
+    }
+    expect(sunes).toBeGreaterThan(0);
   });
 
   it('handles a solved cube', () => {
