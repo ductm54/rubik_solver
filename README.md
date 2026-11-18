@@ -29,7 +29,7 @@ Done so far:
   point, with the pieces that don't matter yet greyed out. **Solver settings**, remembered in the
   browser: cross colours (tick several and the solver picks the best for each cube), cross standard or advanced
   (XCross: the cross and at least one F2L pair together when that takes under 11 moves), F2L standard
-  (turn the cube, one case at a time at the front-right or front-left, with the usual algorithms) or advanced (no turns, no B moves, any slot, best pair order, pseudo-slotting when it is shorter), OLL 2-look
+  (turn the cube, one case at a time at the front-right or front-left, with the usual algorithms) or advanced (no turns, no B moves, any slot, best pair order, pseudo-slotting and u turns when they are shorter), OLL 2-look
   or full 57, PLL 2-look or full 21. The settings view is built from each method's own setting list,
   ready for more methods. **Step 0** says how to hold the cube during inspection: which colour on
   the bottom and which in front, chosen so the solve is short and the cross (or XCross) is easy to
@@ -90,7 +90,7 @@ any branch, use "Run workflow" on the Scanner workflow in the Actions tab.
 | `src/solve/cfop/cross.ts` | Optimal cross: 24⁴ distance table by BFS. Optimal XCross (cross + one pair): iterative deepening, cut by the cross table and a 24⁴ table per slot. Of the shortest solutions, the easiest to execute |
 | `src/solve/cfop/grip.ts` | Regrip model: each hand's thumb is in front, on top or on the bottom; a table of the turns each hand reaches from there; the fewest regrips for a move sequence, with the first grip and where to regrip. The table and the two costs are the place to adjust it to your own finger tricks |
 | `src/solve/cfop/f2l.ts` | F2L pairs: y-turn to front-right or front-left (whichever is shorter), take stuck pieces out, then the case's most-voted SpeedCubeDB algorithm with an AUF (all 150 pair placements for each side); the 41 cases are in `algs/f2l.ts` |
-| `src/solve/cfop/f2lAdvanced.ts` | Advanced F2L: per-slot trigger tables for all 576 pair places (triggers from R, L, F, U and wide/slice r, l, f, S; never B), stuck pieces handled in the same search, every pair order tried, pseudo-slotting (all four pairs made with the bottom layer turned by D, D2 or D') used when it saves moves |
+| `src/solve/cfop/f2lAdvanced.ts` | Advanced F2L: per-slot trigger tables for all 576 pair places (triggers from R, L, F, U and wide/slice r, l, f, S; never B), stuck pieces handled in the same search, every pair order tried, pseudo-slotting (all four pairs made with the bottom layer turned by D, D2 or D') used when it saves moves, and u-slotting (one corner with another slot's edge inside u … u', per pair) |
 | `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
 | `src/solve/cfop/llTips.ts` | How to recognise an OLL / PLL case fast, read from the cube before the step: OLL edge shape, corners done and top colour on the sides; PLL two-side read (front and right: bar, headlights with an opposite or neighbouring edge, block). The tests check that two sides tell all 21 PLLs apart at every angle |
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest, counting each regrip in the cross as 3 extra moves and each B turn after the first move as 5 |

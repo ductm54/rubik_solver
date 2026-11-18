@@ -1,8 +1,8 @@
 /**
  * Advanced F2L: fewer moves. No cube rotations and no B turns, a pair can go into any slot from
  * where it is, pieces stuck in another open slot are taken out as part of the same algorithm,
- * every pair order is tried, and pseudo-slotting (pairs made with the bottom layer turned) is
- * used when it is shorter.
+ * every pair order is tried, and pseudo-slotting (pairs made with the bottom layer turned) and
+ * u turns (a corner with another slot's edge, inside "u … u'") are used when they are shorter.
  *
  * For each target slot and each set of still-open slots there is a table of the shortest
  * trigger sequence for all 576 places of the pair (corner 8 × 3, edge 12 × 2). Triggers only
@@ -115,8 +115,10 @@ export interface AdvancedPair {
   /** Colours of the corner and the edge that go in together (cross colour first on the corner). */
   corner: Color[];
   edge: Color[];
-  /** True when the corner and the edge belong to different slots (pseudo-slotting). */
+  /** True when the plan turns the bottom layer (pseudo-slotting): corners go in with other slots' edges. */
   pseudo: boolean;
+  /** True when this pair goes in inside "u … u'", the corner with the edge of another slot. */
+  uTurn: boolean;
 }
 
 /**
@@ -134,17 +136,17 @@ const placed = (st: Stickers, slot: Slot, offset: number) =>
   pieceSolved(st, SLOT_PIECES[slot][1]) && locate(st, cornerHome(slot, offset)).every((l, k) => l === SLOT_PIECES[slot][0][k]);
 
 /** Where the pair's pieces are, in words. */
-export function describePieces(st: Stickers, slot: Slot, offset: number, crossWord: string): string {
+export function describePieces(st: Stickers, slot: Slot, offset: number, crossWord: string, k = 0): string {
   const cHome = cornerHome(slot, offset);
-  const where = (home: number[]) => {
+  const where = (home: number[], own: Slot) => {
     const l = locate(st, home);
     if (l.some((i) => faceOf(i) === 'U')) return t('f2l.advOnTop');
     const s = SLOTS.find((x) => l.every((i) => SLOT_PIECES[x].flat().includes(i)))!;
-    return s === slot ? t('f2l.advInItsSlot') : t('f2l.advInSlot', { slot: t(`slot.${s}`) });
+    return s === own ? t('f2l.advInItsSlot') : t('f2l.advInSlot', { slot: t(`slot.${s}`) });
   };
   const c = locate(st, cHome);
   const facing = t(faceOf(c[0]) === 'U' ? 'f2l.facingUp' : faceOf(c[0]) === 'D' ? 'f2l.facingDown' : 'f2l.facingSide');
-  return t('f2l.adv', { corner: where(cHome), cross: crossWord, facing, edge: where(SLOT_PIECES[slot][1]) });
+  return t('f2l.adv', { corner: where(cHome, slot), cross: crossWord, facing, edge: where(edgeHome(slot, k), slotOfEdge(edgeHome(slot, k))) });
 }
 
 /** Moves the pair of `slot` would take right now (no pseudo-slotting), or null if the table has no entry. */
@@ -159,14 +161,15 @@ function pairInto(st: Stickers, slot: Slot, offset: number, open: Slot[]): Move[
   return table(slot, open).get(key) ?? null;
 }
 
-const makePair = (st: Stickers, slot: Slot, offset: number, alg: Move[], description: string): AdvancedPair => ({
+const makePair = (st: Stickers, slot: Slot, offset: number, k: number, alg: Move[], description: string): AdvancedPair => ({
   slot,
   alg,
   moves: countMoves(alg),
   description,
   corner: cornerHome(slot, offset).map((i) => homeColor(st, i)),
-  edge: SLOT_PIECES[slot][1].map((i) => homeColor(st, i)),
+  edge: edgeHome(slot, k).map((i) => homeColor(st, i)),
   pseudo: offset !== 0,
+  uTurn: k !== 0,
 });
 
 interface Plan {
@@ -174,25 +177,49 @@ interface Plan {
   pairs: AdvancedPair[];
 }
 
-/** The pairs left at one bottom-layer offset, fewest total moves, trying every order. */
+/**
+ * u-slotting: turning the top two layers (u, u2 or u') moves the middle-layer edges over other
+ * corners, so a corner can go in with the edge of another slot inside "u … u'" without touching
+ * the solved slots (u only moves the U layer and the middle layer, and turns back at the end).
+ * `U_FRAMES[k]` is the turn for k quarter turns (0 = none) and the turn back.
+ */
+const U_FRAMES = ['', 'u', 'u2', "u'"].map((m) => ({ setup: toTrig(m), undo: toTrig(formatAlg(invertAlg(parseAlg(m)))) }));
+
+/** Facelets where the edge that goes in with the corner of `slot` is at home, in u-frame `k`. */
+const edgeHome = (slot: Slot, k: number) => SLOT_PIECES[slot][1].map((i) => U_FRAMES[k].undo.perm[i]);
+const slotOfEdge = (home: number[]) => SLOTS.find((x) => home.every((i) => SLOT_PIECES[x][1].includes(i)))!;
+
+/** The pairs left at one bottom-layer offset, fewest total moves, trying every order and u-frame. */
 function solveAt(st: Stickers, offset: number, crossWord: string, limit: number): Plan | null {
-  const search = (s: Stickers, open: Slot[], limit: number): Plan | null => {
-    if (!open.length) return { total: 0, pairs: [] };
+  // `corners`: slots whose corner is still to go in; `edges`: slots whose edge is still to go in.
+  const search = (s: Stickers, corners: Slot[], edges: Slot[], limit: number): Plan | null => {
+    if (!corners.length) return { total: 0, pairs: [] };
     let best: Plan | null = null;
-    for (const slot of open) {
-      const alg = pairInto(s, slot, offset, open);
-      if (!alg) continue;
-      const moves = countMoves(alg);
-      const room = best ? best.total : limit;
-      if (moves >= room) continue;
-      const rest = search(applyMovesToArray(s, alg), open.filter((x) => x !== slot), room - moves);
-      if (!rest) continue;
-      const pair = makePair(s, slot, offset, alg, describePieces(s, slot, offset, crossWord));
-      best = { total: moves + rest.total, pairs: [pair, ...rest.pairs] };
+    for (let k = 0; k < U_FRAMES.length; k++) {
+      const { setup, undo } = U_FRAMES[k];
+      // Slots whose triggers are safe in this frame: their corner and the edge over it are both open.
+      const open = corners.filter((x) => edges.includes(slotOfEdge(edgeHome(x, k))));
+      for (const slot of open) {
+        const eHome = edgeHome(slot, k);
+        const key = [...locate(s, cornerHome(slot, offset)), ...locate(s, eHome)].map((i) => setup.perm[i]).join(',');
+        const inner = table(slot, open).get(key);
+        // Already in place with u: nothing to show as a step, the plain frame handles it.
+        if (!inner || (k && !inner.length)) continue;
+        const alg = simplifyAlg([...setup.moves, ...inner, ...undo.moves]);
+        const moves = countMoves(alg);
+        const room = best ? best.total : limit;
+        if (moves >= room) continue;
+        const edge = slotOfEdge(eHome);
+        const rest = search(applyMovesToArray(s, alg), corners.filter((x) => x !== slot), edges.filter((x) => x !== edge), room - moves);
+        if (!rest) continue;
+        const pair = makePair(s, slot, offset, k, alg, describePieces(s, slot, offset, crossWord, k));
+        best = { total: moves + rest.total, pairs: [pair, ...rest.pairs] };
+      }
     }
     return best;
   };
-  return search(st, SLOTS.filter((s) => !placed(st, s, offset)), limit);
+  const open = SLOTS.filter((s) => !placed(st, s, offset));
+  return search(st, open, open, limit);
 }
 
 /**
@@ -212,7 +239,7 @@ export function solveF2LAdvanced(st: Stickers, crossWord: string): AdvancedPair[
     if (!plan) continue;
     // Pseudo pairs that are in place as soon as the bottom layer is turned come first.
     const ready = SLOTS.filter((s) => placed(turned, s, offset)).map((s) =>
-      makePair(turned, s, offset, [], t('f2l.advReady')),
+      makePair(turned, s, offset, 0, [], t('f2l.advReady')),
     );
     const pairs = [...ready, ...plan.pairs.map((p) => ({ ...p }))];
     const first = pairs[0];
