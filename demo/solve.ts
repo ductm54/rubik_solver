@@ -404,13 +404,16 @@ player.experimentalModel.currentMoveInfo.addFreshListener(({ patternIndex, moves
     if (done !== expect) return;
     expect = null;
   }
+  const was = [sel, mv];
   if (whole) {
     const i = stepAt(done);
     if (i < 0) return;
     sel = i;
     mv = Math.min(Math.max(done - offsets[i], 0), len(i));
   } else mv = Math.min(done, len(sel));
-  render();
+  // This fires on every animation frame: only redraw when the step or move changed. Redrawing
+  // each frame keeps iPhone Safari busy enough that taps on the controls get lost.
+  if (sel !== was[0] || mv !== was[1]) render();
 });
 
 // When a step finishes while playing: repeat it, or carry on with the next step that has moves.
@@ -588,15 +591,24 @@ function render() {
   $('now-tips-box').hidden = !s?.tips?.length;
   $('now-tips').replaceChildren(...(s?.tips ?? []).map((tip) => el('li', '', tip)));
   $('no-toks').hidden = !s || n > 0;
-  toksEl.replaceChildren(
-    ...tokens(s?.alg ?? '').map((tok, k) => {
-      const b = el('button', k < mv ? 'lp-tok done' : k === mv ? 'lp-tok current' : 'lp-tok', tok);
-      b.type = 'button';
-      if (k === mv) b.setAttribute('aria-current', 'true');
-      b.onclick = () => pick(sel, k);
-      return b;
-    }),
-  );
+  // Rebuild the move chips only when the step changes; otherwise just restyle them in place.
+  const toksKey = `${plan ? planScramble : ''}|${sel}|${s?.alg ?? ''}`;
+  if (toksEl.dataset.key !== toksKey) {
+    toksEl.dataset.key = toksKey;
+    toksEl.replaceChildren(
+      ...tokens(s?.alg ?? '').map((tok, k) => {
+        const b = el('button', 'lp-tok', tok);
+        b.type = 'button';
+        b.onclick = () => pick(sel, k);
+        return b;
+      }),
+    );
+  }
+  [...toksEl.children].forEach((b, k) => {
+    b.className = k < mv ? 'lp-tok done' : k === mv ? 'lp-tok current' : 'lp-tok';
+    if (k === mv) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  });
 }
 
 /** Keep the current step in view inside the (scrollable) step list, without moving the page. */

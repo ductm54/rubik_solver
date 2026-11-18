@@ -405,7 +405,7 @@ body.focus header { opacity: 0.12; }
 .lp-tok.done { border-color: transparent; background: transparent; color: var(--muted); }
 .lp-tok.current { border-color: var(--accent); background: var(--accent); color: #fff; }
 
-.lp-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 16px; }
+.lp-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 16px; touch-action: manipulation; }
 .lp-play { min-width: 112px; padding: 0 18px; }
 .lp-play .ic-pause, .lp-play.playing .ic-play { display: none; }
 .lp-play.playing .ic-pause { display: block; }
