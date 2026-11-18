@@ -304,6 +304,7 @@ const ja: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · {corner}コーナー + {edge}エッジ',
   'cfop.withXcross': 'クロスと同時に完成（XCross）',
   'cfop.afterCross': 'クロスの後すでに完成',
+  'cfop.withPair': 'ペア {n} と同時に完成',
   'cfop.pseudoFirst': '最初に下段を回す（{move}）ので、各コーナーは別のスロットのエッジと組んで入ります',
   'cfop.pseudoLast': '最後の 1 手で下段を元に戻します',
   'cfop.pseudoInto': '疑似ペアを{slot}スロットへ',

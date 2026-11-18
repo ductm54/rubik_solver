@@ -316,6 +316,7 @@ const es: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · esquina {corner} + arista {edge}',
   'cfop.withXcross': 'Resuelto junto con la cruz (XCross)',
   'cfop.afterCross': 'Ya resuelto tras la cruz',
+  'cfop.withPair': 'Entró junto con el par {n}',
   'cfop.pseudoFirst': 'primero se gira la capa inferior ({move}), así cada esquina entra con la arista de otro hueco',
   'cfop.pseudoLast': 'el último giro vuelve a alinear la capa inferior',
   'cfop.pseudoInto': 'Pseudo-par en el hueco {slot}',

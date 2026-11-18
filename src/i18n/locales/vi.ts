@@ -305,6 +305,7 @@ const vi: Translation = {
   'cfop.pseudoTitle': 'F2L {n} · góc {corner} + cạnh {edge}',
   'cfop.withXcross': 'Giải cùng với dấu cộng (XCross)',
   'cfop.afterCross': 'Đã xong sau dấu cộng',
+  'cfop.withPair': 'Đã vào ô cùng với cặp {n}',
   'cfop.pseudoFirst': 'tầng dưới được xoay trước ({move}), nên mỗi góc vào cùng cạnh của một khe khác',
   'cfop.pseudoLast': 'nước cuối căn lại tầng dưới',
   'cfop.pseudoInto': 'Cặp giả vào khe {slot}',
