@@ -5,7 +5,7 @@
  *   #cube, #cube=<54 letters>, #scan     Cube (and its scanner)
  *   #timer, #timer&scramble=<moves>      Timer
  *   #solve, #solve&scramble=<moves>      Solve (also #solve&cube=<54 letters>; old #learn&… links too)
- *   #learn                                Learn: how to solve, method by method
+ *   #learn, #learn=fewer                  Learn: how to solve, course by course
  */
 import './i18n';
 import { t } from '../src/i18n';

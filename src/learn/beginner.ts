@@ -52,11 +52,16 @@ const MIDDLE_EDGES = SIDES.map((s, i) => [s, SIDES[(i + 1) % 4]] as Color[]);
 const YELLOW_EDGES = SIDES.map((s) => ['Y', s] as Color[]);
 
 const mask = (stage: MaskStage) => stickeringMask(STANDARD_SCHEME, stage);
-const bright = (...pieces: Color[][][]) => mask({ kind: 'pieces', cross: 'W', pieces: pieces.flat() });
+const GROUPS = { cross: CROSS_EDGES, corners: WHITE_CORNERS, middle: MIDDLE_EDGES, yellow: YELLOW_EDGES };
+/** Only these groups of pieces bright, the rest dimmed. */
+export const bright = (...groups: (keyof typeof GROUPS)[]) =>
+  mask({ kind: 'pieces', cross: 'W', pieces: groups.flatMap((g) => GROUPS[g]) });
+/** Only the top colour of the top edges shown (the yellow-cross step). */
+export const eoMask = mask({ kind: 'eo', cross: 'W' });
 /** Every piece shown normally. */
 export const FULL_MASK = mask({ kind: 'pll', cross: 'W' });
 
-const times = (alg: string, n: number) => Array(n).fill(alg).join(' ');
+export const times = (alg: string, n: number) => Array(n).fill(alg).join(' ');
 
 export const SEXY = "R U R' U'";
 export const MIDDLE_RIGHT = "U R U' R' U' F' U F";
@@ -84,7 +89,7 @@ export const BEGINNER: Lesson[] = [
       { id: 'flipped', alg: "U' R' F R" },
       { id: 'middle', alg: "F'" },
     ],
-    mask: bright(CROSS_EDGES),
+    mask: bright('cross'),
   },
   {
     id: 'corners',
@@ -96,7 +101,7 @@ export const BEGINNER: Lesson[] = [
       { id: 'up', alg: times(SEXY, 3), show: `(${SEXY}) ×3` },
       { id: 'front', alg: times(SEXY, 5), show: `(${SEXY}) ×5` },
     ],
-    mask: bright(CROSS_EDGES, WHITE_CORNERS),
+    mask: bright('cross', 'corners'),
   },
   {
     id: 'middle',
@@ -107,7 +112,7 @@ export const BEGINNER: Lesson[] = [
       { id: 'right', alg: MIDDLE_RIGHT },
       { id: 'left', alg: MIDDLE_LEFT },
     ],
-    mask: bright(CROSS_EDGES, WHITE_CORNERS, MIDDLE_EDGES),
+    mask: bright('cross', 'corners', 'middle'),
   },
   {
     id: 'ycross',
@@ -119,7 +124,7 @@ export const BEGINNER: Lesson[] = [
       { id: 'l', alg: times(YELLOW_CROSS, 2), show: `(${YELLOW_CROSS}) ×2` },
       { id: 'dot', alg: `${YELLOW_CROSS} U2 ${times(YELLOW_CROSS, 2)}`, show: `${YELLOW_CROSS} · U2 · (${YELLOW_CROSS}) ×2` },
     ],
-    mask: mask({ kind: 'eo', cross: 'W' }),
+    mask: eoMask,
   },
   {
     id: 'yedges',
@@ -130,7 +135,7 @@ export const BEGINNER: Lesson[] = [
       { id: 'adjacent', alg: YELLOW_EDGES_ALG },
       { id: 'opposite', alg: `${YELLOW_EDGES_ALG} U2 ${YELLOW_EDGES_ALG} U`, show: `${YELLOW_EDGES_ALG} · U2 · ${YELLOW_EDGES_ALG} · U` },
     ],
-    mask: bright(CROSS_EDGES, WHITE_CORNERS, MIDDLE_EDGES, YELLOW_EDGES),
+    mask: bright('cross', 'corners', 'middle', 'yellow'),
   },
   {
     id: 'ycorners',
@@ -162,3 +167,11 @@ export const BEGINNER: Lesson[] = [
 
 /** The moves the notation pad offers. */
 export const NOTATION_MOVES = ['U', "U'", 'D', "D'", 'R', "R'", 'L', "L'", 'F', "F'", 'B', "B'", 'U2', 'y'];
+
+/** A course on the Learn tab: a way to solve, step by step. */
+export interface Course {
+  id: string;
+  /** Where its text lives in the translations: `<keys>.<lesson>.title` and so on. */
+  keys: string;
+  lessons: Lesson[];
+}

@@ -1,11 +1,13 @@
 /**
- * Learn view: how to solve the cube, method by method (the beginner method for now). Each step
- * has its text and a 3D viewer with example cases; viewers are made when their step first
- * scrolls near the screen, so the page opens fast.
+ * Learn view: how to solve the cube, course by course (the beginner method, then the same method
+ * with fewer moves), picked with `#learn=<course>`. Each step has its text and a 3D viewer with
+ * example cases; viewers are made when their step first scrolls near the screen, so the page
+ * opens fast.
  */
 import 'cubing/twisty';
 import { t } from '../src/i18n';
-import { BEGINNER, FULL_MASK, HOLD, type Lesson, type LessonCase, NOTATION_MOVES } from '../src/learn/beginner';
+import { type Course, FULL_MASK, HOLD, type Lesson, type LessonCase, NOTATION_MOVES } from '../src/learn/beginner';
+import { COURSES, courseOf } from '../src/learn/courses';
 
 /** The parts of cubing.js's TwistyPlayer used here. */
 type Player = HTMLElement & {
@@ -23,7 +25,10 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text 
 
 const root = document.getElementById('learn-lessons')!;
 const toc = document.getElementById('learn-toc')!;
-const players: Player[] = [];
+let players: Player[] = [];
+/** The course on the page: its text keys are `<keys>.<lesson>…`. */
+let course: Course = courseOf(location.hash);
+const key = (lesson: Lesson, rest: string) => `${course.keys}.${lesson.id}.${rest}`;
 
 /** Translate `key`, with `{alg}` shown as code. */
 function rich(key: string, alg = ''): DocumentFragment {
@@ -75,14 +80,14 @@ function caseDemo(lesson: Lesson): HTMLElement {
     current = i;
     const c = lesson.cases[i];
     buttons.forEach((b, k) => b.setAttribute('aria-pressed', String(k === i)));
-    desc.textContent = t(`learn.${lesson.id}.${c.id}.desc`);
+    desc.textContent = t(key(lesson, `${c.id}.desc`));
     code.textContent = c.show ?? c.alg;
     if (!player) return;
     loadCase(player, lesson, c);
     if (play) setTimeout(() => player?.play(), 150);
   };
   lesson.cases.forEach((c, i) => {
-    const b = el('button', 'learn-case', t(`learn.${lesson.id}.${c.id}`));
+    const b = el('button', 'learn-case', t(key(lesson, c.id)));
     b.type = 'button';
     b.onclick = () => pick(i, true);
     buttons.push(b);
@@ -176,20 +181,20 @@ function lazily(target: Element, make: () => void) {
 
 function lesson(l: Lesson, n: number): HTMLElement {
   const sec = el('section', 'card learn-lesson');
-  sec.id = `learn-step-${l.id}`;
+  sec.id = `learn-step-${course.id}-${l.id}`;
   const textAlg = l.textAlg ?? Object.values(l.algs ?? {})[0] ?? '';
 
   const head = el('header', 'learn-head');
-  head.append(el('span', `stage-tag stage-${l.stage}`, t('learn.stepN', { n })), el('h2', '', t(`learn.${l.id}.title`)));
+  head.append(el('span', `stage-tag stage-${l.stage}`, t('learn.stepN', { n })), el('h2', '', t(key(l, 'title'))));
 
   const text = el('div', 'learn-text');
   const goal = el('p', 'learn-goal');
-  goal.append(el('strong', '', `${t('learn.goal')}: `), t(`learn.${l.id}.goal`));
+  goal.append(el('strong', '', `${t('learn.goal')}: `), t(key(l, 'goal')));
   text.append(goal, el('h3', '', t('learn.how')));
   const how = el('ol', 'learn-how');
   for (let i = 1; i <= l.how; i++) {
     const li = el('li');
-    li.append(rich(`learn.${l.id}.how${i}`, textAlg));
+    li.append(rich(key(l, `how${i}`), textAlg));
     how.append(li);
   }
   text.append(how);
@@ -201,56 +206,78 @@ function lesson(l: Lesson, n: number): HTMLElement {
       const row = el('div', 'learn-alg');
       const dd = el('dd');
       dd.append(el('code', '', alg));
-      row.append(el('dt', '', t(`learn.${l.id}.alg.${k}`)), dd);
+      row.append(el('dt', '', t(key(l, `alg.${k}`))), dd);
       list.append(row);
     }
     text.append(list);
   }
 
   const tip = el('p', 'learn-tip');
-  tip.append(el('strong', '', `${t('learn.tip')}: `), rich(`learn.${l.id}.tip`, textAlg));
+  tip.append(el('strong', '', `${t('learn.tip')}: `), rich(key(l, 'tip'), textAlg));
   text.append(tip);
 
   const body = el('div', 'learn-body');
-  body.append(text, l.id === 'notation' ? notationDemo() : caseDemo(l));
+  body.append(text);
+  if (l.id === 'notation') body.append(notationDemo());
+  else if (l.cases.length) body.append(caseDemo(l));
+  else body.classList.add('learn-body-text');
   sec.append(head, body);
   return sec;
 }
 
 function render() {
+  root.replaceChildren();
+  toc.replaceChildren();
+  for (const p of players) p.pause();
+  players = [];
+  for (const target of pending.keys()) io?.unobserve(target);
+  pending.clear();
+
   const methods = el('div', 'learn-methods');
+  methods.setAttribute('role', 'group');
   methods.append(el('span', 'lp-label', t('learn.methods')));
-  const chip = el('span', 'learn-method', t('learn.beginner'));
-  chip.setAttribute('aria-current', 'true');
-  methods.append(chip, el('span', 'muted learn-more', t('solve.moreComing')));
+  for (const c of COURSES) {
+    const chip = el('a', 'learn-method', t(`learn.${c.id}`));
+    chip.href = c === COURSES[0] ? '#learn' : `#learn=${c.id}`;
+    if (c === course) chip.setAttribute('aria-current', 'true');
+    methods.append(chip);
+  }
+  methods.append(el('span', 'muted learn-more', t('solve.moreComing')));
 
   const list = el('ol', 'learn-toc-list');
-  BEGINNER.forEach((l, i) => {
+  course.lessons.forEach((l, i) => {
     const li = el('li');
     const b = el('button', `learn-toc-item stage-${l.stage}`);
     b.type = 'button';
-    b.append(el('span', 'learn-toc-n', String(i)), el('span', '', t(`learn.${l.id}.title`)));
-    b.onclick = () => document.getElementById(`learn-step-${l.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    b.append(el('span', 'learn-toc-n', String(i)), el('span', '', t(key(l, 'title'))));
+    b.onclick = () => document.getElementById(`learn-step-${course.id}-${l.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     li.append(b);
     list.append(li);
   });
   toc.append(methods, el('h2', '', t('learn.contents')), list);
 
   const intro = el('section', 'card learn-lesson learn-intro-card');
-  intro.append(el('h2', '', t('learn.beginner')), el('p', '', t('learn.beginner.intro')));
+  intro.append(el('h2', '', t(`learn.${course.id}`)), el('p', '', t(`learn.${course.id}.intro`)));
   root.append(intro);
-  BEGINNER.forEach((l, i) => root.append(lesson(l, i)));
+  course.lessons.forEach((l, i) => root.append(lesson(l, i)));
 
   const done = el('section', 'card learn-lesson learn-done');
-  const cta = el('a', 'primary button-like', t('learn.done.cta'));
+  const cta = el('a', 'primary button-like', t(`${course.keys}.done.cta`));
   cta.href = '#solve';
-  done.append(el('h2', '', t('learn.done.title')), el('p', '', t('learn.done.body')), cta);
+  done.append(el('h2', '', t(`${course.keys}.done.title`)), el('p', '', t(`${course.keys}.done.body`)), cta);
   root.append(done);
 }
 
 render();
 
-export function show() {}
+/** The tab was opened again, or its hash changed: show the course it asks for. */
+export function show() {
+  const next = courseOf(location.hash);
+  if (next === course) return;
+  course = next;
+  render();
+  window.scrollTo(0, 0);
+}
 
 /** Another tab was opened: stop the viewers. */
 export function hide() {
