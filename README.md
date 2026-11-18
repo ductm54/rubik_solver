@@ -20,7 +20,12 @@ Done so far:
 - **Phase 4**: solve helper for learning CFOP ([demo](https://solve-rubik.pages.dev/#learn)).
   Enter, scan or scramble a cube and see the solve as steps: an optimal cross, 4 F2L pairs (each
   with its case described, its SpeedCubeDB case number and the most-voted algorithm for it), then OLL and PLL with the
-  case name and a recognition hint. Each step plays in the 3D viewer from the cube as it is at that
+  case name and a recognition hint. Under each OLL and PLL step, **how to recognise it fast**, read from
+  that cube: for OLL the edge shape, how many corners are done and where the top colour shows on the
+  sides, in the order to read them; for PLL the **two-side read** (only the front and right sides:
+  bars, headlights and whether the edge between them is the opposite or a neighbouring colour,
+  blocks), which tells every PLL apart from any angle, plus the headlight rule for the group and tips to
+  learn each case from all four angles. Each step plays in the 3D viewer from the cube as it is at that
   point, with the pieces that don't matter yet greyed out. **Solver settings**, remembered in the
   browser: cross colours (tick several and the solver picks the best for each cube), cross standard or advanced
   (XCross: the cross and at least one F2L pair together when that takes under 11 moves), F2L standard
@@ -87,6 +92,7 @@ any branch, use "Run workflow" on the Scanner workflow in the Actions tab.
 | `src/solve/cfop/f2l.ts` | F2L pairs: y-turn to front-right or front-left (whichever is shorter), take stuck pieces out, then the case's most-voted SpeedCubeDB algorithm with an AUF (all 150 pair placements for each side); the 41 cases are in `algs/f2l.ts` |
 | `src/solve/cfop/f2lAdvanced.ts` | Advanced F2L: per-slot trigger tables for all 576 pair places (triggers from R, L, F, U and wide/slice r, l, f, S; never B), stuck pieces handled in the same search, every pair order tried, pseudo-slotting (all four pairs made with the bottom layer turned by D, D2 or D') used when it saves moves |
 | `src/solve/cfop/ll.ts`, `algs/` | OLL (57, or 3 + 7 for 2-look) and PLL (21, or 2 + 4); cases recognised by running each algorithm backwards, with pre / post AUF |
+| `src/solve/cfop/llTips.ts` | How to recognise an OLL / PLL case fast, read from the cube before the step: OLL edge shape, corners done and top colour on the sides; PLL two-side read (front and right: bar, headlights with an opposite or neighbouring edge, block). The tests check that two sides tell all 21 PLLs apart at every angle |
 | `src/solve/cfop/index.ts` | CFOP: tries every allowed cross colour in all 4 holds, keeps the shortest, counting each regrip in the cross as 3 extra moves and each B turn after the first move as 5 |
 | `src/solve/beginner/index.ts` | Beginner method: each step played on the cube to choose the case, cube turn and number of repeats; never a B turn: the cube is turned instead. The cross edge by edge: the slot turned to the front, then a distance table for each set of cross edges with U, R, F, D, L only (`solveCrossEdge` in `cfop/cross.ts`) |
 | `src/i18n/` | `t(key, params)` with plural forms; `locales/en.ts` holds every key, the other languages load on demand (one chunk each). Solver texts are made in the page's language: the worker gets it with each request |
