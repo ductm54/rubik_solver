@@ -210,12 +210,16 @@ export interface SpeedGroup {
 export const CROSS_SLIDE = "U' R U";
 /** White on top of the corner: the first U of the 4-moves made U2, then one more 4-moves. */
 export const CORNER_UP_FAST = `R U2 R' U' ${SEXY}`;
+/** The left-hand mirror, for a corner at the front-left. */
+export const CORNER_UP_FAST_LEFT = `L' U2 L U ${LEFT_SEXY}`;
 /** White facing right, with the front-right middle edge already solved. */
 export const KEEP_EDGE_RIGHT = "U' R U2 R' U R U R'";
 /** The left-hand mirror: white facing left, with the front-left middle edge already solved. */
 export const KEEP_EDGE_LEFT = "U L' U2 L U' L' U' L";
 /** Swaps the two middle edges on the right side. */
 export const SWAP_RIGHT_EDGES = 'R2 U2 R2 U2 R2';
+/** Flips the front-right middle edge in its slot: R U2 R', U R U2 R', then U F' U' F puts the corner back with the left hand. */
+export const FLIP_MIDDLE = "R U2 R' U R U2 R' U F' U' F";
 /** The yellow cross in one go from an L at the front and right: a double-layer front turn. */
 export const YELLOW_CROSS_WIDE = "f R U R' U' f'";
 /** The corner cycle the other way round, starting with the left hand. */
@@ -260,9 +264,12 @@ export const SPEEDUPS: SpeedGroup[] = [
     stage: 'middle',
     tips: [
       { id: 'swap', alg: SWAP_RIGHT_EDGES },
-      { id: 'flipped', alg: "R U2 R'" },
+      { id: 'flipped', alg: FLIP_MIDDLE },
     ],
-    cases: [{ id: 'swap', alg: SWAP_RIGHT_EDGES }],
+    cases: [
+      { id: 'swap', alg: SWAP_RIGHT_EDGES },
+      { id: 'flipped', alg: FLIP_MIDDLE, show: "R U2 R' · U R U2 R' · U F' U' F" },
+    ],
     mask: bright(CROSS_EDGES, WHITE_CORNERS, MIDDLE_EDGES),
   },
   {

@@ -43,6 +43,8 @@ export interface SettingDef {
   help?: string;
   /** 'choice' = pick one, 'multi' = pick one or more. */
   kind: 'choice' | 'multi';
+  /** 'multi' only: nothing picked is allowed. */
+  allowEmpty?: boolean;
   options: SettingOption[];
 }
 
