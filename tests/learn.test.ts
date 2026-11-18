@@ -1,7 +1,7 @@
 /** The Learn tab's beginner course: every demo starts the way its text describes. */
 import { describe, expect, test } from 'vitest';
 import { applyMovesToArray, invertAlg, parseAlg, solvedState, toColorArray } from '../src/core/cube';
-import { BEGINNER, HOLD, type Lesson, NOTATION_MOVES } from '../src/learn/beginner';
+import { BEGINNER, HOLD, holdOf, type Lesson, NOTATION_MOVES } from '../src/learn/beginner';
 import { type Stickers, centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 
 const SOLVED = toColorArray(solvedState());
@@ -9,8 +9,10 @@ const held = applyMovesToArray(SOLVED, HOLD);
 
 /** The state a case's demo starts from, as the viewer computes it (setup anchored at the end). */
 function start(lesson: string, id: string): Stickers {
-  const c = BEGINNER.find((l) => l.id === lesson)!.cases.find((k) => k.id === id)!;
-  return applyMovesToArray(applyMovesToArray(held, c.end ?? ''), invertAlg(parseAlg(c.alg)));
+  const l = BEGINNER.find((k) => k.id === lesson)!;
+  const c = l.cases.find((k) => k.id === id)!;
+  const hold = applyMovesToArray(SOLVED, holdOf(l));
+  return applyMovesToArray(applyMovesToArray(hold, c.end ?? ''), invertAlg(parseAlg(c.alg)));
 }
 
 const at = (st: Stickers, name: string, face: string) => st[cubie(name)[name.indexOf(face)]];
@@ -29,6 +31,15 @@ test('held with white on the bottom and yellow on top', () => {
   expect(centerColor(held, 'D')).toBe('W');
 });
 
+test('the cross is built with white on top, and the last step turns the cube over', () => {
+  for (const id of ['cross', 'twist']) {
+    const h = applyMovesToArray(SOLVED, holdOf(BEGINNER.find((l) => l.id === id)!));
+    expect(centerColor(h, 'U')).toBe('W');
+    expect(centerColor(h, 'D')).toBe('Y');
+  }
+  for (const l of BEGINNER.filter((k) => !['cross', 'twist'].includes(k.id))) expect(holdOf(l)).toBe(HOLD);
+});
+
 test('every lesson has a known stage, and every algorithm parses', () => {
   for (const l of BEGINNER as Lesson[]) {
     expect(['inspection', 'cross', 'corners', 'middle', 'top']).toContain(l.stage);
@@ -38,23 +49,25 @@ test('every lesson has a known stage, and every algorithm parses', () => {
   for (const m of NOTATION_MOVES) expect(parseAlg(m)).toHaveLength(1);
 });
 
-describe('cross', () => {
-  test('white on top, above its center', () => {
-    const s = start('cross', 'top');
-    expect(at(s, 'UF', 'U')).toBe('W');
-    expect(at(s, 'UF', 'F')).toBe(centerColor(s, 'F'));
-    expect(solved(s, 'DR', 'DB', 'DL')).toBe(true);
+describe('cross (white on top)', () => {
+  const TOP_CROSS = ['UR', 'UB', 'UL'];
+  test('in the bottom layer, white facing down, one turn of D away from its center', () => {
+    const s = start('cross', 'bottom');
+    expect(at(s, 'DR', 'D')).toBe('W');
+    expect(at(s, 'DR', 'R')).toBe(centerColor(s, 'F'));
+    expect(solved(s, ...TOP_CROSS)).toBe(true);
   });
-  test('white facing the front', () => {
+  test('on top but flipped: white facing the front', () => {
     const s = start('cross', 'flipped');
     expect(at(s, 'UF', 'F')).toBe('W');
-    expect(solved(s, 'DR', 'DB', 'DL')).toBe(true);
+    expect(at(s, 'UF', 'U')).toBe(centerColor(s, 'F'));
+    expect(solved(s, ...TOP_CROSS)).toBe(true);
   });
-  test('in the middle layer, white facing left', () => {
+  test('in the middle layer at the front-right, white facing the front', () => {
     const s = start('cross', 'middle');
-    expect(at(s, 'FL', 'L')).toBe('W');
-    expect(at(s, 'FL', 'F')).toBe(centerColor(s, 'F'));
-    expect(solved(s, 'DR', 'DB', 'DL')).toBe(true);
+    expect(at(s, 'FR', 'F')).toBe('W');
+    expect(at(s, 'FR', 'R')).toBe(centerColor(s, 'F'));
+    expect(solved(s, ...TOP_CROSS)).toBe(true);
   });
 });
 
@@ -66,6 +79,11 @@ describe('white corners', () => {
       expect(solved(s, ...CROSS, 'DRB', 'DBL', 'DLF')).toBe(true);
     });
   }
+  test('left 4-moves: front-left, white facing left', () => {
+    const s = start('corners', 'left');
+    expect(at(s, 'UFL', 'L')).toBe('W');
+    expect(solved(s, ...CROSS, 'DFR', 'DRB', 'DBL')).toBe(true);
+  });
 });
 
 describe('middle layer', () => {
@@ -118,9 +136,11 @@ describe('yellow corners in place', () => {
   });
 });
 
-test('twisted corners: front-right and back-right, all pieces in place', () => {
+test('cube turned over, twisted corners at the bottom front-right and front-left, all in place', () => {
   const s = start('twist', 'two');
-  expect(['UFR', 'URB', 'UBL', 'ULF'].filter((c) => !yellowUp(s, c))).toEqual(['UFR', 'URB']);
-  expect(['UFR', 'URB', 'UBL', 'ULF'].every((c) => inPlace(s, c))).toBe(true);
-  expect(solved(s, ...F2L, 'UF', 'UR', 'UB', 'UL', 'UBL', 'ULF')).toBe(true);
+  const yellowDown = (name: string) => at(s, name, 'D') === 'Y';
+  const corners = ['DFR', 'DRB', 'DBL', 'DLF'];
+  expect(corners.filter((c) => !yellowDown(c))).toEqual(['DFR', 'DLF']);
+  expect(corners.every((c) => inPlace(s, c))).toBe(true);
+  expect(solved(s, 'UF', 'UR', 'UB', 'UL', 'UFR', 'URB', 'UBL', 'ULF', 'FR', 'FL', 'BR', 'BL', 'DF', 'DR', 'DB', 'DL', 'DRB', 'DBL')).toBe(true);
 });

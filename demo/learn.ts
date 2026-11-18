@@ -5,7 +5,7 @@
  */
 import 'cubing/twisty';
 import { t } from '../src/i18n';
-import { BEGINNER, FULL_MASK, HOLD, type Lesson, type LessonCase, NOTATION_MOVES } from '../src/learn/beginner';
+import { BEGINNER, FULL_MASK, HOLD, holdOf, type Lesson, type LessonCase, NOTATION_MOVES } from '../src/learn/beginner';
 
 /** The parts of cubing.js's TwistyPlayer used here. */
 type Player = HTMLElement & {
@@ -49,7 +49,7 @@ function makePlayer(): Player {
 function loadCase(p: Player, lesson: Lesson, c: LessonCase) {
   p.pause();
   p.experimentalSetupAnchor = 'end';
-  p.experimentalSetupAlg = [HOLD, c.end ?? ''].join(' ').trim();
+  p.experimentalSetupAlg = [holdOf(lesson), c.end ?? ''].join(' ').trim();
   p.alg = c.alg;
   p.experimentalStickeringMaskOrbits = lesson.mask;
   p.timestamp = 'start';
