@@ -46,11 +46,6 @@ Done so far:
   R U R' U'), middle edges (right / left algorithm), yellow cross (F R U R' U' F': dot → L → line),
   yellow edges (R U R' U R U2 R' U), corners in place (U R U' L' U R' U' L) and corner twists
   (R' D' R D at the front-right). Each step says which case it is and how many repeats it takes.
-- **Beginner guide** (`src/solve/beginner/guide.ts`): the same method with exactly the Learn tab's moves
-  (cross built on top with D / F2 / F U' R U / R' D' R, left and right 4-moves, the last corners twisted
-  with R U R' U' after turning the cube over). Its **Faster tricks** setting switches on the Learn tab's
-  "Go faster" shortcuts per layer: cross, first-layer corners, middle layer, last layer. Each step is
-  picked by trying the allowed moves on the cube and keeping the shortest that works.
 - **Languages**: English, Español, Français, Deutsch, Português, Русский, 中文（简体）, 日本語 and
   Tiếng Việt, picked from the nav (or `?lang=fr`), remembered in the browser, and matched to the browser's
   language on a first visit. Everything is translated: pages, scanner messages, cube errors, timer, and

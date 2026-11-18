@@ -46,7 +46,7 @@ const whereIs = (st: Stickers, name: string) => positionName(locate(st, cubie(na
 const solvedAt = (st: Stickers, name: string) => pieceSolved(st, cubie(name));
 const uSticker = (st: Stickers, name: string) => st[cubie(name)[0]];
 
-export class Builder {
+class Builder {
   steps: SolveStep[] = [];
   constructor(
     public st: Stickers,

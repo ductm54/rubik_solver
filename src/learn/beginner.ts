@@ -210,8 +210,6 @@ export interface SpeedGroup {
 export const CROSS_SLIDE = "U' R U";
 /** White on top of the corner: the first U of the 4-moves made U2, then one more 4-moves. */
 export const CORNER_UP_FAST = `R U2 R' U' ${SEXY}`;
-/** The left-hand mirror, for a corner at the front-left. */
-export const CORNER_UP_FAST_LEFT = `L' U2 L U ${LEFT_SEXY}`;
 /** White facing right, with the front-right middle edge already solved. */
 export const KEEP_EDGE_RIGHT = "U' R U2 R' U R U R'";
 /** The left-hand mirror: white facing left, with the front-left middle edge already solved. */
