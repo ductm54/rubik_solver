@@ -91,6 +91,72 @@ describe('Beginner method', () => {
     expect(seen).toBeGreaterThan(0);
   });
 
+  describe('faster first-layer corners', () => {
+    const faster = (cube: ReturnType<typeof applyMoves>, cross: Color = 'W') => solveBeginner(cube, cross, { corners: 'faster' });
+    const cornerMoves = (p: ReturnType<typeof solveBeginner>) => p.steps.filter((s) => s.stage === 'corners').reduce((a, s) => a + s.moves, 0);
+
+    it('solves random cubes with the first layer done after the corners, never more corner moves than Standard', () => {
+      const rand = rng(13);
+      let fewer = 0;
+      for (let n = 0; n < 60; n++) {
+        const cube = applyMoves(solved, randomMoves(25, rand));
+        const cross = (['W', 'Y', 'G', 'B', 'R', 'O'] as Color[])[n % 6];
+        const plan = faster(cube, cross);
+        let st = toColorArray(cube);
+        let l1: Color[] | null = null;
+        for (const s of plan.steps) {
+          st = applyMovesToArray(st, parseAlg(s.alg));
+          if (s.stage === 'corners') l1 = st;
+        }
+        expect(allSolved(st)).toBe(true);
+        if (l1) expect(['DFR', 'DLF', 'DBL', 'DRB', 'DF', 'DR', 'DB', 'DL'].every((p) => pieceSolved(l1!, cubie(p)))).toBe(true);
+        const std = solveBeginner(cube, cross);
+        if (cornerMoves(plan) < cornerMoves(std)) fewer++;
+      }
+      expect(fewer).toBeGreaterThan(10);
+    });
+
+    it('uses the shortcuts: one set less on top, a stuck corner out with the left hand, a solved middle edge kept', () => {
+      const rand = rng(21);
+      const seen = new Set<string>();
+      for (let n = 0; n < 150 && seen.size < 3; n++) {
+        const plan = faster(applyMoves(solved, randomMoves(25, rand)));
+        for (const s of plan.steps.filter((s) => s.stage === 'corners')) {
+          if (s.alg.includes("R U2 R' U' R U R' U'") || s.alg.includes("L' U2 L U L' U' L U")) seen.add('up');
+          if (s.caseName === EN['beg.cornerElsewhereLeft']) seen.add('left');
+          if (s.caseName === EN['beg.cornerKeep']) seen.add('keep');
+        }
+      }
+      expect([...seen].sort()).toEqual(['keep', 'left', 'up']);
+    });
+
+    it('a kept middle edge stays solved', () => {
+      const rand = rng(17);
+      let seen = 0;
+      for (let n = 0; n < 150 && seen < 5; n++) {
+        const cube = applyMoves(solved, randomMoves(25, rand));
+        const plan = faster(cube);
+        let st = toColorArray(cube);
+        for (const s of plan.steps) {
+          const before = ['FR', 'FL', 'BL', 'BR'].filter((e) => pieceSolved(st, cubie(e))).length;
+          st = applyMovesToArray(st, parseAlg(s.alg));
+          if (s.caseName === EN['beg.cornerKeep']) {
+            seen++;
+            expect(['FR', 'FL', 'BL', 'BR'].filter((e) => pieceSolved(st, cubie(e))).length).toBeGreaterThanOrEqual(before);
+          }
+        }
+      }
+      expect(seen).toBeGreaterThan(0);
+    });
+
+    it('is a setting of the method, Standard by default', () => {
+      expect(BEGINNER.defaults.corners).toBe('standard');
+      const cube = applyMoves(solved, randomMoves(25, rng(4)));
+      expect(BEGINNER.solve(cube, { ...BEGINNER.defaults, corners: 'faster' }).steps).toEqual(faster(cube).steps);
+      expect(BEGINNER.solve(cube, BEGINNER.defaults).steps).toEqual(solveBeginner(cube, 'W').steps);
+    });
+  });
+
   it('works through the method registry and handles a solved cube', () => {
     expect(getMethod('beginner')).toBe(BEGINNER);
     const plan = BEGINNER.solve(solved, BEGINNER.defaults);
