@@ -54,13 +54,22 @@ interface Attempt {
   color: Color;
   /** How awkward the cross (or XCross) is with the cube held this way, in extra moves: regrips and B turns. */
   effort: number;
+  /** Moves of the cross (or XCross) and F2L together. */
+  f2lMoves: number;
+  /** The cross step was an XCross. */
+  xcross: boolean;
 }
 
 const thumb = (th: Thumb) => t(`thumb.${th}`);
 const hand = (h: 'left' | 'right') => t(`hand.${h}`);
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
 
-function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Color): Attempt {
+/**
+ * With `skipX`, the advanced cross does the normal cross: used when the XCross plus the pairs
+ * left takes more moves than the cross plus all four pairs. `skipX.x` and `skipX.f2l` are the
+ * XCross length and its cross + F2L total, for the tip that says why.
+ */
+function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Color, skipX?: { x: number; f2l: number }): Attempt {
   const steps: SolveStep[] = [];
   const holdMoves = parseAlg(hold);
   let st = start;
@@ -74,7 +83,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
   };
 
   // Cross, or with the advanced cross an XCross (cross + at least one pair) when it is short enough.
-  const xcross = opts.cross === 'advanced' ? solveXCross(held, XCROSS_MAX) : null;
+  const xcross = opts.cross === 'advanced' && !skipX ? solveXCross(held, XCROSS_MAX) : null;
   const crossMoves = xcross ?? solveCross(held);
   const back = backTurns(crossMoves);
   const grip = planGrip(crossMoves);
@@ -138,7 +147,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
         stage: 'cross',
         title: t('cfop.crossTitle', { cross: colorWord(cross) }),
         hint: t('cfop.crossHint', { cross: colorWord(cross) }) + regripHint,
-        tips: [...crossTips(held, crossMoves.length), ...(opts.cross === 'advanced' && crossMoves.length ? [t('tip.noXcross', { max: XCROSS_MAX })] : [])],
+        tips: [...crossTips(held, crossMoves.length), ...(opts.cross === 'advanced' && crossMoves.length && !skipX ? [t('tip.noXcross', { max: XCROSS_MAX })] : [])],
       },
       crossMoves,
       { kind: 'cross', cross },
@@ -160,7 +169,7 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     const total = plan.reduce((a, p) => a + p.moves, 0);
     plan.forEach((p, k) => {
       // Why this pair now: what each pair left would cost (not with pseudo-slotting, where pairs are mixed).
-      const tips = k === 0 ? [t('tip.advOrder', { total: movesText(total) })] : [];
+      const tips = k === 0 ? [t('tip.advOrder', { total: movesText(total) })] : p.pseudo ? [t('tip.advPseudoNext')] : [];
       if (!pseudo) {
         const options: PairOption[] = openSlots(st).map((slot) => ({ slot, moves: slot === p.slot ? p.moves : pairCost(st, slot) ?? 0, turns: 0 }));
         tips.push(...(options.length > 1 ? [t('tip.advPick')] : []), ...orderTips(st, options, p.slot));
@@ -252,7 +261,26 @@ function solveFrom(start: Stickers, hold: string, opts: CfopOptions, cross: Colo
     llStep('pll', t('cfop.pllCorners'), tb.cpll, { kind: 'cpll', cross }, t('cfop.cpllSkip'), 'cpll');
     llStep('pll', t('cfop.pllEdges'), tb.epll, { kind: 'pll', cross }, t('cfop.epllSkip'), 'epll');
   }
-  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back };
+  const f2lMoves = steps.filter((s) => s.stage === 'cross' || s.stage === 'f2l').reduce((a, s) => a + s.moves, 0);
+  if (skipX) {
+    const crossStep = steps.find((s) => s.stage === 'cross')!;
+    // Fewer moves, or (same or more moves) an XCross with more regrips and B turns.
+    const key = f2lMoves < skipX.f2l ? 'tip.xSkipped' : 'tip.xSkippedGrip';
+    crossStep.tips = [...(crossStep.tips ?? []), t(key, { x: skipX.x, xTotal: skipX.f2l, total: f2lMoves })];
+  }
+  return { steps, moves: steps.reduce((a, s) => a + s.moves, 0), color: cross, effort: REGRIP_COST * grip.regrips + BACK_TURN_COST * back, f2lMoves, xcross: !!xcross };
+}
+
+/**
+ * The advanced cross: the XCross, unless the normal cross and F2L is faster. An easy cross (one or
+ * two moves) often leaves pairs that F2L solves in fewer moves than forcing one into the XCross.
+ */
+function solveWithBestCross(start: Stickers, hold: string, opts: CfopOptions, cross: Color): Attempt {
+  const a = solveFrom(start, hold, opts, cross);
+  if (!a.xcross) return a;
+  const xLen = a.steps.find((s) => s.stage === 'cross')!.moves;
+  const b = solveFrom(start, hold, opts, cross, { x: xLen, f2l: a.f2lMoves });
+  return b.f2lMoves + b.effort < a.f2lMoves + a.effort ? b : a;
 }
 
 /** Colours of a slot: [cross colour, front-ish side, right-ish side]. */
@@ -295,7 +323,7 @@ export function solveCfop(state: CubeState, opts: CfopOptions): SolvePlan {
     const st = applyMovesToArray(start, hold);
     const cross = centerColor(st, 'D');
     if (!opts.crossColors.includes(cross)) continue;
-    const a = solveFrom(start, hold, opts, cross);
+    const a = solveWithBestCross(start, hold, opts, cross);
     if (!best || cost(a) < cost(best) || (cost(a) === cost(best) && a.effort < best.effort)) best = a;
   }
   if (!best) throw new Error(t('cfop.pickColour'));
@@ -328,7 +356,7 @@ export const CFOP: MethodDef = {
     {
       key: 'cross',
       label: 'Cross',
-      help: 'Standard: the shortest cross. Advanced: an XCross, the cross and at least one F2L pair solved together, whenever that takes under 11 moves (otherwise the normal cross).',
+      help: 'Standard: the shortest cross. Advanced: an XCross, the cross and at least one F2L pair solved together, whenever that takes under 11 moves and is faster than the normal cross and F2L (otherwise the normal cross).',
       kind: 'choice',
       options: [
         { value: 'standard', label: 'Standard' },

@@ -331,6 +331,30 @@ describe('CFOP solver', () => {
     expect(adv).toBeLessThan(std);
   });
 
+  it('advanced cross skips the XCross when the normal cross and F2L are faster', () => {
+    let skipped = 0;
+    for (let n = 0; n < 40; n++) {
+      // Short scrambles: the cross is often 1-2 moves, where an XCross can cost more than it saves.
+      const state = applyMoves(solved, randomMoves(n < 20 ? 6 : 25));
+      for (const f2l of ['standard', 'advanced'] as const) {
+        const plan = solveCfop(state, { crossColors: ['W'], cross: 'advanced', f2l, oll: 'full', pll: 'full' });
+        const cross = plan.steps.find((s) => s.stage === 'cross')!;
+        const tip = cross.tips?.find((x) => x.startsWith('An XCross was possible'));
+        if (!tip) continue;
+        skipped++;
+        expect(cross.title.startsWith('XCross')).toBe(false);
+        expect(cross.tips!.some((x) => x.startsWith('No XCross within'))).toBe(false);
+        const [, x, xTotal, total] = tip.match(/in (\d+) moves\D*(\d+) moves.* take (\d+)/)!.map(Number);
+        const f2lMoves = plan.steps.filter((s) => s.stage === 'cross' || s.stage === 'f2l').reduce((a, s) => a + s.moves, 0);
+        expect(total).toBe(f2lMoves);
+        expect(x).toBeLessThan(11);
+        // Fewer moves, or else the XCross was skipped for its regrips and B turns, and the tip says which.
+        expect(tip.includes('regrips')).toBe(total >= xTotal);
+      }
+    }
+    expect(skipped).toBeGreaterThan(0);
+  });
+
   it('cross, XCross and F2L steps say how to read the cube and why the pair is taken now', () => {
     for (let n = 0; n < 60; n++) {
       const state = applyMoves(solved, randomMoves(25));
