@@ -83,6 +83,7 @@ export const SLOW_MOVE_COST = 3.4; // anything unlisted
 - **(c) Keep a simple per-move table, updated as above. Recommended now.** It is cheap, transparent and easy to edit, and it captures the effects that matter most: U2, the double turns and D. The experiment below shows it changes 60% of plans for a gain of about 2% in time.
 - **(a) Transition penalties.** Add about +0.5 R for R↔F, F↔R, R↔D and f↔R adjacent pairs, as a 2-move lookup in `turnCost`. With about 2 such transitions per solve, the most this can gain is about 1 R per solve, roughly 4% of F2L time. I estimate it would change plans in about 20–30% of solves. It is worth doing only if it stays as simple as a small `PAIR_PENALTY` map. This is a medium priority.
 - **(b) Extend grip.ts to wide and slice moves.** r and l move the thumb the same way R and L do, so adding them to `WRIST` is a 2-line change. u, f and S would need entries in the reach table. This **matters more than (a)** for correctness, because without it `countRegrips` ignores r and l, which leaves the grip state wrong after an r move (an r moves the thumb exactly like an R). I estimate it would affect plans with wide turns, about 1.8–2.3 wide turns per solve. Low cost, so it is worth doing.
+  - **Done in b7d38ee:** r/l are wrist turns, u/u2/f'/f/f2 have reach entries, and advanced F2L adds REGRIP_COST (3) per regrip of each pair's algorithm. Over 100 scrambles regrips fell from about 0.09 to 0.04 per pair (0.35 to 0.15 per solve), for 0.4 more moves.
 - Do not try to reimplement the full MCC. It is opinion-tuned, and its many parameters do not improve the ranking of F2L plans in a way anyone could check.
 
 ## 4. Experiment
@@ -109,3 +110,7 @@ What the numbers show:
 - **Plans are sensitive to how U2 is priced.** U2s drop from 2.2 to 1.4 per solve with the proposed table, replaced by other trigger choices and r or u moves. As a side effect, regrips fall by 17% (0.65 → 0.54), even though the table does not model regrips directly.
 - **MCC-style pricing pushes towards more wide and slice turns** (3.15 per solve), because MCC treats r like R. Without an extra cost for wide turns, they appear as often as they do in fewest-move plans.
 - These differences are small next to a single regrip (about 3 R) or rotation (about 4.4 R). That is why (b), correct grip tracking for r and l, is worth more than further tuning of individual move costs.
+
+## 5. Final config (reviewed after b7d38ee)
+
+Confirmed with no edits: MOVE_COST as above, SLOW_MOVE_COST 3.4, rotations 0; grip.ts RIGHT_HAND as in b7d38ee (left hand mirrored); REGRIP_COST 3; BACK_TURN_COST 5 (cross only); the first grip is free, and so is regripping between pairs. MCC keeps regrips apart from its move weights, so charging regrips separately counts nothing twice. Any REGRIP_COST from 2 to 4 gives nearly the same plans (6 to 10 of 100 differ); with 0, 57 of 100 differ.
