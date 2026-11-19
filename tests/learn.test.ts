@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { applyMovesToArray, invertAlg, parseAlg, solvedState, toColorArray } from '../src/core/cube';
 import { BEGINNER, HOLD, holdOf, type Lesson, NOTATION_MOVES, SPEEDUPS } from '../src/learn/beginner';
 import { CFOP_INTRO } from '../src/learn/cfop';
+import { CROSS_LESSONS } from '../src/learn/cfopCross';
 import { F2L_CASE_IDS, F2L_LESSONS } from '../src/learn/f2l';
 import { F2L_CASES } from '../src/solve/cfop/algs/f2l';
 import { faceOf, locate } from '../src/solve/pieces';
@@ -14,7 +15,7 @@ const held = applyMovesToArray(SOLVED, HOLD);
 
 /** The state a case's demo starts from, as the viewer computes it (setup anchored at the end). */
 function start(lesson: string, id: string): Stickers {
-  const l = [...BEGINNER, ...SPEEDUPS, ...CFOP_INTRO, ...F2L_LESSONS].find((k) => k.id === lesson)!;
+  const l = [...BEGINNER, ...SPEEDUPS, ...CFOP_INTRO, ...CROSS_LESSONS, ...F2L_LESSONS].find((k) => k.id === lesson)!;
   const c = l.cases.find((k) => k.id === id)!;
   const hold = applyMovesToArray(SOLVED, holdOf(l));
   return applyMovesToArray(applyMovesToArray(hold, c.end ?? ''), invertAlg(parseAlg(c.alg)));
@@ -397,6 +398,69 @@ describe('intuitive F2L: the front-right pair', () => {
         expect(EN[`learn.${l.id}.${k}` as keyof typeof EN], `${l.id}.${k}`).toBeTruthy();
       for (const c of l.cases) expect(EN[`learn.${l.id}.${c.id}.desc` as keyof typeof EN]).toBeTruthy();
       for (const k of Object.keys(l.algs ?? {})) expect(EN[`learn.${l.id}.alg.${k}` as keyof typeof EN]).toBeTruthy();
+    }
+  });
+});
+
+describe('CFOP cross: the front-bottom edge, white on the bottom', () => {
+  /** Where the front-bottom edge is, and which way its white faces: e.g. "UF U". */
+  const where = (st: Stickers) => {
+    const e = locate(st, cubie('DF'));
+    return `${e.map(faceOf).sort((a, b) => 'UDFBRL'.indexOf(a) - 'UDFBRL'.indexOf(b)).join('')} ${faceOf(e[0])}`;
+  };
+  const expected: Record<string, string> = {
+    'crossDown.top': 'UF U',
+    'crossDown.side': 'FR R',
+    'crossDown.sideFront': 'FR F',
+    'crossFix.topFlipped': 'UF F',
+    'crossFix.bottomFlipped': 'DF F',
+    'crossFix.bottomWrong': 'DR D',
+  };
+
+  test('held with white on the bottom', () => {
+    expect(centerColor(held, 'D')).toBe('W');
+  });
+
+  test('every case: the other cross edges solved, the edge where its text says, the cross solved after', () => {
+    for (const [key, w] of Object.entries(expected)) {
+      const [lesson, id] = key.split('.');
+      const s = start(lesson, id);
+      const c = CROSS_LESSONS.find((l) => l.id === lesson)!.cases.find((k) => k.id === id)!;
+      expect(where(s), key).toBe(w);
+      // In the wrong spot it takes the place of the right edge, which waits on top above it.
+      if (id === 'bottomWrong') {
+        expect(solved(s, 'DB', 'DL')).toBe(true);
+        const r = locate(s, cubie('DR'));
+        expect(`${r.map(faceOf).sort().join('')} ${faceOf(r[0])}`).toBe('RU U');
+        expect(solved(applyMovesToArray(s, 'R2'), 'DR')).toBe(true);
+      } else expect(solved(s, 'DR', 'DB', 'DL'), key).toBe(true);
+      expect(solved(s, 'DF'), key).toBe(false);
+      expect(solved(applyMovesToArray(s, c.alg), ...CROSS), key).toBe(true);
+    }
+    const all = CROSS_LESSONS.flatMap((l) => l.cases.map((c) => `${l.id}.${c.id}`));
+    expect(all.sort()).toEqual(Object.keys(expected).sort());
+  });
+
+  test('the step-by-step moves do what the text says', () => {
+    // Middle, white front: after D the spot is under the right side, R' fills it.
+    const sf = applyMovesToArray(start('crossDown', 'sideFront'), "D R'");
+    expect(where(applyMovesToArray(sf, 'D'))).not.toBe('DF D');
+    expect(locate(sf, cubie('DF')).map(faceOf).sort().join('')).toBe('DR');
+    // On top, flipped: U' to the right, R' to the middle layer at the front-right.
+    const tf = start('crossFix', 'topFlipped');
+    expect(where(applyMovesToArray(tf, "U'"))).toBe('UR R');
+    expect(where(applyMovesToArray(tf, "U' R'"))).toBe('FR R');
+    // Bottom, flipped: F' lifts it to the front-right, white still facing front.
+    expect(where(applyMovesToArray(start('crossFix', 'bottomFlipped'), "F'"))).toBe('FR F');
+    // Bottom, wrong spot: R2 to the top, U to the front.
+    expect(where(applyMovesToArray(start('crossFix', 'bottomWrong'), 'R2 U'))).toBe('UF U');
+  });
+
+  test('every lesson and case has its text', () => {
+    for (const l of CROSS_LESSONS) {
+      for (const k of ['title', 'goal', 'tip', ...Array.from({ length: l.how }, (_, i) => `how${i + 1}`)])
+        expect(EN[`learn.${l.id}.${k}` as keyof typeof EN], `${l.id}.${k}`).toBeTruthy();
+      for (const c of l.cases) expect(EN[`learn.${l.id}.${c.id}.desc` as keyof typeof EN]).toBeTruthy();
     }
   });
 });

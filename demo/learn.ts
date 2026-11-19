@@ -18,6 +18,7 @@ import {
   type SpeedGroup,
 } from '../src/learn/beginner';
 import { CFOP_INTRO } from '../src/learn/cfop';
+import { CROSS_LESSONS } from '../src/learn/cfopCross';
 import { F2L_LESSONS } from '../src/learn/f2l';
 
 /** What a case viewer needs: lessons and speed-up groups both have it. */
@@ -272,7 +273,7 @@ function speedGroup(g: SpeedGroup): HTMLElement {
 
 /** The levels after the introduction to CFOP: number, id, how many algorithms, and the lessons once written. */
 const LATER: { n: number; id: string; algs: number; lessons?: Lesson[] }[] = [
-  { n: 4, id: 'cross', algs: 0 },
+  { n: 4, id: 'cross', algs: 0, lessons: CROSS_LESSONS },
   { n: 5, id: 'f2l', algs: 0, lessons: F2L_LESSONS },
   { n: 6, id: 'oll2', algs: 10 },
   { n: 7, id: 'pll2', algs: 6 },
