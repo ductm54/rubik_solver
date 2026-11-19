@@ -548,17 +548,31 @@ describe('the last layer: 2-look OLL and PLL', () => {
     }
   });
 
-  test('a few Sunes, each after a U turn, make any corner case yellow', () => {
+  test('Sunes only: the rule always gives a U turn, and any turn it gives solves every corner case in three Sunes or fewer', () => {
     const sune = OLL2_LESSONS[1].cases[0].alg;
-    const ids = OLL2_LESSONS.slice(1).flatMap((l) => l.cases.map((c) => [l.id, c.id] as const));
+    const ups = (st: Stickers) => LL_CORNERS.filter((c) => yellowUp(st, c)).length;
+    const frontLeft = (st: Stickers) => corners(st).split(' ')[3].split(':')[1];
+    const rule = (st: Stickers) => ({ 0: 'L', 1: 'U', 2: 'F' })[ups(st) as 0 | 1 | 2];
+    const ids = ['oll2Sune', 'oll2Corners'].flatMap((l) => OLL2_LESSONS.find((k) => k.id === l)!.cases.map((c) => [l, c.id] as const));
     for (const [lesson, id] of ids) {
       let states = [start(lesson, id)];
-      let n = 0;
-      while (!states.some(topYellow)) {
-        states = states.flatMap((st) => ['', 'U', 'U2', "U'"].map((u) => applyMovesToArray(st, `${u} ${sune}`.trim())));
-        n++;
+      for (let n = 0; n < 3; n++) {
+        states = states.filter((st) => !topYellow(st));
+        states = states.flatMap((st) => {
+          const turns = ['', 'U', 'U2', "U'"].filter((u) => frontLeft(applyMovesToArray(st, u)) === rule(st));
+          expect(turns.length, id).toBeGreaterThan(0);
+          return turns.map((u) => applyMovesToArray(st, `${u} ${sune}`));
+        });
       }
-      expect(n, id).toBeLessThanOrEqual(3);
+      expect(states.every(topYellow), id).toBe(true);
+    }
+  });
+
+  test('Sunes only: each demo starts from its corner case and follows the rule', () => {
+    for (const c of OLL2_LESSONS.find((l) => l.id === 'oll2Sunes')!.cases) {
+      expect(start('oll2Sunes', c.id)).toEqual(start('oll2Corners', c.id));
+      expect(topYellow(run('oll2Sunes', c.id)), c.id).toBe(true);
+      expect(solved(run('oll2Sunes', c.id), ...F2L), c.id).toBe(true);
     }
   });
 
