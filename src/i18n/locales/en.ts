@@ -945,8 +945,6 @@ const en = {
   'learn.next.pll2': '2-look PLL',
   'learn.next.pll': 'Full PLL',
   'learn.next.oll': 'Full OLL',
-  'learn.next.f2lAdv': 'Advanced F2L',
-  'learn.next.f2lAdv.desc': 'Look-ahead, better cases and using free slots, to solve F2L without pauses.',
 
   'learn.notation.title': 'Hold the cube and read the moves',
   'learn.notation.goal': 'Learn the letters every algorithm is written in.',

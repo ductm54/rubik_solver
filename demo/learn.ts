@@ -287,7 +287,6 @@ const LATER: { n: number; id: string; algs: number; lessons?: Lesson[] }[] = [
   { n: 7, id: 'pll2', algs: 6, lessons: PLL2_LESSONS },
   { n: 8, id: 'pll', algs: 21, lessons: PLL_LESSONS },
   { n: 9, id: 'oll', algs: 57, lessons: OLL_LESSONS },
-  { n: 10, id: 'f2lAdv', algs: 0 },
 ];
 const SOON = LATER.filter((l) => !l.lessons);
 
@@ -474,21 +473,24 @@ function render() {
     lv.lessons.forEach((l, i) => p.append(lesson(l, i + 1)));
   }
 
-  p = panel('next');
-  names.push(['next', t('learn.next.title')]);
-  const next = el('section', 'card learn-lesson learn-intro-card learn-next');
-  next.id = 'learn-next';
-  const list = el('ol', 'learn-next-list');
-  for (const { n, id, algs } of SOON) {
-    const li = el('li');
-    const head = el('div', 'learn-next-head');
-    head.append(el('span', 'learn-level-n', String(n)), el('strong', '', t(`learn.next.${id}`)));
-    if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
-    li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
-    list.append(li);
+  // Levels still to come, if any: listed on a page of their own.
+  if (SOON.length) {
+    p = panel('next');
+    names.push(['next', t('learn.next.title')]);
+    const next = el('section', 'card learn-lesson learn-intro-card learn-next');
+    next.id = 'learn-next';
+    const list = el('ol', 'learn-next-list');
+    for (const { n, id, algs } of SOON) {
+      const li = el('li');
+      const head = el('div', 'learn-next-head');
+      head.append(el('span', 'learn-level-n', String(n)), el('strong', '', t(`learn.next.${id}`)));
+      if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
+      li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
+      list.append(li);
+    }
+    next.append(el('h2', '', t('learn.next.title')), el('p', '', t('learn.next.intro')), list);
+    p.append(next);
   }
-  next.append(el('h2', '', t('learn.next.title')), el('p', '', t('learn.next.intro')), list);
-  p.append(next);
 
   levelNav(names);
 }
