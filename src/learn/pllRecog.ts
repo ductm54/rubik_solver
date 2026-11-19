@@ -124,3 +124,21 @@ function build(): RecogCase[] {
 }
 
 export const PLL_RECOG: RecogCase[] = build();
+
+/**
+ * The chart's view for six front-and-right stickers (coloured with the ring colours above), with
+ * its case: the one whose side shapes and comparisons all match. The solver's PLL tips use it so
+ * they explain a case the same way the chart does.
+ */
+export function findView(stickers: Color[]): { id: string; view: RecogView } | undefined {
+  const front = sideKind(stickers.slice(0, 3));
+  const right = sideKind(stickers.slice(3));
+  const rels = PAIRS.map(([i, j]) => relation(stickers[i], stickers[j]));
+  for (const c of PLL_RECOG) {
+    for (const v of c.views) {
+      if (v.front !== front || v.right !== right) continue;
+      if (PAIRS.every(([i, j], p) => relation(v.stickers[i], v.stickers[j]) === rels[p])) return { id: c.id, view: v };
+    }
+  }
+  return undefined;
+}

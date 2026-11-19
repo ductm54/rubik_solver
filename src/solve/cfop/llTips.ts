@@ -4,8 +4,9 @@
  * two-side picture (front and right) that is enough to tell every case apart. Shown on the Learn
  * page under the algorithm (SolveStep.tips).
  */
-import type { Color } from '../../core/cube';
+import { type Color, STANDARD_SCHEME } from '../../core/cube';
 import { andList, cap, t } from '../../i18n';
+import { PAIRS, findView } from '../../learn/pllRecog';
 import { colorNames, colorWord } from '../mask';
 import type { Stickers } from '../pieces';
 
@@ -64,7 +65,40 @@ function readSide(st: Stickers, s: Side): string {
   }
   if (a === e) return t('tip.pllBlockLeft', { side, color: colorWord(a), lone: colorWord(b) });
   if (e === b) return t('tip.pllBlockRight', { side, color: colorWord(b), lone: colorWord(a) });
-  return t('tip.pllMixed', { side, colors: colorNames([a, e, b]) });
+  const sa = sideOfColor(st, a);
+  const endsOpposite = sa && sideOfColor(st, b) === OPPOSITE[sa];
+  return t(endsOpposite ? 'tip.pllMixedOpp' : 'tip.pllMixedAdj', { side, colors: colorNames([a, e, b]), left: colorWord(a), right: colorWord(b) });
+}
+
+/** The six top-layer stickers on the front then the right side, as the chart numbers them. */
+const SIX = [...SIDE_ROWS.F, ...SIDE_ROWS.R];
+
+/** The chart's view (and case) for this cube's front and right sides. */
+export function pllView(st: Stickers) {
+  // Relabel each colour as the standard colour of its side, so the chart's colour ring applies.
+  const ring = (c: Color) => {
+    const s = sideOfColor(st, c);
+    return s ? STANDARD_SCHEME[s] : c;
+  };
+  return findView(SIX.map((i) => ring(st[i])));
+}
+
+/**
+ * The comparisons across the two sides that the recognition chart (learn/pllRecog.ts) needs for
+ * this view, said with this cube's colours. Empty when the two sides' shapes are already enough.
+ */
+export function pllCompare(st: Stickers): string[] {
+  const found = pllView(st);
+  if (!found) return [];
+  return found.view.compare.map(({ pair, rel }) => {
+    const [i, j] = PAIRS[pair];
+    return t(`tip.pllCompare.${rel}`, {
+      a: t(`tip.pllPos.${i}`),
+      b: t(`tip.pllPos.${j}`),
+      ca: colorWord(st[SIX[i]]),
+      cb: colorWord(st[SIX[j]]),
+    });
+  });
 }
 
 /** Sides whose two corner stickers match (headlights, or a bar). */
@@ -110,6 +144,8 @@ export function llTips(st: Stickers, kind: LLKind, top: string, caseLabel: strin
     out.push(lights.length ? t('tip.cpllLightsHere', { sides: andList(lights.map(sideWord)) }) : t('tip.cpllNoLights'));
     return out;
   }
+  const compare = pllCompare(st);
+  if (compare.length) out.push(t('tip.pllCompareIntro'), ...compare);
   out.push(t('tip.pllOnly', { name: caseLabel }));
   if (kind === 'epll') {
     out.push(t('tip.epllRule'), t('tip.epllU'));
