@@ -17,6 +17,7 @@
           <a href="#cube" data-route="cube" data-i18n="nav.cube">Cube</a>
           <a href="#solve" data-route="solve" data-i18n="nav.solve">Solve</a>
           <a href="#learn" data-route="learn" data-i18n="nav.learn">Learn</a>
+          <a href="#algs" data-route="algs" data-i18n="nav.algs">Algorithms</a>
           <a href="#timer" data-route="timer" data-i18n="nav.timer">Timer</a>
         </nav>
         <div class="lang-slot"></div>
@@ -26,7 +27,7 @@
         </button>
       </header>
 
-      <!-- One page, four views: #cube, #solve, #learn, #timer. Each view's code loads the first time it is opened (app.ts). -->
+      <!-- One page, five views: #cube, #solve, #learn, #algs, #timer. Each view's code loads the first time it is opened (app.ts). -->
       <div id="page-cube" class="page" hidden>
         <section class="lp-intro">
           <h1 data-i18n="cube.title">Cube Scramble Finder</h1>
@@ -375,6 +376,27 @@
           <div id="learn-lessons" class="learn-lessons"></div>
         </main>
         <footer class="lp-footer">
+          <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
+        </footer>
+      </div>
+
+      <div id="page-algs" class="page" hidden>
+        <section class="lp-intro">
+          <h1 data-i18n="algs.title">Algorithms</h1>
+          <p class="sub" data-i18n="algs.sub"></p>
+        </section>
+        <main class="algs-main">
+          <div class="card algs-bar">
+            <div id="algs-sets" class="segmented" role="radiogroup" aria-label="Algorithm set" data-i18n-aria-label="algs.setLabel"></div>
+            <input id="algs-search" type="search" class="algs-search" placeholder="Number, name or moves" data-i18n-placeholder="algs.searchPlaceholder" aria-label="Search" data-i18n-aria-label="algs.search" />
+            <label class="check algs-twolook"><input id="algs-twolook" type="checkbox" /> <span data-i18n="algs.twoLook">2-look only</span></label>
+            <p id="algs-about" class="hint algs-about"></p>
+          </div>
+          <div id="algs-list" class="algs-list"></div>
+        </main>
+        <dialog id="algs-dialog" class="algs-dialog"></dialog>
+        <footer class="lp-footer">
+          <span>F2L: <a href="https://speedcubedb.com/a/3x3/F2L">SpeedCubeDB</a> ·</span>
           <span data-i18n="common.viewer">Viewer:</span> <a href="https://js.cubing.net/cubing/">cubing.js</a>
         </footer>
       </div>

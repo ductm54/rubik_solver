@@ -586,3 +586,52 @@ button.learn-level-item:hover { background: var(--tint); }
 .learn-moves { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
 .learn-moves code { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .learn-viewer { height: 260px; } }
+
+/* --- algorithms page (reference sheet) */
+:root { --ll-grey: #3a3a40; --arrow: #1b1b1f; }
+@media (prefers-color-scheme: dark) { :root { --ll-grey: #4a4a52; --arrow: #ececef; } }
+.algs-main { grid-template-columns: minmax(0, 1fr) !important; }
+.algs-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; position: sticky; top: 0; z-index: 2; }
+.algs-bar .segmented { flex: none; }
+.algs-seg-n { font-size: 12px; opacity: 0.75; font-weight: 400; }
+.algs-search { flex: 1 1 200px; min-width: 0; min-height: 36px; padding: 0 12px; border: 1px solid var(--strong-border); border-radius: 10px; background: var(--card); color: var(--text); font: inherit; font-size: 14px; }
+.algs-twolook { margin: 0; }
+.algs-twolook[hidden] { display: none; }
+.algs-about { flex-basis: 100%; margin: 0; }
+.algs-list { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.algs-group-head { display: flex; align-items: baseline; gap: 10px; margin: 0 4px 8px; }
+.algs-group-head h2 { font-size: 17px; }
+.algs-group-head .muted { font-size: 13px; }
+.algs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.algs-card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 10px; text-align: left; border: 1px solid var(--border); border-radius: 14px; background: var(--card); min-width: 0; }
+.algs-card:hover { border-color: var(--muted); }
+.algs-card .algs-diagram { width: 92px; height: 92px; align-self: center; margin-bottom: 4px; }
+.algs-card-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 14px; }
+.algs-card-head .tag { font-size: 11px; padding: 0 6px; }
+.algs-shape { font-size: 12px; margin-top: -4px; }
+.algs-alg { font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; color: var(--text); }
+.algs-diagram .algs-st { stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.6; }
+.algs-diagram polygon.algs-st { stroke-width: 0.03; }
+.algs-arrow { stroke: var(--arrow); stroke-width: 1.8; stroke-linecap: round; }
+.algs-arrowhead { fill: var(--arrow); }
+
+.algs-dialog { width: min(860px, calc(100vw - 24px)); max-height: calc(100vh - 24px); padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); color: var(--text); }
+.algs-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.algs-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.algs-dialog-head h2 { font-size: 20px; }
+.algs-dialog-head .muted { font-size: 13px; }
+.algs-dialog-body { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 720px) { .algs-dialog-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.algs-viewer { height: 300px; }
+.algs-dialog-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.algs-dialog-side > .algs-diagram { width: 110px; height: 110px; }
+.algs-hint { margin: 0; font-size: 14px; }
+.algs-rows { display: flex; flex-direction: column; gap: 6px; }
+.algs-row-wrap { display: flex; flex-direction: column; gap: 4px; }
+.algs-row-wrap .lp-label { margin-top: 6px; }
+.algs-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; text-align: left; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.algs-row code { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.algs-row .muted { font-size: 12px; white-space: nowrap; }
+.algs-row:hover { border-color: var(--muted); }
+.algs-row[aria-pressed='true'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+@media (max-width: 480px) { .tabs { gap: 0; } .tabs a { padding: 0 10px; } }
