@@ -506,12 +506,24 @@ body.focus header { opacity: 0.12; }
 .learn-toc h2 { font-size: 15px; margin: 16px 0 8px; }
 .learn-toc > h2:first-child { margin-top: 0; }
 .learn-path { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.learn-level:not(.active) > .learn-toc-list { display: none; }
+.learn-level.active > .learn-level-item { background: var(--accent-soft); }
+.learn-level.active .learn-level-n { background: var(--accent); color: var(--accent-text, #fff); }
+.learn-panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.learn-panel[hidden] { display: none; }
+.learn-level-nav { display: flex; gap: 12px; flex-wrap: wrap; }
+.learn-nav-link { flex: 1 1 220px; display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); text-decoration: none; }
+.learn-nav-link:hover { border-color: var(--accent); }
+.learn-nav-link .muted { font-size: 13px; }
+.learn-nav-link.next { text-align: right; }
+.learn-nav-link.next:only-child { margin-left: auto; flex-grow: 0; }
 .learn-level > .learn-toc-list { margin: 2px 0 6px 14px; padding-left: 8px; border-left: 2px solid var(--border); }
 .learn-level-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; font-weight: 700; text-align: left; }
 button.learn-level-item { cursor: pointer; }
 button.learn-level-item:hover { background: var(--tint); }
 .learn-level-n { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); border: 1px solid var(--accent); color: var(--text); font-size: 13px; font-weight: 700; }
 .learn-level-soon .learn-level-item { color: var(--muted); font-weight: 600; }
+.learn-level-soon .learn-level-item:hover { background: var(--tint); }
 .learn-level-soon .learn-level-n { background: var(--soft); border-color: var(--border); color: var(--muted); }
 .learn-soon { margin-left: auto; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border); }
 .learn-level-card { border-top: 3px solid var(--accent); }

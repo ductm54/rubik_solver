@@ -1,6 +1,6 @@
 /**
  * Learn view: how to solve the cube as a learning path, level by level (basics, the beginner
- * method, a faster beginner method, then CFOP, still to come). Each step
+ * method, a faster beginner method, an introduction to CFOP, then CFOP's levels, still to come). Each step
  * has its text and a 3D viewer with example cases; viewers are made when their step first
  * scrolls near the screen, so the page opens fast.
  */
@@ -17,6 +17,9 @@ import {
   SPEEDUPS,
   type SpeedGroup,
 } from '../src/learn/beginner';
+import { CFOP_INTRO } from '../src/learn/cfop';
+import { CROSS_LESSONS } from '../src/learn/cfopCross';
+import { F2L_LESSONS } from '../src/learn/f2l';
 
 /** What a case viewer needs: lessons and speed-up groups both have it. */
 type Demo = Pick<Lesson, 'id' | 'hold' | 'mask' | 'cases'>;
@@ -65,7 +68,7 @@ function loadCase(p: Player, lesson: Demo, c: LessonCase) {
   p.experimentalSetupAnchor = 'end';
   p.experimentalSetupAlg = [holdOf(lesson), c.end ?? ''].join(' ').trim();
   p.alg = c.alg;
-  p.experimentalStickeringMaskOrbits = lesson.mask;
+  p.experimentalStickeringMaskOrbits = c.mask ?? lesson.mask;
   p.timestamp = 'start';
 }
 
@@ -188,13 +191,13 @@ function lazily(target: Element, make: () => void) {
   io.observe(target);
 }
 
-function lesson(l: Lesson, n: number): HTMLElement {
+function lesson(l: Lesson, n: number, tag = t('learn.stepN', { n })): HTMLElement {
   const sec = el('section', 'card learn-lesson');
   sec.id = `learn-step-${l.id}`;
   const textAlg = l.textAlg ?? Object.values(l.algs ?? {})[0] ?? '';
 
   const head = el('header', 'learn-head');
-  head.append(el('span', `stage-tag stage-${l.stage}`, t('learn.stepN', { n })), el('h2', '', t(`learn.${l.id}.title`)));
+  head.append(el('span', `stage-tag stage-${l.stage}`, tag), el('h2', '', t(`learn.${l.id}.title`)));
 
   const text = el('div', 'learn-text');
   const goal = el('p', 'learn-goal');
@@ -225,8 +228,10 @@ function lesson(l: Lesson, n: number): HTMLElement {
   tip.append(el('strong', '', `${t('learn.tip')}: `), rich(`learn.${l.id}.tip`, textAlg));
   text.append(tip);
 
-  const body = el('div', 'learn-body');
-  body.append(text, l.id === 'notation' ? notationDemo() : caseDemo(l));
+  const body = el('div', l.cases.length || l.id === 'notation' ? 'learn-body' : 'learn-body learn-body-text');
+  body.append(text);
+  if (l.id === 'notation') body.append(notationDemo());
+  else if (l.cases.length) body.append(caseDemo(l));
   sec.append(head, body);
   return sec;
 }
@@ -243,10 +248,10 @@ function speedGroup(g: SpeedGroup): HTMLElement {
     const i = BEGINNER.findIndex((l) => l.id === g.step);
     const from = el('p', 'muted learn-fast-from');
     const link = el('a', '', `${t('learn.stepN', { n: i })} · ${t(`learn.${g.step}.title`)}`);
-    link.href = `#learn`;
+    link.href = `#learn&level=1`;
     link.onclick = (e) => {
       e.preventDefault();
-      document.getElementById(`learn-step-${g.step}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      goTo(`learn-step-${g.step}`);
     };
     const [before, after = ''] = t('learn.fast.from', { step: '\u0001' }).split('\u0001');
     from.append(before, link, after);
@@ -266,47 +271,118 @@ function speedGroup(g: SpeedGroup): HTMLElement {
   return sec;
 }
 
-/** The CFOP levels after the beginner course, not written yet: id and how many algorithms. */
-const NEXT_LEVELS: [id: string, algs: number][] = [
-  ['cfop', 0],
-  ['cross', 0],
-  ['f2l', 0],
-  ['oll2', 10],
-  ['pll2', 6],
-  ['pll', 21],
-  ['oll', 57],
-  ['f2lAdv', 0],
+/** The levels after the introduction to CFOP: number, id, how many algorithms, and the lessons once written. */
+const LATER: { n: number; id: string; algs: number; lessons?: Lesson[] }[] = [
+  { n: 4, id: 'cross', algs: 0, lessons: CROSS_LESSONS },
+  { n: 5, id: 'f2l', algs: 0, lessons: F2L_LESSONS },
+  { n: 6, id: 'oll2', algs: 10 },
+  { n: 7, id: 'pll2', algs: 6 },
+  { n: 8, id: 'pll', algs: 21 },
+  { n: 9, id: 'oll', algs: 57 },
+  { n: 10, id: 'f2lAdv', algs: 0 },
 ];
+const SOON = LATER.filter((l) => !l.lessons);
 
-const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+/** One panel per level (and one for the levels still to come): only the open one is shown. */
+const panels = new Map<string, HTMLElement>();
+const tocLevels = new Map<string, HTMLElement>();
+let open = '';
+const LEVEL_KEY = 'learn.level';
+
+/** The level a `#learn&level=<n>` hash asks for, if any. */
+const levelInHash = () => /[&?]level=([\w-]+)/.exec(location.hash)?.[1] ?? null;
+
+/** Show level `key` (a level number, or `next`). Returns whether it changed. */
+function openLevel(key: string): boolean {
+  if (!panels.has(key)) key = '0';
+  if (key === open) return false;
+  open = key;
+  for (const p of players) p.pause();
+  for (const [k, panel] of panels) panel.hidden = k !== key;
+  for (const [k, li] of tocLevels) {
+    li.classList.toggle('active', k === key);
+    li.querySelector('.learn-level-item')?.toggleAttribute('aria-current', k === key);
+  }
+  try {
+    localStorage.setItem(LEVEL_KEY, key);
+  } catch {
+    // Remembering the level is only a convenience.
+  }
+  const hash = `#learn&level=${key}`;
+  if (location.hash !== hash) history.replaceState(null, '', hash);
+  return true;
+}
+
+/** Open the level that holds element `id` and scroll to it. */
+function goTo(id: string) {
+  const target = document.getElementById(id);
+  const panel = target?.closest<HTMLElement>('.learn-panel');
+  if (!target || !panel) return;
+  openLevel(panel.dataset.level!);
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 function tocItem(mark: string, label: string, target: string, stage = ''): HTMLLIElement {
   const li = el('li');
   const b = el('button', `learn-toc-item ${stage ? `stage-${stage}` : ''}`.trim());
   b.type = 'button';
   b.append(el('span', 'learn-toc-n', mark), el('span', '', label));
-  b.onclick = () => scrollTo(target);
+  b.onclick = () => goTo(target);
   li.append(b);
   return li;
 }
 
-/** One level of the path in the contents: its number and name, with its steps under it. */
-function tocLevel(n: number, name: string, target: string, steps: HTMLLIElement[] = []): HTMLLIElement {
-  const li = el('li', 'learn-level');
+/** One level of the path in the contents: its number and name, with its steps under it (shown when open). */
+function tocLevel(n: number, name: string, steps: HTMLLIElement[] = [], soon = false): HTMLLIElement {
+  const key = soon ? 'next' : String(n);
+  const li = el('li', soon ? 'learn-level learn-level-soon' : 'learn-level');
   const b = el('button', 'learn-level-item');
   b.type = 'button';
   b.append(el('span', 'learn-level-n', String(n)), el('span', '', name));
-  b.onclick = () => scrollTo(target);
+  if (soon) b.append(el('span', 'learn-soon', t('learn.soon')));
+  b.onclick = () => goTo(`learn-panel-${key}`);
   li.append(b);
   if (steps.length) {
     const sub = el('ol', 'learn-toc-list');
     sub.append(...steps);
     li.append(sub);
   }
+  if (!soon) tocLevels.set(key, li);
   return li;
 }
 
-/** The card that opens a level of the path. */
+/** A level's panel, holding its cards. */
+function panel(key: string): HTMLElement {
+  const p = el('div', 'learn-panel');
+  p.id = `learn-panel-${key}`;
+  p.dataset.level = key;
+  p.hidden = true;
+  panels.set(key, p);
+  root.append(p);
+  return p;
+}
+
+/** Links to the level before and after, at the foot of each panel. */
+function levelNav(names: [key: string, label: string][]) {
+  names.forEach(([key], i) => {
+    const nav = el('nav', 'learn-level-nav');
+    nav.setAttribute('aria-label', t('learn.path'));
+    const link = (k: string, label: string, cls: string) => {
+      const a = el('a', `learn-nav-link ${cls}`);
+      a.href = `#learn&level=${k}`;
+      a.append(el('span', 'muted', t(cls === 'prev' ? 'learn.prevLevel' : 'learn.nextLevel')), el('strong', '', label));
+      a.onclick = (e) => {
+        e.preventDefault();
+        goTo(`learn-panel-${k}`);
+      };
+      return a;
+    };
+    if (i > 0) nav.append(link(names[i - 1][0], names[i - 1][1], 'prev'));
+    if (i < names.length - 1) nav.append(link(names[i + 1][0], names[i + 1][1], 'next'));
+    panels.get(key)!.append(nav);
+  });
+}
+
 function levelCard(n: number, id: string, name: string, intro: string): HTMLElement {
   const sec = el('section', 'card learn-lesson learn-intro-card learn-level-card');
   sec.id = id;
@@ -318,71 +394,116 @@ function levelCard(n: number, id: string, name: string, intro: string): HTMLElem
 
 function render() {
   const [notation, ...steps] = BEGINNER;
+  const level = (n: number, name: string) => `${t('learn.levelN', { n })} · ${name}`;
+  const names: [string, string][] = [];
 
   // Contents: the learning path, level by level.
   const path = el('ol', 'learn-path');
   path.append(
-    tocLevel(0, t('learn.basics'), 'learn-level-basics', [
-      tocItem('0', t(`learn.${notation.id}.title`), `learn-step-${notation.id}`, notation.stage),
-    ]),
+    tocLevel(0, t('learn.basics'), [tocItem('0', t(`learn.${notation.id}.title`), `learn-step-${notation.id}`, notation.stage)]),
     tocLevel(
       1,
       t('learn.beginner'),
-      'learn-level-beginner',
       steps.map((l, i) => tocItem(String(i + 1), t(`learn.${l.id}.title`), `learn-step-${l.id}`, l.stage)),
     ),
     tocLevel(
       2,
       t('learn.fast'),
-      'learn-fast',
       SPEEDUPS.map((g) => tocItem('»', t(`learn.${g.id}.title`), `learn-${g.id.replace('.', '-')}`, g.stage)),
     ),
+    tocLevel(
+      3,
+      t('learn.cfopIntro'),
+      CFOP_INTRO.map((l, i) => tocItem(String(i + 1), t(`learn.${l.id}.title`), `learn-step-${l.id}`, l.stage)),
+    ),
   );
-  NEXT_LEVELS.forEach(([id], i) => {
-    const li = el('li', 'learn-level learn-level-soon');
-    const row = el('div', 'learn-level-item');
-    row.append(el('span', 'learn-level-n', String(i + 3)), el('span', '', t(`learn.next.${id}`)), el('span', 'learn-soon', t('learn.soon')));
-    li.append(row);
-    path.append(li);
-  });
+  for (const lv of LATER) {
+    const items = lv.lessons?.map((l, i) => tocItem(String(i + 1), t(`learn.${l.id}.title`), `learn-step-${l.id}`, l.stage));
+    path.append(tocLevel(lv.n, t(`learn.next.${lv.id}`), items, !lv.lessons));
+  }
   toc.append(el('h2', '', t('learn.path')), path);
 
   // Level 0: basics.
-  root.append(levelCard(0, 'learn-level-basics', t('learn.basics'), t('learn.basics.intro')));
-  root.append(lesson(notation, 0));
+  let p = panel('0');
+  names.push(['0', level(0, t('learn.basics'))]);
+  p.append(levelCard(0, 'learn-level-basics', t('learn.basics'), t('learn.basics.intro')), lesson(notation, 0));
 
   // Level 1: the beginner method.
-  root.append(levelCard(1, 'learn-level-beginner', t('learn.beginner'), t('learn.beginner.intro')));
-  steps.forEach((l, i) => root.append(lesson(l, i + 1)));
+  p = panel('1');
+  names.push(['1', level(1, t('learn.beginner'))]);
+  p.append(levelCard(1, 'learn-level-beginner', t('learn.beginner'), t('learn.beginner.intro')));
+  steps.forEach((l, i) => p.append(lesson(l, i + 1)));
   const done = el('section', 'card learn-lesson learn-done');
   const cta = el('a', 'primary button-like', t('learn.done.cta'));
   cta.href = '#solve';
   done.append(el('h2', '', t('learn.done.title')), el('p', '', t('learn.done.body')), cta);
-  root.append(done);
+  p.append(done);
 
   // Level 2: faster beginner.
-  root.append(levelCard(2, 'learn-fast', t('learn.fast'), t('learn.fast.intro')));
-  for (const g of SPEEDUPS) root.append(speedGroup(g));
+  p = panel('2');
+  names.push(['2', level(2, t('learn.fast'))]);
+  p.append(levelCard(2, 'learn-fast', t('learn.fast'), t('learn.fast.intro')));
+  for (const g of SPEEDUPS) p.append(speedGroup(g));
 
-  // Levels 3 and on: what comes next.
+  // Level 3: introduction to CFOP.
+  p = panel('3');
+  names.push(['3', level(3, t('learn.cfopIntro'))]);
+  p.append(levelCard(3, 'learn-level-cfop', t('learn.cfopIntro'), t('learn.cfopIntro.intro')));
+  for (const l of CFOP_INTRO) p.append(lesson(l, 0, t('learn.cfopIntro.tag')));
+  const tryIt = el('section', 'card learn-lesson learn-done');
+  const solve = el('a', 'primary button-like', t('learn.cfopIntro.cta'));
+  solve.href = '#solve';
+  tryIt.append(el('h2', '', t('learn.cfopIntro.done')), el('p', '', t('learn.cfopIntro.doneBody')), solve);
+  p.append(tryIt);
+
+  // Levels 4 and on: those written so far, then what comes next.
+  for (const lv of LATER) {
+    if (!lv.lessons) continue;
+    const key = String(lv.n);
+    p = panel(key);
+    names.push([key, level(lv.n, t(`learn.next.${lv.id}`))]);
+    p.append(levelCard(lv.n, `learn-level-${lv.id}`, t(`learn.next.${lv.id}`), t(`learn.level.${lv.id}.intro`)));
+    lv.lessons.forEach((l, i) => p.append(lesson(l, i + 1)));
+  }
+
+  p = panel('next');
+  names.push(['next', t('learn.next.title')]);
   const next = el('section', 'card learn-lesson learn-intro-card learn-next');
   next.id = 'learn-next';
   const list = el('ol', 'learn-next-list');
-  NEXT_LEVELS.forEach(([id, algs], i) => {
+  for (const { n, id, algs } of SOON) {
     const li = el('li');
     const head = el('div', 'learn-next-head');
-    head.append(el('span', 'learn-level-n', String(i + 3)), el('strong', '', t(`learn.next.${id}`)));
+    head.append(el('span', 'learn-level-n', String(n)), el('strong', '', t(`learn.next.${id}`)));
     if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
     li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
     list.append(li);
-  });
+  }
   next.append(el('h2', '', t('learn.next.title')), el('p', '', t('learn.next.intro')), list);
-  root.append(next);
+  p.append(next);
+
+  levelNav(names);
+}
+
+/** The level to open: the one in the link, else the last one read, else the first. */
+function startLevel(): string {
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(LEVEL_KEY);
+  } catch {
+    // No storage: start at the first level.
+  }
+  return levelInHash() ?? saved ?? '0';
 }
 
 render();
+openLevel(startLevel());
 
-export function show() {}
+/** The Learn tab was opened again, or its link changed: open the level the link asks for. */
+export function show() {
+  const key = levelInHash();
+  if (key && openLevel(key)) document.getElementById(`learn-panel-${open}`)?.scrollIntoView({ block: 'start' });
+}
 
 /** Another tab was opened: stop the viewers. */
 export function hide() {
