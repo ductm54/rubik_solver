@@ -18,6 +18,7 @@ import {
   type SpeedGroup,
 } from '../src/learn/beginner';
 import { CFOP_INTRO } from '../src/learn/cfop';
+import { F2L_LESSONS } from '../src/learn/f2l';
 
 /** What a case viewer needs: lessons and speed-up groups both have it. */
 type Demo = Pick<Lesson, 'id' | 'hold' | 'mask' | 'cases'>;
@@ -226,8 +227,10 @@ function lesson(l: Lesson, n: number, tag = t('learn.stepN', { n })): HTMLElemen
   tip.append(el('strong', '', `${t('learn.tip')}: `), rich(`learn.${l.id}.tip`, textAlg));
   text.append(tip);
 
-  const body = el('div', 'learn-body');
-  body.append(text, l.id === 'notation' ? notationDemo() : caseDemo(l));
+  const body = el('div', l.cases.length || l.id === 'notation' ? 'learn-body' : 'learn-body learn-body-text');
+  body.append(text);
+  if (l.id === 'notation') body.append(notationDemo());
+  else if (l.cases.length) body.append(caseDemo(l));
   sec.append(head, body);
   return sec;
 }
@@ -267,16 +270,17 @@ function speedGroup(g: SpeedGroup): HTMLElement {
   return sec;
 }
 
-/** The CFOP levels after the beginner course, not written yet: id and how many algorithms. */
-const NEXT_LEVELS: [id: string, algs: number][] = [
-  ['cross', 0],
-  ['f2l', 0],
-  ['oll2', 10],
-  ['pll2', 6],
-  ['pll', 21],
-  ['oll', 57],
-  ['f2lAdv', 0],
+/** The levels after the introduction to CFOP: number, id, how many algorithms, and the lessons once written. */
+const LATER: { n: number; id: string; algs: number; lessons?: Lesson[] }[] = [
+  { n: 4, id: 'cross', algs: 0 },
+  { n: 5, id: 'f2l', algs: 0, lessons: F2L_LESSONS },
+  { n: 6, id: 'oll2', algs: 10 },
+  { n: 7, id: 'pll2', algs: 6 },
+  { n: 8, id: 'pll', algs: 21 },
+  { n: 9, id: 'oll', algs: 57 },
+  { n: 10, id: 'f2lAdv', algs: 0 },
 ];
+const SOON = LATER.filter((l) => !l.lessons);
 
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -344,13 +348,24 @@ function render() {
       CFOP_INTRO.map((l, i) => tocItem(String(i + 1), t(`learn.${l.id}.title`), `learn-step-${l.id}`, l.stage)),
     ),
   );
-  NEXT_LEVELS.forEach(([id], i) => {
+  for (const lv of LATER) {
+    if (lv.lessons) {
+      path.append(
+        tocLevel(
+          lv.n,
+          t(`learn.next.${lv.id}`),
+          `learn-level-${lv.id}`,
+          lv.lessons.map((l, i) => tocItem(String(i + 1), t(`learn.${l.id}.title`), `learn-step-${l.id}`, l.stage)),
+        ),
+      );
+      continue;
+    }
     const li = el('li', 'learn-level learn-level-soon');
     const row = el('div', 'learn-level-item');
-    row.append(el('span', 'learn-level-n', String(i + 4)), el('span', '', t(`learn.next.${id}`)), el('span', 'learn-soon', t('learn.soon')));
+    row.append(el('span', 'learn-level-n', String(lv.n)), el('span', '', t(`learn.next.${lv.id}`)), el('span', 'learn-soon', t('learn.soon')));
     li.append(row);
     path.append(li);
-  });
+  }
   toc.append(el('h2', '', t('learn.path')), path);
 
   // Level 0: basics.
@@ -379,18 +394,24 @@ function render() {
   tryIt.append(el('h2', '', t('learn.cfopIntro.done')), el('p', '', t('learn.cfopIntro.doneBody')), solve);
   root.append(tryIt);
 
-  // Levels 4 and on: what comes next.
+  // Levels 4 and on: those written so far, then what comes next.
+  for (const lv of LATER) {
+    if (!lv.lessons) continue;
+    root.append(levelCard(lv.n, `learn-level-${lv.id}`, t(`learn.next.${lv.id}`), t(`learn.level.${lv.id}.intro`)));
+    lv.lessons.forEach((l, i) => root.append(lesson(l, i + 1)));
+  }
+
   const next = el('section', 'card learn-lesson learn-intro-card learn-next');
   next.id = 'learn-next';
   const list = el('ol', 'learn-next-list');
-  NEXT_LEVELS.forEach(([id, algs], i) => {
+  for (const { n, id, algs } of SOON) {
     const li = el('li');
     const head = el('div', 'learn-next-head');
-    head.append(el('span', 'learn-level-n', String(i + 4)), el('strong', '', t(`learn.next.${id}`)));
+    head.append(el('span', 'learn-level-n', String(n)), el('strong', '', t(`learn.next.${id}`)));
     if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
     li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
     list.append(li);
-  });
+  }
   next.append(el('h2', '', t('learn.next.title')), el('p', '', t('learn.next.intro')), list);
   root.append(next);
 }

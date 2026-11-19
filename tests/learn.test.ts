@@ -3,6 +3,9 @@ import { describe, expect, test } from 'vitest';
 import { applyMovesToArray, invertAlg, parseAlg, solvedState, toColorArray } from '../src/core/cube';
 import { BEGINNER, HOLD, holdOf, type Lesson, NOTATION_MOVES, SPEEDUPS } from '../src/learn/beginner';
 import { CFOP_INTRO } from '../src/learn/cfop';
+import { F2L_CASE_IDS, F2L_LESSONS } from '../src/learn/f2l';
+import { F2L_CASES } from '../src/solve/cfop/algs/f2l';
+import { faceOf, locate } from '../src/solve/pieces';
 import { EN } from '../src/i18n/locales/en';
 import { type Stickers, centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 
@@ -11,7 +14,7 @@ const held = applyMovesToArray(SOLVED, HOLD);
 
 /** The state a case's demo starts from, as the viewer computes it (setup anchored at the end). */
 function start(lesson: string, id: string): Stickers {
-  const l = [...BEGINNER, ...SPEEDUPS, ...CFOP_INTRO].find((k) => k.id === lesson)!;
+  const l = [...BEGINNER, ...SPEEDUPS, ...CFOP_INTRO, ...F2L_LESSONS].find((k) => k.id === lesson)!;
   const c = l.cases.find((k) => k.id === id)!;
   const hold = applyMovesToArray(SOLVED, holdOf(l));
   return applyMovesToArray(applyMovesToArray(hold, c.end ?? ''), invertAlg(parseAlg(c.alg)));
@@ -289,5 +292,111 @@ describe('intro to CFOP: one example solve, stage by stage', () => {
       expect(EN[`learn.cfop.${c.id}.desc` as keyof typeof EN]).toBeTruthy();
     }
     expect(parseAlg(CFOP_INTRO[0].cases.find((k) => k.id === 'all')!.alg)).toHaveLength(40);
+  });
+});
+
+/** The insert each joining case ends with. */
+const EXPECTED_SETUP: Record<string, string> = {
+  'f2lPair.apart': 'joined pair',
+  'f2lPair.up': 'right',
+  'f2lPair.wrong': 'right',
+  'f2lStuck.corner': 'right',
+  'f2lStuck.edge': 'joined pair',
+  'f2lStuck.flipped': 'front',
+};
+
+describe('intuitive F2L: the front-right pair', () => {
+  const OTHERS = [...CROSS, 'DLF', 'FL', 'DBL', 'BL', 'DRB', 'BR'];
+  /** Where the corner is and which way white faces, and where the edge is: e.g. "UFR R UB". */
+  const where = (st: Stickers) => {
+    const c = locate(st, cubie('DFR'));
+    const e = locate(st, cubie('FR'));
+    const pos = (f: number[], order: string) => f.map(faceOf).sort((a, b) => order.indexOf(a) - order.indexOf(b)).join('');
+    return `${pos(c, 'UDFBRL')} ${faceOf(c[0])} ${pos(e, 'UDFBRL')}`;
+  };
+  /** Corner and edge side by side in the top layer, the same colours next to each other. */
+  const joined = (st: Stickers) => {
+    const c = locate(st, cubie('DFR'));
+    const e = locate(st, cubie('FR'));
+    if (![...c, ...e].some((i) => faceOf(i) === 'U') || c.some((i) => faceOf(i) === 'D')) return false;
+    if (!e.every((i) => c.some((k) => faceOf(k) === faceOf(i)))) return false;
+    // The edge's two colours are the corner's side colours: each must face the same way on both.
+    return e.every((ei, n) => faceOf(ei) === faceOf(c[n + 1]));
+  };
+  const lessonCase = (key: string) => {
+    const [lesson, id] = key.split('.');
+    return F2L_LESSONS.find((l) => l.id === lesson)!.cases.find((k) => k.id === id)!;
+  };
+
+  test('the slot at the front-right is the white-blue-red pair', () => {
+    expect([centerColor(held, 'D'), centerColor(held, 'F'), centerColor(held, 'R')]).toEqual(['W', 'B', 'R']);
+  });
+
+  test('every case is a SpeedCubeDB case: cross and other slots solved, the pair out, solved by the moves', () => {
+    for (const [key, id] of Object.entries(F2L_CASE_IDS)) {
+      const [lesson, cid] = key.split('.');
+      const s = start(lesson, cid);
+      expect(solved(s, ...OTHERS)).toBe(true);
+      expect(solved(s, 'DFR', 'FR')).toBe(false);
+      expect(solved(applyMovesToArray(s, lessonCase(key).alg), ...F2L)).toBe(true);
+      const c = F2L_CASES.find((k) => k.id === id)!;
+      // Same place for the corner and the edge, up to a U turn (the rest of the top layer may differ).
+      const theirs = where(applyMovesToArray(held, invertAlg(parseAlg(c.FR[0]))));
+      expect(['', 'U', "U'", 'U2'].map((a) => where(applyMovesToArray(s, a))), key).toContain(theirs);
+    }
+  });
+
+  test('each case starts where its text puts the corner (and white) and the edge', () => {
+    const expected: Record<string, string> = {
+      'f2lInsert.right': 'UFR R UB',
+      'f2lInsert.front': 'UFR F UL',
+      'f2lInsert.joined': 'UFR F UR',
+      'f2lInsert.joinedFront': 'UFR R UF',
+      'f2lPair.apart': 'UFR F UB',
+      'f2lPair.wrong': 'UFR R UR',
+      'f2lPair.up': 'UFR U UR',
+      'f2lStuck.corner': 'DFR R UR',
+      'f2lStuck.edge': 'UFR F FR',
+      'f2lStuck.flipped': 'UFR F FR',
+    };
+    for (const [key, w] of Object.entries(expected)) expect(where(start(...(key.split('.') as [string, string]))), key).toBe(w);
+    expect(solved(start('f2lStuck', 'edge'), 'FR')).toBe(true);
+    expect(solved(start('f2lStuck', 'flipped'), 'FR')).toBe(false);
+  });
+
+  test('ready pairs: joined where the text says, and wrong in the joined-wrong case', () => {
+    expect(joined(start('f2lInsert', 'joined'))).toBe(true);
+    expect(joined(start('f2lInsert', 'joinedFront'))).toBe(true);
+    expect(joined(start('f2lPair', 'wrong'))).toBe(false);
+    // R and F' take the corner to its edge.
+    expect(joined(applyMovesToArray(start('f2lInsert', 'right'), 'R'))).toBe(true);
+    expect(joined(applyMovesToArray(start('f2lInsert', 'front'), "F'"))).toBe(true);
+  });
+
+  test('the joining moves lead, after a U turn, to an insert set-up or a joined pair', () => {
+    const setups = F2L_LESSONS[0].cases.map((c) => [c.id, where(start('f2lInsert', c.id))] as const);
+    const reached: Record<string, string> = {};
+    for (const lesson of ['f2lPair', 'f2lStuck']) {
+      for (const c of F2L_LESSONS.find((l) => l.id === lesson)!.cases) {
+        const parts = c.show!.split(' · ');
+        const st = applyMovesToArray(start(lesson, c.id), parts.slice(0, -2).join(' '));
+        expect(solved(st, ...OTHERS)).toBe(true);
+        const auf = parseAlg(parts.at(-2)!);
+        expect(auf.every((m) => m.base === 'U')).toBe(true);
+        const after = applyMovesToArray(st, parts.at(-2)!);
+        const setup = setups.find(([, w]) => w === where(after))?.[0];
+        reached[`${lesson}.${c.id}`] = setup ?? (joined(after) ? 'joined pair' : 'none');
+      }
+    }
+    expect(reached).toEqual(EXPECTED_SETUP);
+  });
+
+  test('every case and algorithm has its text', () => {
+    for (const l of F2L_LESSONS) {
+      for (const k of ['title', 'goal', 'tip', ...Array.from({ length: l.how }, (_, i) => `how${i + 1}`)])
+        expect(EN[`learn.${l.id}.${k}` as keyof typeof EN], `${l.id}.${k}`).toBeTruthy();
+      for (const c of l.cases) expect(EN[`learn.${l.id}.${c.id}.desc` as keyof typeof EN]).toBeTruthy();
+      for (const k of Object.keys(l.algs ?? {})) expect(EN[`learn.${l.id}.alg.${k}` as keyof typeof EN]).toBeTruthy();
+    }
   });
 });
