@@ -1,6 +1,6 @@
 /**
  * Learn view: how to solve the cube as a learning path, level by level (basics, the beginner
- * method, a faster beginner method, then CFOP, still to come). Each step
+ * method, a faster beginner method, an introduction to CFOP, then CFOP's levels, still to come). Each step
  * has its text and a 3D viewer with example cases; viewers are made when their step first
  * scrolls near the screen, so the page opens fast.
  */
@@ -17,6 +17,7 @@ import {
   SPEEDUPS,
   type SpeedGroup,
 } from '../src/learn/beginner';
+import { CFOP_INTRO } from '../src/learn/cfop';
 
 /** What a case viewer needs: lessons and speed-up groups both have it. */
 type Demo = Pick<Lesson, 'id' | 'hold' | 'mask' | 'cases'>;
@@ -65,7 +66,7 @@ function loadCase(p: Player, lesson: Demo, c: LessonCase) {
   p.experimentalSetupAnchor = 'end';
   p.experimentalSetupAlg = [holdOf(lesson), c.end ?? ''].join(' ').trim();
   p.alg = c.alg;
-  p.experimentalStickeringMaskOrbits = lesson.mask;
+  p.experimentalStickeringMaskOrbits = c.mask ?? lesson.mask;
   p.timestamp = 'start';
 }
 
@@ -188,13 +189,13 @@ function lazily(target: Element, make: () => void) {
   io.observe(target);
 }
 
-function lesson(l: Lesson, n: number): HTMLElement {
+function lesson(l: Lesson, n: number, tag = t('learn.stepN', { n })): HTMLElement {
   const sec = el('section', 'card learn-lesson');
   sec.id = `learn-step-${l.id}`;
   const textAlg = l.textAlg ?? Object.values(l.algs ?? {})[0] ?? '';
 
   const head = el('header', 'learn-head');
-  head.append(el('span', `stage-tag stage-${l.stage}`, t('learn.stepN', { n })), el('h2', '', t(`learn.${l.id}.title`)));
+  head.append(el('span', `stage-tag stage-${l.stage}`, tag), el('h2', '', t(`learn.${l.id}.title`)));
 
   const text = el('div', 'learn-text');
   const goal = el('p', 'learn-goal');
@@ -268,7 +269,6 @@ function speedGroup(g: SpeedGroup): HTMLElement {
 
 /** The CFOP levels after the beginner course, not written yet: id and how many algorithms. */
 const NEXT_LEVELS: [id: string, algs: number][] = [
-  ['cfop', 0],
   ['cross', 0],
   ['f2l', 0],
   ['oll2', 10],
@@ -337,11 +337,17 @@ function render() {
       'learn-fast',
       SPEEDUPS.map((g) => tocItem('»', t(`learn.${g.id}.title`), `learn-${g.id.replace('.', '-')}`, g.stage)),
     ),
+    tocLevel(
+      3,
+      t('learn.cfopIntro'),
+      'learn-level-cfop',
+      CFOP_INTRO.map((l, i) => tocItem(String(i + 1), t(`learn.${l.id}.title`), `learn-step-${l.id}`, l.stage)),
+    ),
   );
   NEXT_LEVELS.forEach(([id], i) => {
     const li = el('li', 'learn-level learn-level-soon');
     const row = el('div', 'learn-level-item');
-    row.append(el('span', 'learn-level-n', String(i + 3)), el('span', '', t(`learn.next.${id}`)), el('span', 'learn-soon', t('learn.soon')));
+    row.append(el('span', 'learn-level-n', String(i + 4)), el('span', '', t(`learn.next.${id}`)), el('span', 'learn-soon', t('learn.soon')));
     li.append(row);
     path.append(li);
   });
@@ -364,14 +370,23 @@ function render() {
   root.append(levelCard(2, 'learn-fast', t('learn.fast'), t('learn.fast.intro')));
   for (const g of SPEEDUPS) root.append(speedGroup(g));
 
-  // Levels 3 and on: what comes next.
+  // Level 3: introduction to CFOP.
+  root.append(levelCard(3, 'learn-level-cfop', t('learn.cfopIntro'), t('learn.cfopIntro.intro')));
+  for (const l of CFOP_INTRO) root.append(lesson(l, 0, t('learn.cfopIntro.tag')));
+  const tryIt = el('section', 'card learn-lesson learn-done');
+  const solve = el('a', 'primary button-like', t('learn.cfopIntro.cta'));
+  solve.href = '#solve';
+  tryIt.append(el('h2', '', t('learn.cfopIntro.done')), el('p', '', t('learn.cfopIntro.doneBody')), solve);
+  root.append(tryIt);
+
+  // Levels 4 and on: what comes next.
   const next = el('section', 'card learn-lesson learn-intro-card learn-next');
   next.id = 'learn-next';
   const list = el('ol', 'learn-next-list');
   NEXT_LEVELS.forEach(([id, algs], i) => {
     const li = el('li');
     const head = el('div', 'learn-next-head');
-    head.append(el('span', 'learn-level-n', String(i + 3)), el('strong', '', t(`learn.next.${id}`)));
+    head.append(el('span', 'learn-level-n', String(i + 4)), el('strong', '', t(`learn.next.${id}`)));
     if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
     li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
     list.append(li);

@@ -30,6 +30,8 @@ export interface LessonCase {
   show?: string;
   /** From the solved cube to where the moves end. Default: solved. */
   end?: string;
+  /** Which pieces the viewer shows bright for this case. Default: its lesson's `mask`. */
+  mask?: string;
 }
 
 export interface Lesson {

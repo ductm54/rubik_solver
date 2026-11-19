@@ -2,6 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { applyMovesToArray, invertAlg, parseAlg, solvedState, toColorArray } from '../src/core/cube';
 import { BEGINNER, HOLD, holdOf, type Lesson, NOTATION_MOVES, SPEEDUPS } from '../src/learn/beginner';
+import { CFOP_INTRO } from '../src/learn/cfop';
 import { EN } from '../src/i18n/locales/en';
 import { type Stickers, centerColor, cubie, pieceSolved } from '../src/solve/pieces';
 
@@ -10,7 +11,7 @@ const held = applyMovesToArray(SOLVED, HOLD);
 
 /** The state a case's demo starts from, as the viewer computes it (setup anchored at the end). */
 function start(lesson: string, id: string): Stickers {
-  const l = [...BEGINNER, ...SPEEDUPS].find((k) => k.id === lesson)!;
+  const l = [...BEGINNER, ...SPEEDUPS, ...CFOP_INTRO].find((k) => k.id === lesson)!;
   const c = l.cases.find((k) => k.id === id)!;
   const hold = applyMovesToArray(SOLVED, holdOf(l));
   return applyMovesToArray(applyMovesToArray(hold, c.end ?? ''), invertAlg(parseAlg(c.alg)));
@@ -229,5 +230,64 @@ describe('going faster', () => {
 
   test('twist: two backwards 4-moves are four 4-moves', () => {
     expect(start('fast.twist', 'two')).toEqual(start('twist', 'two'));
+  });
+});
+
+describe('intro to CFOP: one example solve, stage by stage', () => {
+  const ALL = [...F2L, 'UF', 'UR', 'UB', 'UL', 'UFR', 'URB', 'UBL', 'ULF'];
+  const LL_CORNERS = ['UFR', 'URB', 'UBL', 'ULF'];
+  const LL_EDGES = ['UF', 'UR', 'UB', 'UL'];
+  const after = (id: string) => {
+    const c = CFOP_INTRO[0].cases.find((k) => k.id === id)!;
+    return applyMovesToArray(start('cfop', id), c.alg);
+  };
+  const topYellow = (st: Stickers) => [...LL_CORNERS, ...LL_EDGES].every((p) => yellowUp(st, p));
+
+  test('each stage starts where the one before ends, and the whole solve is the four in a row', () => {
+    const ids = ['cross', 'f2l', 'oll', 'pll'];
+    for (let i = 1; i < ids.length; i++) expect(start('cfop', ids[i])).toEqual(after(ids[i - 1]));
+    expect(start('cfop', 'all')).toEqual(start('cfop', 'cross'));
+    expect(solved(after('all'), ...ALL)).toBe(true);
+  });
+
+  test('cross: unsolved before, solved after, white on the bottom', () => {
+    expect(centerColor(start('cfop', 'cross'), 'D')).toBe('W');
+    expect(solved(start('cfop', 'cross'), ...CROSS)).toBe(false);
+    expect(solved(after('cross'), ...CROSS)).toBe(true);
+  });
+
+  test('F2L: the first two layers solved after, the cross kept by every insert', () => {
+    const c = CFOP_INTRO[0].cases.find((k) => k.id === 'f2l')!;
+    let st = start('cfop', 'f2l');
+    expect(solved(st, ...F2L)).toBe(false);
+    for (const insert of c.show!.split(' · ')) {
+      st = applyMovesToArray(st, insert);
+      expect(solved(st, ...CROSS)).toBe(true);
+      expect(parseAlg(insert).length).toBeLessThanOrEqual(4);
+    }
+    expect(solved(st, ...F2L)).toBe(true);
+  });
+
+  test('OLL: edges yellow up, three corners not, then the whole top yellow', () => {
+    const s = start('cfop', 'oll');
+    expect(LL_EDGES.every((e) => yellowUp(s, e))).toBe(true);
+    expect(LL_CORNERS.filter((c) => !yellowUp(s, c))).toHaveLength(3);
+    expect(topYellow(after('oll'))).toBe(true);
+  });
+
+  test('PLL: top yellow but two corners and two edges out of place, then solved', () => {
+    const s = start('cfop', 'pll');
+    expect(topYellow(s)).toBe(true);
+    expect(LL_CORNERS.filter((c) => !solved(s, c))).toHaveLength(2);
+    expect(LL_EDGES.filter((e) => !solved(s, e))).toHaveLength(2);
+    expect(solved(after('pll'), ...ALL)).toBe(true);
+  });
+
+  test('every case has its text, and the demo is about 40 moves', () => {
+    for (const c of CFOP_INTRO[0].cases) {
+      expect(EN[`learn.cfop.${c.id}` as keyof typeof EN]).toBeTruthy();
+      expect(EN[`learn.cfop.${c.id}.desc` as keyof typeof EN]).toBeTruthy();
+    }
+    expect(parseAlg(CFOP_INTRO[0].cases.find((k) => k.id === 'all')!.alg)).toHaveLength(40);
   });
 });
