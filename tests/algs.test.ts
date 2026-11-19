@@ -79,7 +79,20 @@ describe('OLL', () => {
   }
 });
 
+/** How many top-layer pieces each PLL moves: [corners, edges]. */
+const MOVES: Record<string, [number, number]> = {
+  Ua: [0, 3], Ub: [0, 3], H: [0, 4], Z: [0, 4], Aa: [3, 0], Ab: [3, 0], E: [4, 0],
+  T: [2, 2], F: [2, 2], Ja: [2, 2], Jb: [2, 2], Ra: [2, 2], Rb: [2, 2],
+  Ga: [2, 4], Gb: [2, 4], Gc: [2, 4], Gd: [2, 4], Y: [2, 2], V: [2, 2], Na: [2, 2], Nb: [2, 2],
+};
+
 describe('PLL', () => {
+  test('arrows only on the pieces each case moves', () => {
+    for (const c of REFERENCE.pll) {
+      const corners = c.arrows!.filter(([from]) => from % 2 === 0).length;
+      expect([corners, c.arrows!.length - corners], c.id).toEqual(MOVES[c.id]);
+    }
+  });
   for (const c of REFERENCE.pll) {
     test(`${c.id}-perm: top oriented, not solved, arrows match the pieces that move`, () => {
       const st = start(c.setup);

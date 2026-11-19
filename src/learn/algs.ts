@@ -176,24 +176,39 @@ function ollCase(c: (typeof OLL)[number]): RefCase {
   };
 }
 
-function pllCase(c: (typeof PLL)[number]): RefCase {
-  const setup = invert(c.alg);
+/** U-layer stickers that move, as [from, to] pairs, for the case `setup` makes. */
+function pllArrows(setup: string): [number, number][] {
   const ids = labels(setup);
   const arrows: [number, number][] = [];
-  for (const p of [0, 1, 2, 3, 5, 6, 7, 8].map((k) => k)) {
+  for (const p of [0, 1, 2, 3, 5, 6, 7, 8]) {
     const to = HOME.get(ids[p])!;
     if (to !== p && to < 9) arrows.push([p, to]);
   }
+  return arrows;
+}
+
+/**
+ * Some PLL algorithms leave the top a turn off (Z, Jb, Ra, Rb as listed): the sheet adds that last
+ * U turn, so the case is drawn with only the pieces that really move.
+ */
+function pllCase(c: (typeof PLL)[number]): RefCase {
+  const [alg, setup, arrows] = ['', 'U', 'U2', "U'"]
+    .map((u) => {
+      const full = `${c.alg} ${u}`.trim();
+      const setup = invert(full);
+      return [full, setup, pllArrows(setup)] as const;
+    })
+    .reduce((best, x) => (x[2].length < best[2].length ? x : best));
   return {
     set: 'pll',
     id: c.id,
     group: PLL_GROUPS.find(([, names]) => names.includes(c.id))![0],
     hint: c.hint,
-    algs: [c.alg],
+    algs: [alg],
     setup,
     twoLook: PLL_2LOOK.has(c.alg),
-    stickers: ids.map(colour),
-    arrows,
+    stickers: labels(setup).map(colour),
+    arrows: [...arrows],
     mask: MASKS.pll,
   };
 }
