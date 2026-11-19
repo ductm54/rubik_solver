@@ -49,6 +49,8 @@ export interface Lesson {
   cases: LessonCase[];
   /** Which pieces the viewer shows bright (the rest dimmed). */
   mask: string;
+  /** A link to these cases on the Algorithms tab (`learn.ref.<set>`, or `learn.ref.<set>2` for 2-look only). */
+  ref?: { set: 'f2l' | 'oll' | 'pll'; twoLook?: boolean };
 }
 
 const SIDES: Color[] = ['G', 'R', 'B', 'O'];

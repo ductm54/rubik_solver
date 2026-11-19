@@ -570,6 +570,9 @@ button.learn-level-item:hover { background: var(--tint); }
 .learn-alg code { font-size: 16px; font-weight: 600; }
 .learn-tip { margin: 16px 0 0; font-size: 14px; color: var(--muted); }
 .learn-tip strong { color: var(--text); }
+.learn-ref { margin: 10px 0 0; font-size: 14px; font-weight: 600; }
+.learn-ref a { color: var(--accent); text-decoration: none; }
+.learn-ref a:hover { text-decoration: underline; }
 
 .learn-demo { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .learn-cases { display: flex; flex-wrap: wrap; gap: 6px; }

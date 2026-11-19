@@ -1,6 +1,6 @@
 /**
  * Learn view: how to solve the cube as a learning path, level by level (basics, the beginner
- * method, a faster beginner method, an introduction to CFOP, then CFOP's levels, still to come). Each step
+ * method, a faster beginner method, an introduction to CFOP, then CFOP's levels: cross, F2L and the last layer). Each step
  * has its text and a 3D viewer with example cases; viewers are made when their step first
  * scrolls near the screen, so the page opens fast.
  */
@@ -20,6 +20,7 @@ import {
 import { CFOP_INTRO } from '../src/learn/cfop';
 import { CROSS_LESSONS } from '../src/learn/cfopCross';
 import { F2L_LESSONS } from '../src/learn/f2l';
+import { OLL2_LESSONS, OLL_LESSONS, PLL2_LESSONS, PLL_LESSONS } from '../src/learn/lastLayer';
 
 /** What a case viewer needs: lessons and speed-up groups both have it. */
 type Demo = Pick<Lesson, 'id' | 'hold' | 'mask' | 'cases'>;
@@ -227,6 +228,13 @@ function lesson(l: Lesson, n: number, tag = t('learn.stepN', { n })): HTMLElemen
   const tip = el('p', 'learn-tip');
   tip.append(el('strong', '', `${t('learn.tip')}: `), rich(`learn.${l.id}.tip`, textAlg));
   text.append(tip);
+  if (l.ref) {
+    const ref = el('p', 'learn-ref');
+    const a = el('a', '', t(`learn.ref.${l.ref.set}${l.ref.twoLook ? '2' : ''}`));
+    a.href = `#algs&set=${l.ref.set}${l.ref.twoLook ? '&twolook=1' : ''}`;
+    ref.append(a);
+    text.append(ref);
+  }
 
   const body = el('div', l.cases.length || l.id === 'notation' ? 'learn-body' : 'learn-body learn-body-text');
   body.append(text);
@@ -275,10 +283,10 @@ function speedGroup(g: SpeedGroup): HTMLElement {
 const LATER: { n: number; id: string; algs: number; lessons?: Lesson[] }[] = [
   { n: 4, id: 'cross', algs: 0, lessons: CROSS_LESSONS },
   { n: 5, id: 'f2l', algs: 0, lessons: F2L_LESSONS },
-  { n: 6, id: 'oll2', algs: 10 },
-  { n: 7, id: 'pll2', algs: 6 },
-  { n: 8, id: 'pll', algs: 21 },
-  { n: 9, id: 'oll', algs: 57 },
+  { n: 6, id: 'oll2', algs: 10, lessons: OLL2_LESSONS },
+  { n: 7, id: 'pll2', algs: 6, lessons: PLL2_LESSONS },
+  { n: 8, id: 'pll', algs: 21, lessons: PLL_LESSONS },
+  { n: 9, id: 'oll', algs: 57, lessons: OLL_LESSONS },
   { n: 10, id: 'f2lAdv', algs: 0 },
 ];
 const SOON = LATER.filter((l) => !l.lessons);

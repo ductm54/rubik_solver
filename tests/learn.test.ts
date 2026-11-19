@@ -5,6 +5,7 @@ import { BEGINNER, HOLD, holdOf, type Lesson, NOTATION_MOVES, SPEEDUPS } from '.
 import { CFOP_INTRO } from '../src/learn/cfop';
 import { CROSS_LESSONS } from '../src/learn/cfopCross';
 import { F2L_CASE_IDS, F2L_LESSONS } from '../src/learn/f2l';
+import { OLL2_LESSONS, OLL_LESSONS, OLL_LINE, PLL2_LESSONS, PLL_LESSONS } from '../src/learn/lastLayer';
 import { F2L_CASES } from '../src/solve/cfop/algs/f2l';
 import { faceOf, locate } from '../src/solve/pieces';
 import { EN } from '../src/i18n/locales/en';
@@ -15,7 +16,7 @@ const held = applyMovesToArray(SOLVED, HOLD);
 
 /** The state a case's demo starts from, as the viewer computes it (setup anchored at the end). */
 function start(lesson: string, id: string): Stickers {
-  const l = [...BEGINNER, ...SPEEDUPS, ...CFOP_INTRO, ...CROSS_LESSONS, ...F2L_LESSONS].find((k) => k.id === lesson)!;
+  const l = [...BEGINNER, ...SPEEDUPS, ...CFOP_INTRO, ...CROSS_LESSONS, ...F2L_LESSONS, ...OLL2_LESSONS, ...PLL2_LESSONS].find((k) => k.id === lesson)!;
   const c = l.cases.find((k) => k.id === id)!;
   const hold = applyMovesToArray(SOLVED, holdOf(l));
   return applyMovesToArray(applyMovesToArray(hold, c.end ?? ''), invertAlg(parseAlg(c.alg)));
@@ -487,6 +488,112 @@ describe('CFOP cross: the front-bottom edge, white on the bottom', () => {
       for (const k of ['title', 'goal', 'tip', ...Array.from({ length: l.how }, (_, i) => `how${i + 1}`)])
         expect(EN[`learn.${l.id}.${k}` as keyof typeof EN], `${l.id}.${k}`).toBeTruthy();
       for (const c of l.cases) expect(EN[`learn.${l.id}.${c.id}.desc` as keyof typeof EN]).toBeTruthy();
+    }
+  });
+});
+
+describe('the last layer: 2-look OLL and PLL', () => {
+  const LL_EDGES = ['UF', 'UR', 'UB', 'UL'];
+  const LL_CORNERS = ['UFR', 'URB', 'UBL', 'ULF'];
+  const ALL = [...F2L, ...LL_EDGES, ...LL_CORNERS];
+  const yellowEdges = (st: Stickers) => LL_EDGES.filter((e) => yellowUp(st, e)).join(' ');
+  /** Which way each corner's yellow faces, e.g. "UFR:F URB:R UBL:B ULF:U". */
+  const corners = (st: Stickers) =>
+    LL_CORNERS.map((n) => `${n}:${n[cubie(n).findIndex((i) => st[i] === 'Y')]}`).join(' ');
+  const topYellow = (st: Stickers) => [...LL_EDGES, ...LL_CORNERS].every((p) => yellowUp(st, p));
+  const run = (lesson: string, id: string) => {
+    const l = [...OLL2_LESSONS, ...PLL2_LESSONS].find((k) => k.id === lesson)!;
+    return applyMovesToArray(start(lesson, id), l.cases.find((c) => c.id === id)!.alg);
+  };
+  /** The colour of each top edge's side sticker, front, right, back, left. */
+  const edgeColours = (st: Stickers) => ['F', 'R', 'B', 'L'].map((f) => at(st, `U${f}`, f)).join('');
+
+  test('every demo starts with F2L solved and ends where its step ends', () => {
+    for (const l of OLL2_LESSONS)
+      for (const c of l.cases) {
+        expect(solved(start(l.id, c.id), ...F2L), c.id).toBe(true);
+        const end = run(l.id, c.id);
+        if (l.id === 'oll2Edges') expect(yellowEdges(end)).toBe('UF UR UB UL');
+        else expect(topYellow(end), c.id).toBe(true);
+      }
+    for (const l of PLL2_LESSONS)
+      for (const c of l.cases) {
+        expect(topYellow(start(l.id, c.id)), c.id).toBe(true);
+        expect(solved(start(l.id, c.id), ...ALL), c.id).toBe(false);
+        expect(solved(run(l.id, c.id), ...ALL), c.id).toBe(true);
+      }
+  });
+
+  test('yellow cross: line across, L at the front and right, dot; the line move takes a dot to that L', () => {
+    expect(yellowEdges(start('oll2Edges', 'line'))).toBe('UR UL');
+    expect(yellowEdges(start('oll2Edges', 'l'))).toBe('UF UR');
+    expect(yellowEdges(start('oll2Edges', 'dot'))).toBe('');
+    expect(yellowEdges(applyMovesToArray(start('oll2Edges', 'dot'), OLL_LINE))).toBe('UF UR');
+  });
+
+  test('corners: where each yellow faces, as the text says', () => {
+    const expected: Record<string, string> = {
+      'oll2Sune.sune': 'UFR:F URB:R UBL:B ULF:U',
+      'oll2Sune.antisune': 'UFR:R URB:U UBL:L ULF:F',
+      'oll2Corners.H': 'UFR:F URB:B UBL:B ULF:F',
+      'oll2Corners.pi': 'UFR:F URB:B UBL:L ULF:L',
+      'oll2Corners.headlights': 'UFR:U URB:B UBL:B ULF:U',
+      'oll2Corners.T': 'UFR:U URB:U UBL:B ULF:F',
+      'oll2Corners.bowtie': 'UFR:F URB:U UBL:L ULF:U',
+    };
+    for (const [key, w] of Object.entries(expected)) {
+      const s = start(...(key.split('.') as [string, string]));
+      expect(corners(s), key).toBe(w);
+      expect(yellowEdges(s)).toBe('UF UR UB UL');
+    }
+  });
+
+  test('a few Sunes, each after a U turn, make any corner case yellow', () => {
+    const sune = OLL2_LESSONS[1].cases[0].alg;
+    const ids = OLL2_LESSONS.slice(1).flatMap((l) => l.cases.map((c) => [l.id, c.id] as const));
+    for (const [lesson, id] of ids) {
+      let states = [start(lesson, id)];
+      let n = 0;
+      while (!states.some(topYellow)) {
+        states = states.flatMap((st) => ['', 'U', 'U2', "U'"].map((u) => applyMovesToArray(st, `${u} ${sune}`.trim())));
+        n++;
+      }
+      expect(n, id).toBeLessThanOrEqual(3);
+    }
+  });
+
+  test('PLL corners: headlights on the left with the right corners swapped, or a diagonal swap', () => {
+    const adj = start('pll2Corners', 'adjacent');
+    expect(at(adj, 'ULF', 'L')).toBe(at(adj, 'UBL', 'L'));
+    expect(LL_CORNERS.filter((c) => !solved(adj, c))).toEqual(['UFR', 'URB']);
+    const diag = start('pll2Corners', 'diagonal');
+    for (const f of ['F', 'R', 'B', 'L']) {
+      const row = [0, 2].map((j) => diag['URFDLB'.indexOf(f) * 9 + j]);
+      expect(row[0], f).not.toBe(row[1]);
+    }
+    expect(LL_CORNERS.filter((c) => !solved(diag, c))).toEqual(['UFR', 'UBL']);
+  });
+
+  test('PLL edges: corners solved, the edges where the text says', () => {
+    for (const c of PLL2_LESSONS[1].cases) expect(solved(start('pll2Edges', c.id), ...F2L, ...LL_CORNERS), c.id).toBe(true);
+    // Centers: B front, R right, G back, O left.
+    expect(edgeColours(start('pll2Edges', 'Ua'))).toBe('ROGB');
+    expect(edgeColours(start('pll2Edges', 'Ub'))).toBe('OBGR');
+    expect(edgeColours(start('pll2Edges', 'H'))).toBe('GOBR');
+    expect(edgeColours(start('pll2Edges', 'Z'))).toBe('OGRB');
+  });
+
+  test('every lesson, case, algorithm and Algorithms-tab link has its text', () => {
+    for (const lv of ['oll2', 'pll2', 'pll', 'oll']) expect(EN[`learn.level.${lv}.intro` as keyof typeof EN], lv).toBeTruthy();
+    for (const l of [...OLL2_LESSONS, ...PLL2_LESSONS, ...PLL_LESSONS, ...OLL_LESSONS, ...F2L_LESSONS]) {
+      for (const k of ['title', 'goal', 'tip', ...Array.from({ length: l.how }, (_, i) => `how${i + 1}`)])
+        expect(EN[`learn.${l.id}.${k}` as keyof typeof EN], `${l.id}.${k}`).toBeTruthy();
+      for (const c of l.cases) {
+        expect(EN[`learn.${l.id}.${c.id}` as keyof typeof EN], `${l.id}.${c.id}`).toBeTruthy();
+        expect(EN[`learn.${l.id}.${c.id}.desc` as keyof typeof EN], `${l.id}.${c.id}`).toBeTruthy();
+      }
+      for (const k of Object.keys(l.algs ?? {})) expect(EN[`learn.${l.id}.alg.${k}` as keyof typeof EN], k).toBeTruthy();
+      if (l.ref) expect(EN[`learn.ref.${l.ref.set}${l.ref.twoLook ? '2' : ''}` as keyof typeof EN]).toBeTruthy();
     }
   });
 });
