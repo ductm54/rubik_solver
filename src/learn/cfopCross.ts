@@ -41,7 +41,8 @@ export const CROSS_LESSONS: Lesson[] = [
     id: 'crossPlan',
     stage: 'cross',
     how: 4,
-    cases: [],
+    textAlg: 'D',
+    cases: [{ id: 'order', alg: 'F2 D', show: 'F2 · D' }],
     mask: MASK,
   },
 ];

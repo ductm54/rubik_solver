@@ -679,7 +679,7 @@ const en = {
 
   'learn.crossDown.title': 'Edges to the bottom',
   'learn.crossDown.goal': 'Bring a white edge down into the cross with white facing down.',
-  'learn.crossDown.how1': 'Look at the edge that belongs at the front-bottom: white and the front center colour. First turn the top (U) or the bottom (D) so the edge and its spot line up.',
+  'learn.crossDown.how1': 'Look at the edge that belongs at the front-bottom: white and the front center colour. First turn the top (U) or the bottom (D) so the edge and its spot line up. Its spot can also be just next to the other cross edges in the right colour order (step 3).',
   'learn.crossDown.how2': 'An edge on top with white facing up goes straight down with a half turn, {alg}. An edge in the middle layer drops in with one quarter turn of the side it is on.',
   'learn.crossDown.how3': 'Turning a side can knock out a cross edge already in place. Turn the bottom (D) first to move your spot out of the way, then turn it back: the edges already placed stay put.',
   'learn.crossDown.tip': 'You cannot see the bottom well: tilt the cube up a little to check the cross, but do not turn it over.',
@@ -703,13 +703,15 @@ const en = {
   'learn.crossFix.bottomWrong': 'Bottom, wrong spot',
   'learn.crossFix.bottomWrong.desc': 'The edge is on the bottom with white facing down, but in the right edge\'s spot, and the right edge is on top above it. R2 swaps them: the right edge goes in and the front edge comes up. U brings it to the front and F2 puts it in.',
 
-  'learn.crossPlan.title': 'Plan it in inspection',
-  'learn.crossPlan.goal': 'Know the whole cross before your first move.',
+  'learn.crossPlan.title': 'Colour order and planning',
+  'learn.crossPlan.goal': 'Build the cross in the right colour order, and know it before your first move.',
   'learn.crossPlan.how1': 'In a timed solve you get 15 seconds to look at the cube first. Use them to find the four white edges and plan how each one gets to the bottom.',
-  'learn.crossPlan.how2': 'The edges only need to be right next to each other: make two of them correct relative to each other, add the others around them, and turn the bottom (D) at the end to line them up with the centers.',
+  'learn.crossPlan.how2': 'The edges do not have to match the centers while you build the cross, only be in the right colour order. With white on the bottom and blue in front, the order going round is blue, red, green, orange (front, right, back, left): red just right of blue, green opposite blue, orange opposite red. Put the edges in that order, then one turn of the bottom, {alg}, D\' or D2, lines them all up with the centers.',
   'learn.crossPlan.how3': 'Look for moves that place two edges at once, and for edges that are already next to each other. A good cross takes 8 moves or fewer, every cross can be done in 8.',
   'learn.crossPlan.how4': 'Practise planning the first two edges, then three, then the whole cross, before you turn: solve it with your eyes closed to check your plan.',
-  'learn.crossPlan.tip': 'On the Solve tab, the CFOP method shows a short cross for any scramble. Try to find your own first, then compare.',
+  'learn.crossPlan.tip': 'The colour order saves moves: you never turn the bottom just to match one edge with its center. On the Solve tab, the CFOP method shows a short cross for any scramble. Try to find your own first, then compare.',
+  'learn.crossPlan.order': 'Colour order',
+  'learn.crossPlan.order.desc': 'Three cross edges are on the bottom in the right colour order, but one turn away from their centers; the last edge is on top at the front. F2 puts it in next to the others, in order, and D lines up the whole cross.',
 
   'learn.level.f2l.intro': 'F2L (First 2 Layers) solves the white corners and the middle edges together: four corner-edge pairs, one per slot. It is the longest stage of CFOP and the one that saves the most time. Here you learn it by understanding, with no algorithm sheet: a few ideas work for every case. Hold the cube with the white cross on the bottom and the slot you are solving at the front-right.',
 

@@ -416,6 +416,32 @@ describe('CFOP cross: the front-bottom edge, white on the bottom', () => {
     'crossFix.bottomFlipped': 'DF F',
     'crossFix.bottomWrong': 'DR D',
   };
+  const ORDER = ['B', 'R', 'G', 'O']; // front, right, back, left
+  /** The side colours of the white edges on the bottom, front, right, back, left ('-' if none). */
+  const bottomOrder = (st: Stickers) =>
+    ['DF', 'DR', 'DB', 'DL'].map((n) => {
+      const [d, side] = cubie(n);
+      return st[d] === 'W' ? st[side] : '-';
+    });
+
+  test('colour order: blue, red, green, orange round the bottom, three edges in order but one turn off', () => {
+    expect(['F', 'R', 'B', 'L'].map((f) => centerColor(held, f as never))).toEqual(ORDER);
+    const s = start('crossPlan', 'order');
+    expect(s[cubie('UF')[0]]).toBe('W'); // the last edge: on top at the front, white up
+    const order = bottomOrder(s);
+    expect(order.filter((c) => c === '-')).toHaveLength(1);
+    expect(solved(s, 'DR') || solved(s, 'DB') || solved(s, 'DL')).toBe(false);
+    // Following the order round, each edge comes right after the one before.
+    const placed = order.map((c, i) => [c, i] as const).filter(([c]) => c !== '-');
+    for (const [c, i] of placed) {
+      const next = order[(i + 1) % 4];
+      if (next !== '-') expect(ORDER[(ORDER.indexOf(c) + 1) % 4]).toBe(next);
+    }
+    const afterF2 = applyMovesToArray(s, 'F2');
+    expect(bottomOrder(afterF2)).not.toContain('-');
+    expect(solved(afterF2, ...CROSS)).toBe(false);
+    expect(solved(applyMovesToArray(afterF2, 'D'), ...CROSS)).toBe(true);
+  });
 
   test('held with white on the bottom', () => {
     expect(centerColor(held, 'D')).toBe('W');
@@ -437,7 +463,7 @@ describe('CFOP cross: the front-bottom edge, white on the bottom', () => {
       expect(solved(s, 'DF'), key).toBe(false);
       expect(solved(applyMovesToArray(s, c.alg), ...CROSS), key).toBe(true);
     }
-    const all = CROSS_LESSONS.flatMap((l) => l.cases.map((c) => `${l.id}.${c.id}`));
+    const all = CROSS_LESSONS.flatMap((l) => l.cases.map((c) => `${l.id}.${c.id}`)).filter((k) => k !== 'crossPlan.order');
     expect(all.sort()).toEqual(Object.keys(expected).sort());
   });
 
