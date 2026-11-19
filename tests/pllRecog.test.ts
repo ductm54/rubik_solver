@@ -4,6 +4,7 @@ import { type Color, applyMovesToArray, invertAlg, parseAlg } from '../src/core/
 import { EN } from '../src/i18n/locales/en';
 import { REFERENCE } from '../src/learn/algs';
 import { PAIRS, PLL_RECOG, type RecogView, relation, sideKind } from '../src/learn/pllRecog';
+import { llTips, pllView } from '../src/solve/cfop/llTips';
 import { cubie, pieceSolved } from '../src/solve/pieces';
 
 const describe = (v: RecogView) => [v.front, v.right, ...v.compare.map((c) => `${c.pair}:${c.rel}`)];
@@ -54,6 +55,23 @@ test('every word the chart uses has its text', () => {
       expect(has(`learn.pllRecog.rel.${c.rel}`)).toBe(true);
       const [i, j] = PAIRS[c.pair];
       expect(has(`learn.pllRecog.pair.${i}${j}`) || (has(`learn.pllRecog.pos.${i}`) && has(`learn.pllRecog.pos.${j}`)), `${i}${j}`).toBe(true);
+    }
+  }
+});
+
+test("the solver's PLL tip reads every case and angle as the chart does, whatever colours are on the sides", () => {
+  // Colours moved one step round the ring: the same cube held with another side in front.
+  const RING: Color[] = ['B', 'R', 'G', 'O'];
+  const turn = (st: Color[]) => st.map((c) => (RING.includes(c) ? RING[(RING.indexOf(c) + 1) % 4] : c));
+  for (const ref of REFERENCE.pll) {
+    for (const u of ['', 'U', 'U2', "U'"]) {
+      let st = applyMovesToArray(ref.stickers as Color[], u);
+      for (let k = 0; k < 4; k++, st = turn(st)) {
+        const found = pllView(st);
+        expect(found?.id, `${ref.id} ${u} hold ${k}`).toBe(ref.id);
+        const tips = llTips(st, 'pll', 'yellow', ref.id);
+        expect(tips.filter((l) => l.includes(': the same colour') || l.includes(': opposite colours') || l.includes(': neighbouring colours'))).toHaveLength(found!.view.compare.length);
+      }
     }
   }
 });
