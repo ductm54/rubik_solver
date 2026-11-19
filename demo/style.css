@@ -573,6 +573,21 @@ button.learn-level-item:hover { background: var(--tint); }
 .learn-ref { margin: 10px 0 0; font-size: 14px; font-weight: 600; }
 .learn-ref a { color: var(--accent); text-decoration: none; }
 .learn-ref a:hover { text-decoration: underline; }
+.recog { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.recog h3 { margin: 0; }
+.recog-group { margin: 10px 0 0; font-size: 15px; }
+.recog-case { border: 1px solid var(--border); border-radius: 12px; background: var(--bg); padding: 10px 12px; min-width: 0; }
+.recog-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 8px; }
+.recog-alg { font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
+.recog-n { margin-left: auto; font-size: 12px; }
+.recog-views { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.recog-view { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.recog-diagram { width: 120px; height: 100px; }
+.recog-st { stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.03; }
+.recog-view figcaption { font-size: 12.5px; line-height: 1.35; text-align: center; }
+.recog-view figcaption p { margin: 0; }
+.recog-pre { margin-top: 3px !important; font-weight: 600; }
+@media (max-width: 520px) { .recog-views { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .learn-demo { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .learn-cases { display: flex; flex-wrap: wrap; gap: 6px; }

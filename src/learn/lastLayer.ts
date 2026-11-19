@@ -1,7 +1,7 @@
 /**
  * Levels 6 to 9 of the Learn tab: the last layer of CFOP. 2-look OLL (yellow cross, then the
  * corners, and how to do any corner case with Sunes alone) and 2-look PLL (corners, then edges),
- * with a demo for every case, then full PLL and full OLL: how to go from 2-look to one look, with
+ * with a demo for every case, then full PLL (with a two-side recognition chart, learn/pllRecog.ts) and full OLL: how to go from 2-look to one look, with
  * every case on the Algorithms tab.
  *
  * The algorithms are the solver's own (solve/cfop/algs), so the course, the Solve tab and the
@@ -111,6 +111,9 @@ export const PLL2_LESSONS: Lesson[] = [
   },
 ];
 
-export const PLL_LESSONS: Lesson[] = [{ id: 'pllFull', stage: 'top', how: 4, cases: [], mask: FULL_MASK, ref: { set: 'pll' } }];
+export const PLL_LESSONS: Lesson[] = [
+  { id: 'pllFull', stage: 'top', how: 4, cases: [], mask: FULL_MASK, ref: { set: 'pll' } },
+  { id: 'pllRecog', stage: 'top', how: 4, cases: [], mask: FULL_MASK, chart: 'pllRecog' },
+];
 
 export const OLL_LESSONS: Lesson[] = [{ id: 'ollFull', stage: 'top', how: 4, cases: [], mask: mask('oll'), ref: { set: 'oll' } }];

@@ -51,6 +51,8 @@ export interface Lesson {
   mask: string;
   /** A link to these cases on the Algorithms tab (`learn.ref.<set>`, or `learn.ref.<set>2` for 2-look only). */
   ref?: { set: 'f2l' | 'oll' | 'pll'; twoLook?: boolean };
+  /** A chart shown under the step, full width. */
+  chart?: 'pllRecog';
 }
 
 const SIDES: Color[] = ['G', 'R', 'B', 'O'];
