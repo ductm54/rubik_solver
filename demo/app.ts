@@ -1,11 +1,12 @@
 /**
- * The app shell: Cube, Solve, Learn and Timer are views of one page, picked by the URL hash, so
+ * The app shell: Cube, Solve, Learn, Algorithms and Timer are views of one page, picked by the URL hash, so
  * switching between them never reloads. A view's code loads the first time it is opened.
  *
  *   #cube, #cube=<54 letters>, #scan     Cube (and its scanner)
  *   #timer, #timer&scramble=<moves>      Timer
  *   #solve, #solve&scramble=<moves>      Solve (also #solve&cube=<54 letters>; old #learn&… links too)
  *   #learn                                Learn: how to solve, method by method
+ *   #algs, #algs&set=oll                  Algorithms: every F2L, OLL and PLL case
  */
 import './i18n';
 import { t } from '../src/i18n';
@@ -23,6 +24,7 @@ const loaders: Record<Route, () => Promise<View>> = {
   timer: () => import('./timer'),
   solve: () => import('./solve'),
   learn: () => import('./learn'),
+  algs: () => import('./algs'),
 };
 const loaded: Partial<Record<Route, Promise<View>>> = {};
 let current: Route | null = null;

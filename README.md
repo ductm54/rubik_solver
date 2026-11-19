@@ -23,6 +23,13 @@ Done so far:
   repeated 4-moves, a wide-turn yellow cross, left-hand corner cycle…) and starting the cross on any
   colour.
 
+- **Algorithms tab**: a reference sheet of every CFOP case ([demo](https://solve-rubik.pages.dev/#algs)):
+  all 41 F2L cases (SpeedCubeDB numbering, with alternatives and the front-left version), 57 OLL and
+  21 PLL, grouped by shape, each with a diagram (OLL: where the yellow is; PLL: arrows for the
+  pieces that move; F2L: the pair, from the corner) and its algorithm. Search by number, name or
+  moves, or show only the 2-look sets. Tap a case to play any of its algorithms on the 3D cube.
+  The same algorithm lists as the solver, and tests check every algorithm solves its case.
+
 - **Phase 4**: solve helper for learning CFOP ([demo](https://solve-rubik.pages.dev/#solve)).
   Enter, scan or scramble a cube and see the solve as steps: an optimal cross, 4 F2L pairs (each
   with its case described, its SpeedCubeDB case number and the most-voted algorithm for it), then OLL and PLL with the
