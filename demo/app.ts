@@ -6,7 +6,7 @@
  *   #timer, #timer&scramble=<moves>      Timer
  *   #solve, #solve&scramble=<moves>      Solve (also #solve&cube=<54 letters>; old #learn&… links too)
  *   #learn                                Learn: how to solve, method by method
- *   #algs, #algs&set=oll                  Algorithms: every F2L, OLL and PLL case
+ *   #algs, #algs&set=oll(&twolook=1)      Algorithms: every F2L, OLL and PLL case
  */
 import './i18n';
 import { t } from '../src/i18n';

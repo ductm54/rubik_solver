@@ -302,12 +302,20 @@ function startSet(): AlgSet {
   return setInHash() ?? (ALG_SETS.includes(saved as AlgSet) ? (saved as AlgSet) : 'oll');
 }
 
+/** A `&twolook=1` link (from the Learn tab) turns on "2-look only". */
+const twoLookInHash = () => {
+  if (/[&?]twolook=1/.test(location.hash)) twoLook.checked = true;
+};
+
+twoLookInHash();
 pickSet(startSet());
 
 /** The tab was opened again, or its link changed. */
 export function show() {
   const s = setInHash();
-  if (s && s !== set) pickSet(s);
+  twoLookInHash();
+  // pickSet also tidies the link, dropping `&twolook=1`.
+  if ((s && s !== set) || /twolook=/.test(location.hash)) pickSet(s ?? set);
 }
 
 /** Another tab was opened: stop the viewer. */

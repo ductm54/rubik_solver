@@ -83,5 +83,6 @@ export const F2L_LESSONS: Lesson[] = [
     how: 4,
     cases: [],
     mask: MASK,
+    ref: { set: 'f2l' },
   },
 ];

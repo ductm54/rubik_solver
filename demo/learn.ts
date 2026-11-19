@@ -1,6 +1,6 @@
 /**
  * Learn view: how to solve the cube as a learning path, level by level (basics, the beginner
- * method, a faster beginner method, an introduction to CFOP, then CFOP's levels, still to come). Each step
+ * method, a faster beginner method, an introduction to CFOP, then CFOP's levels: cross, F2L and the last layer). Each step
  * has its text and a 3D viewer with example cases; viewers are made when their step first
  * scrolls near the screen, so the page opens fast.
  */
@@ -20,6 +20,8 @@ import {
 import { CFOP_INTRO } from '../src/learn/cfop';
 import { CROSS_LESSONS } from '../src/learn/cfopCross';
 import { F2L_LESSONS } from '../src/learn/f2l';
+import { OLL2_LESSONS, OLL_LESSONS, PLL2_LESSONS, PLL_LESSONS } from '../src/learn/lastLayer';
+import { PAIRS, PLL_RECOG, type RecogView } from '../src/learn/pllRecog';
 
 /** What a case viewer needs: lessons and speed-up groups both have it. */
 type Demo = Pick<Lesson, 'id' | 'hold' | 'mask' | 'cases'>;
@@ -227,13 +229,102 @@ function lesson(l: Lesson, n: number, tag = t('learn.stepN', { n })): HTMLElemen
   const tip = el('p', 'learn-tip');
   tip.append(el('strong', '', `${t('learn.tip')}: `), rich(`learn.${l.id}.tip`, textAlg));
   text.append(tip);
+  if (l.ref) {
+    const ref = el('p', 'learn-ref');
+    const a = el('a', '', t(`learn.ref.${l.ref.set}${l.ref.twoLook ? '2' : ''}`));
+    a.href = `#algs&set=${l.ref.set}${l.ref.twoLook ? '&twolook=1' : ''}`;
+    ref.append(a);
+    text.append(ref);
+  }
 
   const body = el('div', l.cases.length || l.id === 'notation' ? 'learn-body' : 'learn-body learn-body-text');
   body.append(text);
   if (l.id === 'notation') body.append(notationDemo());
   else if (l.cases.length) body.append(caseDemo(l));
   sec.append(head, body);
+  if (l.chart === 'pllRecog') sec.append(recogChart());
   return sec;
+}
+
+const SVG = 'http://www.w3.org/2000/svg';
+const svg = (tag: string, attrs: Record<string, string | number>) => {
+  const e = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  return e;
+};
+
+/**
+ * The top layer seen from the front-right corner: the yellow top, and the front and right sides'
+ * top-row stickers (front left to right, right front to back), as a cuber sees them.
+ */
+function recogDiagram(stickers: string[]): SVGSVGElement {
+  const root = svg('svg', { viewBox: '-2.7 -2.6 5.4 4.5', class: 'recog-diagram', 'aria-hidden': 'true' }) as SVGSVGElement;
+  const cos = Math.cos(Math.PI / 6);
+  // x to the right, z towards the viewer, y up; the cube's top-front-right corner is (3, 1, 3).
+  const at = (x: number, y: number, z: number) => [((x - z) * cos).toFixed(3), ((x + z) * 0.5 - y - 1.5).toFixed(3)].join(',');
+  const quad = (pts: number[][], colour: string) =>
+    root.append(svg('polygon', { points: pts.map((p) => at(p[0], p[1], p[2])).join(' '), fill: `var(--${colour})`, class: 'recog-st' }));
+  const d = 0.06;
+  // The side stickers are what you read: drawn taller than a real sticker.
+  const h = 1.3;
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 3; j++)
+      quad([[i + d, 1, j + d], [i + 1 - d, 1, j + d], [i + 1 - d, 1, j + 1 - d], [i + d, 1, j + 1 - d]], 'Y');
+  for (let k = 0; k < 3; k++) {
+    quad([[k + d, 1 - d, 3], [k + 1 - d, 1 - d, 3], [k + 1 - d, 1 - h + d, 3], [k + d, 1 - h + d, 3]], stickers[k]);
+    quad([[3, 1 - d, 3 - k - d], [3, 1 - d, 2 - k + d], [3, 1 - h + d, 2 - k + d], [3, 1 - h + d, 3 - k - d]], stickers[3 + k]);
+  }
+  return root;
+}
+
+const pairText = (pair: number) => {
+  const [i, j] = PAIRS[pair];
+  const key = `learn.pllRecog.pair.${i}${j}`;
+  if (t(key) !== key) return t(key);
+  const pos = (n: number) => t(`learn.pllRecog.pos.${n}`);
+  const text = t('learn.pllRecog.pairOf', { a: pos(i), b: pos(j) });
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+function recogView(v: RecogView, only: boolean): HTMLElement {
+  const fig = el('figure', 'recog-view');
+  const cap = el('figcaption');
+  const line = (label: string, text: string) => {
+    const p = el('p');
+    p.append(el('span', 'muted', `${label}: `), text);
+    cap.append(p);
+  };
+  line(t('learn.pllRecog.front'), t(`learn.pllRecog.kind.${v.front}`));
+  line(t('learn.pllRecog.right'), t(`learn.pllRecog.kind.${v.right}`));
+  for (const c of v.compare) line(pairText(c.pair), t(`learn.pllRecog.rel.${c.rel}`));
+  const pre = el('p', 'recog-pre');
+  if (v.pre) pre.append(el('code', '', t('learn.pllRecog.pre', { u: v.pre })));
+  else pre.textContent = t(only ? 'learn.pllRecog.oneView' : 'learn.pllRecog.noPre');
+  cap.append(pre);
+  fig.append(recogDiagram(v.stickers), cap);
+  return fig;
+}
+
+/** Every PLL case, from each angle it can be seen from, grouped as on the Algorithms tab. */
+function recogChart(): HTMLElement {
+  const box = el('div', 'recog');
+  box.append(el('h3', '', t('learn.pllRecog.chart')));
+  let group = '';
+  for (const c of PLL_RECOG) {
+    if (c.group !== group) {
+      group = c.group;
+      box.append(el('h4', 'recog-group', t(`algs.group.${group}`)));
+    }
+    const row = el('section', 'recog-case');
+    const head = el('header', 'recog-head');
+    head.append(el('strong', '', t('algs.perm', { n: c.id })), el('code', 'recog-alg', c.alg));
+    if (c.views.length > 1) head.append(el('span', 'muted recog-n', t('learn.pllRecog.views', { n: c.views.length })));
+    const views = el('div', 'recog-views');
+    for (const v of c.views) views.append(recogView(v, c.views.length === 1));
+    row.append(head, views);
+    box.append(row);
+  }
+  return box;
 }
 
 /** A card of shortcuts for one step (or general habits), with demos when there are moves to show. */
@@ -275,11 +366,10 @@ function speedGroup(g: SpeedGroup): HTMLElement {
 const LATER: { n: number; id: string; algs: number; lessons?: Lesson[] }[] = [
   { n: 4, id: 'cross', algs: 0, lessons: CROSS_LESSONS },
   { n: 5, id: 'f2l', algs: 0, lessons: F2L_LESSONS },
-  { n: 6, id: 'oll2', algs: 10 },
-  { n: 7, id: 'pll2', algs: 6 },
-  { n: 8, id: 'pll', algs: 21 },
-  { n: 9, id: 'oll', algs: 57 },
-  { n: 10, id: 'f2lAdv', algs: 0 },
+  { n: 6, id: 'oll2', algs: 10, lessons: OLL2_LESSONS },
+  { n: 7, id: 'pll2', algs: 6, lessons: PLL2_LESSONS },
+  { n: 8, id: 'pll', algs: 21, lessons: PLL_LESSONS },
+  { n: 9, id: 'oll', algs: 57, lessons: OLL_LESSONS },
 ];
 const SOON = LATER.filter((l) => !l.lessons);
 
@@ -466,21 +556,24 @@ function render() {
     lv.lessons.forEach((l, i) => p.append(lesson(l, i + 1)));
   }
 
-  p = panel('next');
-  names.push(['next', t('learn.next.title')]);
-  const next = el('section', 'card learn-lesson learn-intro-card learn-next');
-  next.id = 'learn-next';
-  const list = el('ol', 'learn-next-list');
-  for (const { n, id, algs } of SOON) {
-    const li = el('li');
-    const head = el('div', 'learn-next-head');
-    head.append(el('span', 'learn-level-n', String(n)), el('strong', '', t(`learn.next.${id}`)));
-    if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
-    li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
-    list.append(li);
+  // Levels still to come, if any: listed on a page of their own.
+  if (SOON.length) {
+    p = panel('next');
+    names.push(['next', t('learn.next.title')]);
+    const next = el('section', 'card learn-lesson learn-intro-card learn-next');
+    next.id = 'learn-next';
+    const list = el('ol', 'learn-next-list');
+    for (const { n, id, algs } of SOON) {
+      const li = el('li');
+      const head = el('div', 'learn-next-head');
+      head.append(el('span', 'learn-level-n', String(n)), el('strong', '', t(`learn.next.${id}`)));
+      if (algs) head.append(el('span', 'muted learn-next-algs', t('learn.next.algs', { n: algs })));
+      li.append(head, el('p', 'muted', t(`learn.next.${id}.desc`)));
+      list.append(li);
+    }
+    next.append(el('h2', '', t('learn.next.title')), el('p', '', t('learn.next.intro')), list);
+    p.append(next);
   }
-  next.append(el('h2', '', t('learn.next.title')), el('p', '', t('learn.next.intro')), list);
-  p.append(next);
 
   levelNav(names);
 }
