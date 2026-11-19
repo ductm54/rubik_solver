@@ -627,9 +627,11 @@ const en = {
   // In move text, `code` spans are written as {alg} placeholders filled in by the page.
   'learn.docTitle': 'Learn to Solve',
   'learn.title': 'Learn to solve the cube',
-  'learn.sub': 'A learning path from your first turn to speedcubing. Start at Level 0 and work down: each level builds on the one before. Every step has examples to play on the 3D cube.',
+  'learn.sub': 'A learning path from your first turn to speedcubing, one level at a time. Start at Level 0 and move on when you are ready: each level builds on the one before. Every step has examples to play on the 3D cube.',
   'learn.path': 'Learning path',
   'learn.levelN': 'Level {n}',
+  'learn.prevLevel': '← Previous',
+  'learn.nextLevel': 'Next →',
   'learn.soon': 'Soon',
   'learn.basics': 'Basics',
   'learn.basics.intro': 'Before you solve anything: how to hold the cube and how to read the letters that stand for each turn. Every later level uses them.',
