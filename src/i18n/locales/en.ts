@@ -652,7 +652,7 @@ const en = {
 
   'learn.cfopIntro': 'Intro to CFOP',
   'learn.cfopIntro.tag': 'Overview',
-  'learn.cfopIntro.intro': 'CFOP (also called the Fridrich method) is what most speedcubers use, and it is the next step after the beginner method. It still solves the cube layer by layer, but it does more at once: the whole cube in four stages instead of seven steps, in about 55 moves instead of over 100. You already know half of it.',
+  'learn.cfopIntro.intro': 'CFOP is short for its four stages: Cross, F2L (First 2 Layers), OLL (Orient the Last Layer) and PLL (Permute the Last Layer). Also called the Fridrich method, it is what most speedcubers use, and it is the next step after the beginner method. It still solves the cube layer by layer, but it does more at once: the whole cube in four stages instead of seven steps, in about 55 moves instead of over 100. You already know half of it.',
   'learn.cfopIntro.done': 'What next',
   'learn.cfopIntro.doneBody': 'You do not have to learn it all at once. The next levels take the stages one at a time, and with 2-look OLL and 2-look PLL (16 algorithms) you can already solve with full CFOP. On the Solve tab, pick the CFOP method to see how your own scrambles are solved stage by stage.',
   'learn.cfopIntro.cta': 'Try CFOP on the Solve tab →',
